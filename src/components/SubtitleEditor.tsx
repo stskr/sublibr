@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { formatSrtTime, parseSrtTime, generateId, formatDisplayTime } from '../utils';
+import { formatSrtTime, parseSrtTime, generateId, formatDisplayTime, detectDirection } from '../utils';
 import type { Subtitle } from '../types';
 
 interface SubtitleEditorProps {
@@ -90,6 +90,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
 
                             <textarea
                                 className="subtitle-text"
+                                dir={detectDirection(sub.text)}
                                 value={sub.text}
                                 onChange={(e) => handleTextChange(sub.id, e.target.value)}
                                 onClick={(e) => e.stopPropagation()}

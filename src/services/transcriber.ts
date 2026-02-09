@@ -129,7 +129,10 @@ Transcribe the audio now:`;
     const adjustedStart = chunk.startTime;
     let subtitles = parseTranscription(text, adjustedStart);
 
-    // No overlap filtering needed as overlap is 0
+    // MAX SAFETY STRATEGY:
+    // We do NOT filter anything here. We let the overlap pass through 100%.
+    // We rely entirely on the fuzzy matcher in 'mergeSubtitles' to handle deduplication.
+    // This ensures that if a sentence was missed in the previous chunk but caught here, it stays.
 
     return {
         subtitles,
@@ -137,43 +140,128 @@ Transcribe the audio now:`;
     };
 }
 
-// Merge subtitles from multiple chunks, handling overlaps
+// Merge subtitles using a "Smart Stitching" approach
+// We process chunks pairwise and "stitch" them together, handling the boundary 
+// where a subtitle might span across the cut point.
 export function mergeSubtitles(allSubtitles: Subtitle[][]): Subtitle[] {
-    const merged: Subtitle[] = [];
+    if (allSubtitles.length === 0) return [];
 
-    for (const chunkSubs of allSubtitles) {
-        for (const sub of chunkSubs) {
-            // Check for overlap with existing subtitles using fuzzy matching
-            // If start times are close (< 2s) AND text is similar
-            const overlapping = merged.find(m => {
-                const timeDiff = Math.abs(m.startTime - sub.startTime);
-                if (timeDiff > 2.0) return false;
+    // Start with the first chunk
+    let finalSubtitles = [...allSubtitles[0]];
 
-                // Normalize text for comparison
-                const textA = m.text.toLowerCase().trim();
-                const textB = sub.text.toLowerCase().trim();
+    for (let i = 1; i < allSubtitles.length; i++) {
+        const nextChunkSubs = allSubtitles[i];
+        if (nextChunkSubs.length === 0) continue;
 
-                // If text is identical or contained within each other
-                if (textA === textB || textA.includes(textB) || textB.includes(textA)) return true;
+        // The exact time where the second chunk begins its audio
+        const stitchPoint = nextChunkSubs[0].startTime;
 
-                // Fuzzy match using Levenshtein distance
-                const distance = levenshteinDistance(textA, textB);
-                const maxLen = Math.max(textA.length, textB.length);
-                if (maxLen === 0) return true; // both empty
+        // Define Overlap Zone (up to 20s)
+        const overlapEnd = stitchPoint + 20;
 
-                // Allow 40% difference (covers slight AI variations)
-                return (distance / maxLen) < 0.4;
-            });
+        // DECISION: Which chunk provides better quality in the overlap zone?
+        // We compare the text density in the zone [stitchPoint, overlapEnd]
 
-            if (!overlapping) {
-                merged.push(sub);
+        const prevChunkInOverlap = finalSubtitles.filter(s => s.startTime >= stitchPoint && s.startTime < overlapEnd);
+        const nextChunkInOverlap = nextChunkSubs.filter(s => s.startTime < overlapEnd);
+
+        const prevDensity = prevChunkInOverlap.reduce((acc, s) => acc + s.text.length, 0);
+        const nextDensity = nextChunkInOverlap.reduce((acc, s) => acc + s.text.length, 0);
+
+        let cutTime: number;
+
+        if (nextDensity >= prevDensity) {
+            // New chunk is better. We switch exactly at the stitchPoint.
+            // 1. Remove everything from Old Chunk that starts after stitchPoint
+            finalSubtitles = finalSubtitles.filter(s => s.startTime < stitchPoint);
+
+            // 2. Handle "Straddling": The last sub of Old Chunk might cross stitchPoint.
+            // e.g. Old: [10, 14] "Hello world". StitchPoint: 12. Next: [12, 14] "world".
+            const lastSub = finalSubtitles[finalSubtitles.length - 1];
+            if (lastSub && lastSub.endTime > stitchPoint) {
+                // It crosses the boundary.
+                // We trim it to the stitch point to avoid collision with the new chunk
+                // But we add a small safety gap (-0.05s)
+                lastSub.endTime = Math.max(lastSub.startTime, stitchPoint - 0.05);
             }
+
+            // 3. Add the New Chunk
+            finalSubtitles.push(...nextChunkSubs);
+        } else {
+            // Old chunk is better. We keep it until overlapEnd.
+            // We only add New Chunk subs that start AFTER overlapEnd.
+            cutTime = overlapEnd;
+            const nextChunkClean = nextChunkSubs.filter(s => s.startTime >= cutTime);
+
+            // Handle Straddling found in the Old Chunk (if any sub crosses overlapEnd)
+            // Actually, if we keep Old Chunk, we just append New Chunk.
+            // But we must ensure the previous sub doesn't overlap the new first sub.
+            // (Handled by the final cleanup pass)
+
+            finalSubtitles.push(...nextChunkClean);
         }
     }
 
-    // Sort by start time and reindex
-    merged.sort((a, b) => a.startTime - b.startTime);
-    return merged.map((sub, i) => ({ ...sub, index: i + 1 }));
+    // Final Cleanup: Sort, Fix Overlaps, and Enforce Gaps
+    finalSubtitles.sort((a, b) => a.startTime - b.startTime);
+
+    const cleaned: Subtitle[] = [];
+    if (finalSubtitles.length > 0) cleaned.push(finalSubtitles[0]);
+
+    for (let i = 1; i < finalSubtitles.length; i++) {
+        const current = finalSubtitles[i];
+        const prev = cleaned[cleaned.length - 1];
+
+        // 1. Resolve Overlaps
+        if (current.startTime < prev.endTime) {
+            const overlap = prev.endTime - current.startTime;
+
+            // If they overlap significantly and text is similar, drop the current one (duplicate)
+            const normalize = (str: string) => str.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+            const normA = normalize(prev.text);
+            const normB = normalize(current.text);
+
+            // Check short substring vs long
+            if (normA.includes(normB) || normB.includes(normA) || overlap > 0.5) {
+                // Determine which to keep based on length
+                if (current.text.length > prev.text.length) {
+                    // Current is better, replace prev
+                    // But we must respect prev's start time? No, keep current's timing.
+                    // Actually, if we replace, we might create a gap before it.
+                    // Best strategy: Trim prev to current.startTime
+                    prev.endTime = current.startTime - 0.05;
+                } else {
+                    // Prev is better (or equal), drop current?
+                    // If we drop current, we lose it.
+                    // But if it's a duplicate, we want to lose it.
+                    if (overlap > 1.0) continue; // Skip current
+
+                    // If overlap is small, just trim prev
+                    prev.endTime = current.startTime - 0.05;
+                }
+            } else {
+                // Different content, just overlap. Trim prev.
+                prev.endTime = current.startTime - 0.05;
+            }
+        }
+
+        // 2. Enforce Minimum Gap (10ms) to ensure they are distinct in UI
+        if (current.startTime <= prev.endTime) {
+            prev.endTime = current.startTime - 0.01;
+            // Sanity check: if this makes prev have 0 duration
+            if (prev.endTime <= prev.startTime) {
+                // This implies extreme overlap.
+                // We should probably just drop prev if it's swallowed.
+                // For now, let's keep it minimal
+                prev.endTime = prev.startTime + 0.1;
+                current.startTime = prev.endTime + 0.01;
+            }
+        }
+
+        cleaned.push(current);
+    }
+
+    return cleaned.map((sub, i) => ({ ...sub, index: i + 1 }));
 }
 
 // Generate SRT file content

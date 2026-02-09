@@ -108,3 +108,10 @@ export function levenshteinDistance(s: string, t: string): number {
     }
     return d[s.length][t.length];
 }
+
+// Detect text direction
+export function detectDirection(text: string): 'rtl' | 'ltr' {
+    // Hebrew, Arabic, Persian, Urdu, etc.
+    const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+    return rtlChars.test(text) ? 'rtl' : 'ltr';
+}

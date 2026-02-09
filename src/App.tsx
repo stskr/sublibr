@@ -219,6 +219,16 @@ function App() {
                 </button>
               )}
 
+              {subtitles.length > 0 && (
+                <button
+                  className="btn-primary download-btn"
+                  onClick={handleDownload}
+                  style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}
+                >
+                  <span className="icon icon-sm">download</span> Download SRT
+                </button>
+              )}
+
               <ProgressIndicator state={processing} />
             </div>
 
