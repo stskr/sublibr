@@ -7,6 +7,7 @@ import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { createAudioChunks } from './services/audioProcessor';
 import { transcribeChunk, mergeSubtitles, generateSrt } from './services/transcriber';
+import { LANGUAGES } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
 
 import './App.css';
@@ -210,13 +211,44 @@ function App() {
               </div>
 
               {!isProcessing && subtitles.length === 0 && (
-                <button
-                  className="btn-primary generate-btn"
-                  onClick={handleGenerate}
-                  disabled={!canGenerate}
-                >
-                  <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
-                </button>
+                <div className="sidebar-section">
+                  <div className="language-selector-sidebar">
+                    <label className="sidebar-label">Subtitle Language</label>
+                    <select
+                      value={settings.autoDetectLanguage ? 'auto' : settings.language}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'auto') {
+                          setSettings(s => ({ ...s, autoDetectLanguage: true }));
+                        } else {
+                          setSettings(s => ({ ...s, autoDetectLanguage: false, language: val }));
+                        }
+                      }}
+                      className="language-select full-width"
+                    >
+                      <option value="auto">✨ Auto-detect</option>
+                      <optgroup label="Common Languages">
+                        {LANGUAGES.slice(0, 10).map(lang => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="All Languages">
+                        {LANGUAGES.slice(10).map(lang => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <button
+                    className="btn-primary generate-btn"
+                    onClick={handleGenerate}
+                    disabled={!canGenerate}
+                    style={{ marginTop: '1rem' }}
+                  >
+                    <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
+                  </button>
+                </div>
               )}
 
               {subtitles.length > 0 && (
