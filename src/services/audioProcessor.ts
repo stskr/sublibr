@@ -8,7 +8,7 @@ interface SilenceSegment {
 const TARGET_CHUNK_DURATION = 75; // seconds (middle of 60-90 range)
 const MIN_CHUNK_DURATION = 60;
 const MAX_CHUNK_DURATION = 90;
-const OVERLAP_DURATION = 3; // seconds (middle of 2-5 range)
+const OVERLAP_DURATION = 10; // seconds (increased for safety)
 
 export async function createAudioChunks(
     audioPath: string,
@@ -76,7 +76,7 @@ export async function createAudioChunks(
     const chunkConfigs = chunks.map((chunk, i) => ({
         start: chunk.start,
         end: chunk.end,
-        outputPath: `${tempDir}/chunk_${i.toString().padStart(3, '0')}.mp3`,
+        outputPath: `${tempDir}/chunk_${i.toString().padStart(3, '0')}.flac`,
     }));
 
     // Split audio using FFmpeg

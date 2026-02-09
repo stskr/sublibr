@@ -114,7 +114,7 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
             {/* API Key Warning */}
             {!hasApiKey && (
                 <div className="api-key-warning">
-                    <span className="warning-icon">⚠️</span>
+                    <span className="icon icon-sm warning-icon">warning</span>
                     <span>Please add your API key in Settings before uploading files</span>
                 </div>
             )}
@@ -179,7 +179,7 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
                     </div>
                 ) : fileInfo ? (
                     <div className="file-info">
-                        <div className="file-icon">{fileInfo.isVideo ? '🎬' : '🎵'}</div>
+                        <span className="icon icon-lg file-icon">{fileInfo.isVideo ? 'movie' : 'music_note'}</span>
                         <div className="file-details">
                             <h3>{fileInfo.name}</h3>
                             <p>
@@ -192,7 +192,7 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
                     </div>
                 ) : (
                     <div className="upload-prompt">
-                        <div className="upload-icon">📁</div>
+                        <span className="icon icon-xl upload-icon">folder_open</span>
                         <h3>Drop your audio or video file here</h3>
                         <p>or</p>
                         <button className="btn-primary" onClick={handleBrowse} disabled={!hasApiKey}>
@@ -208,7 +208,7 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
 
             {error && (
                 <div className="error-message">
-                    <span className="error-icon">⚠️</span>
+                    <span className="icon icon-sm error-icon">error</span>
                     {error}
                 </div>
             )}

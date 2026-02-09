@@ -107,7 +107,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
                                 }}
                                 title="Delete subtitle"
                             >
-                                ×
+                                <span className="icon icon-sm">close</span>
                             </button>
                         </div>
                     ))}
@@ -115,7 +115,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
             )}
 
             <button className="add-subtitle-btn" onClick={handleAdd}>
-                + Add Subtitle
+                <span className="icon icon-sm">add</span> Add Subtitle
             </button>
         </div>
     );

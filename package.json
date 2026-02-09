@@ -7,8 +7,10 @@
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently \"npm run dev:preload\" \"vite\"",
+    "dev:preload": "esbuild electron/preload.ts --bundle --platform=node --target=node16 --outdir=dist-electron --format=cjs --external:electron --watch",
+    "build:preload": "esbuild electron/preload.ts --bundle --platform=node --target=node16 --outdir=dist-electron --format=cjs --external:electron",
+    "build": "npm run build:preload && tsc -b && vite build",
     "build:electron": "npm run build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -29,6 +31,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
     "electron": "^40.2.1",
     "electron-builder": "^26.7.0",
     "eslint": "^9.39.1",

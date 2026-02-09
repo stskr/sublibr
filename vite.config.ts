@@ -28,12 +28,16 @@ export default defineConfig({
         },
         vite: {
           build: {
+            sourcemap: 'inline',
+            minify: false,
             outDir: 'dist-electron',
+            lib: {
+              entry: 'electron/preload.ts',
+              formats: ['cjs'],
+              fileName: () => '[name].cjs',
+            },
             rollupOptions: {
               external: ['electron'],
-              output: {
-                format: 'cjs',
-              },
             },
           },
         },

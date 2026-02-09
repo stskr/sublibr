@@ -28,7 +28,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // Required for ESM preload scripts
+      // sandbox: true, // Default is true, explicit for clarity
     },
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0a0a0f',
@@ -133,9 +133,8 @@ ipcMain.handle('file:getTempPath', () => {
 ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPath: string) => {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
-      .audioCodec('libmp3lame')
-      .audioBitrate(128)
-      .toFormat('mp3')
+      .audioCodec('flac')
+      .toFormat('flac')
       .on('end', () => resolve(outputPath))
       .on('error', (err) => reject(err.message))
       .save(outputPath);
@@ -191,9 +190,8 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
       ffmpeg(inputPath)
         .setStartTime(chunk.start)
         .setDuration(chunk.end - chunk.start)
-        .audioCodec('libmp3lame')
-        .audioBitrate(128)
-        .toFormat('mp3')
+        .audioCodec('flac')
+        .toFormat('flac')
         .on('end', () => {
           results.push(chunk.outputPath);
           resolve();

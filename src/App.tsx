@@ -170,21 +170,21 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-title">
-          <h1>🎬 Subtitles Generator</h1>
+          <h1><span className="icon">subtitles</span> Subtitles Generator</h1>
         </div>
         <div className="header-actions">
           {subtitles.length > 0 && (
             <button className="btn-secondary" onClick={handleDownload}>
-              ⬇️ Download SRT
+              <span className="icon icon-sm">download</span> Download SRT
             </button>
           )}
           {mediaFile?.isVideo && subtitles.length > 0 && (
             <button className="btn-secondary" onClick={() => setShowVideoPreview(true)}>
-              👁️ Preview
+              <span className="icon icon-sm">visibility</span> Preview
             </button>
           )}
           <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings">
-            ⚙️
+            <span className="icon">settings</span>
           </button>
         </div>
       </header>
@@ -202,7 +202,7 @@ function App() {
           <div className="editor-container">
             <div className="editor-sidebar">
               <div className="file-summary">
-                <span className="file-icon">{mediaFile.isVideo ? '🎬' : '🎵'}</span>
+                <span className="icon icon-lg file-icon">{mediaFile.isVideo ? 'movie' : 'music_note'}</span>
                 <div className="file-info">
                   <strong>{mediaFile.name}</strong>
                   <span>{Math.floor(duration / 60)}m {Math.floor(duration % 60)}s</span>
@@ -215,7 +215,7 @@ function App() {
                   onClick={handleGenerate}
                   disabled={!canGenerate}
                 >
-                  ✨ Generate Subtitles
+                  <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
                 </button>
               )}
 

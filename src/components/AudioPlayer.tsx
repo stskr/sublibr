@@ -106,15 +106,15 @@ export function AudioPlayer({
 
             <div className="player-controls">
                 <button className="control-btn skip" onClick={skipBackward} title="Back 5s">
-                    ⏪
+                    <span className="icon">fast_rewind</span>
                 </button>
 
                 <button className="control-btn play" onClick={togglePlay}>
-                    {isPlaying ? '⏸' : '▶'}
+                    <span className="icon">{isPlaying ? 'pause' : 'play_arrow'}</span>
                 </button>
 
                 <button className="control-btn skip" onClick={skipForward} title="Forward 5s">
-                    ⏩
+                    <span className="icon">fast_forward</span>
                 </button>
             </div>
 
@@ -130,7 +130,7 @@ export function AudioPlayer({
             </div>
 
             <div className="player-volume">
-                <span className="volume-icon">{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
+                <span className="icon icon-sm volume-icon">{volume === 0 ? 'volume_off' : volume < 0.5 ? 'volume_down' : 'volume_up'}</span>
                 <input
                     type="range"
                     min="0"

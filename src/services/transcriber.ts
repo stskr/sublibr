@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Subtitle, AudioChunk } from '../types';
-import { generateId } from '../utils';
+import { generateId, levenshteinDistance } from '../utils';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -79,7 +79,13 @@ export async function transcribeChunk(
     autoDetect: boolean
 ): Promise<TranscriptionResult> {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ model });
+
+    // Handle legacy/deprecated model names by upgrading to 2.5
+    let effectiveModel = model;
+    if (model.includes('gemini-1.5-flash')) effectiveModel = 'gemini-2.5-flash';
+    if (model.includes('gemini-1.5-pro')) effectiveModel = 'gemini-2.5-pro';
+
+    const geminiModel = genAI.getGenerativeModel({ model: effectiveModel });
 
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
@@ -108,7 +114,7 @@ Transcribe the audio now:`;
         prompt,
         {
             inlineData: {
-                mimeType: 'audio/mp3',
+                mimeType: 'audio/flac',
                 data: audioBase64,
             },
         },
@@ -117,9 +123,15 @@ Transcribe the audio now:`;
     const response = await result.response;
     const text = response.text();
 
-    // Parse with offset adjustment (subtract overlap since it's duplicate content)
-    const adjustedStart = chunk.startTime + chunk.overlap;
-    const subtitles = parseTranscription(text, adjustedStart);
+    // Parse with correct time base (don't add overlap to buffer time)
+    const adjustedStart = chunk.startTime;
+    let subtitles = parseTranscription(text, adjustedStart);
+
+    // We do NOT filter strictly anymore, to allow capturing content missed by previous chunk.
+    // However, if overlap > 0, we might want to trim the very beginning if it's clearly redundant,
+    // but duplicate merging is safer. Let's just filter extreme cases (e.g. content before chunk start time).
+    // The parseTranscription uses adjustedStart which IS chunk.startTime.
+    // So subtitles naturally start at chunk.startTime.
 
     return {
         subtitles,
@@ -133,11 +145,27 @@ export function mergeSubtitles(allSubtitles: Subtitle[][]): Subtitle[] {
 
     for (const chunkSubs of allSubtitles) {
         for (const sub of chunkSubs) {
-            // Check for overlap with existing subtitles
-            const overlapping = merged.find(
-                m => Math.abs(m.startTime - sub.startTime) < 2 &&
-                    m.text.toLowerCase().includes(sub.text.slice(0, 20).toLowerCase())
-            );
+            // Check for overlap with existing subtitles using fuzzy matching
+            // If start times are close (< 2s) AND text is similar
+            const overlapping = merged.find(m => {
+                const timeDiff = Math.abs(m.startTime - sub.startTime);
+                if (timeDiff > 2.0) return false;
+
+                // Normalize text for comparison
+                const textA = m.text.toLowerCase().trim();
+                const textB = sub.text.toLowerCase().trim();
+
+                // If text is identical or contained within each other
+                if (textA === textB || textA.includes(textB) || textB.includes(textA)) return true;
+
+                // Fuzzy match using Levenshtein distance
+                const distance = levenshteinDistance(textA, textB);
+                const maxLen = Math.max(textA.length, textB.length);
+                if (maxLen === 0) return true; // both empty
+
+                // Allow 40% difference (covers slight AI variations)
+                return (distance / maxLen) < 0.4;
+            });
 
             if (!overlapping) {
                 merged.push(sub);

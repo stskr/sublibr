@@ -58,7 +58,9 @@ export function VideoPreview({ videoPath, subtitles, onClose }: VideoPreviewProp
     return (
         <div className="video-preview-overlay" onKeyDown={handleKeyDown} tabIndex={0}>
             <div className="video-preview-container">
-                <button className="close-preview-btn" onClick={onClose}>×</button>
+                <button className="close-preview-btn" onClick={onClose}>
+                    <span className="icon">close</span>
+                </button>
 
                 <div className="video-wrapper">
                     <video
@@ -76,7 +78,8 @@ export function VideoPreview({ videoPath, subtitles, onClose }: VideoPreviewProp
 
                 <div className="preview-controls">
                     <button className="btn-primary" onClick={togglePlay}>
-                        {isPlaying ? '⏸ Pause' : '▶ Play'}
+                        <span className="icon">{isPlaying ? 'pause' : 'play_arrow'}</span>
+                        {isPlaying ? 'Pause' : 'Play'}
                     </button>
                 </div>
             </div>

@@ -4,6 +4,17 @@ interface ProgressIndicatorProps {
     state: ProcessingState;
 }
 
+const STATUS_ICONS: Record<string, string> = {
+    'idle': 'hourglass_empty',
+    'extracting': 'audiotrack',
+    'detecting-silences': 'graphic_eq',
+    'splitting': 'content_cut',
+    'transcribing': 'translate',
+    'merging': 'merge',
+    'done': 'check_circle',
+    'error': 'error',
+};
+
 const STATUS_MESSAGES: Record<string, string> = {
     'idle': 'Ready',
     'extracting': 'Extracting audio...',
@@ -25,7 +36,12 @@ export function ProgressIndicator({ state }: ProgressIndicatorProps) {
     return (
         <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`}>
             <div className="progress-header">
-                <span className="progress-status">{STATUS_MESSAGES[status]}</span>
+                <span className="progress-status">
+                    <span className={`icon icon-sm ${status === 'transcribing' ? 'spin' : ''}`}>
+                        {STATUS_ICONS[status] || 'sync'}
+                    </span>
+                    {STATUS_MESSAGES[status]}
+                </span>
                 {status === 'transcribing' && totalChunks && (
                     <span className="progress-chunks">
                         Chunk {currentChunk} of {totalChunks}
@@ -44,6 +60,7 @@ export function ProgressIndicator({ state }: ProgressIndicatorProps) {
 
             {error && (
                 <div className="progress-error">
+                    <span className="icon icon-sm">error_outline</span>
                     {error}
                 </div>
             )}

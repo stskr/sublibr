@@ -1,24 +1,41 @@
-import { contextBridge, ipcRenderer } from "electron";
-contextBridge.exposeInMainWorld("electronAPI", {
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// electron/preload.ts
+var preload_exports = {};
+module.exports = __toCommonJS(preload_exports);
+var import_electron = require("electron");
+import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Settings
-  getStoreValue: (key) => ipcRenderer.invoke("store:get", key),
-  setStoreValue: (key, value) => ipcRenderer.invoke("store:set", key, value),
+  getStoreValue: (key) => import_electron.ipcRenderer.invoke("store:get", key),
+  setStoreValue: (key, value) => import_electron.ipcRenderer.invoke("store:set", key, value),
   // File dialogs
-  openFileDialog: () => ipcRenderer.invoke("dialog:openFile"),
-  saveFileDialog: (defaultName) => ipcRenderer.invoke("dialog:saveFile", defaultName),
+  openFileDialog: () => import_electron.ipcRenderer.invoke("dialog:openFile"),
+  saveFileDialog: (defaultName) => import_electron.ipcRenderer.invoke("dialog:saveFile", defaultName),
   // File operations
-  readFile: (path) => ipcRenderer.invoke("file:read", path),
-  readFileAsDataUrl: (path) => ipcRenderer.invoke("file:readAsDataUrl", path),
-  writeFile: (path, data) => ipcRenderer.invoke("file:write", path, data),
-  getFileInfo: (path) => ipcRenderer.invoke("file:getInfo", path),
-  getTempPath: () => ipcRenderer.invoke("file:getTempPath"),
+  readFile: (path) => import_electron.ipcRenderer.invoke("file:read", path),
+  readFileAsDataUrl: (path) => import_electron.ipcRenderer.invoke("file:readAsDataUrl", path),
+  writeFile: (path, data) => import_electron.ipcRenderer.invoke("file:write", path, data),
+  getFileInfo: (path) => import_electron.ipcRenderer.invoke("file:getInfo", path),
+  getTempPath: () => import_electron.ipcRenderer.invoke("file:getTempPath"),
   // FFmpeg operations
-  extractAudio: (inputPath, outputPath) => ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath),
-  getDuration: (filePath) => ipcRenderer.invoke("ffmpeg:getDuration", filePath),
-  detectSilences: (filePath, threshold, minDuration) => ipcRenderer.invoke("ffmpeg:detectSilences", filePath, threshold, minDuration),
-  splitAudio: (inputPath, chunks) => ipcRenderer.invoke("ffmpeg:splitAudio", inputPath, chunks),
+  extractAudio: (inputPath, outputPath) => import_electron.ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath),
+  getDuration: (filePath) => import_electron.ipcRenderer.invoke("ffmpeg:getDuration", filePath),
+  detectSilences: (filePath, threshold, minDuration) => import_electron.ipcRenderer.invoke("ffmpeg:detectSilences", filePath, threshold, minDuration),
+  splitAudio: (inputPath, chunks) => import_electron.ipcRenderer.invoke("ffmpeg:splitAudio", inputPath, chunks),
   // Progress events
   onProgress: (callback) => {
-    ipcRenderer.on("progress", (_event, progress) => callback(progress));
+    import_electron.ipcRenderer.on("progress", (_event, progress) => callback(progress));
   }
 });

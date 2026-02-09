@@ -20,9 +20,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname$1, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-      // Required for ESM preload scripts
+      nodeIntegration: false
+      // sandbox: true, // Default is true, explicit for clarity
     },
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0a0a0f"
@@ -106,7 +105,7 @@ ipcMain.handle("file:getTempPath", () => {
 });
 ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath) => {
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath).audioCodec("libmp3lame").audioBitrate(128).toFormat("mp3").on("end", () => resolve(outputPath)).on("error", (err) => reject(err.message)).save(outputPath);
+    ffmpeg(inputPath).audioCodec("flac").toFormat("flac").on("end", () => resolve(outputPath)).on("error", (err) => reject(err.message)).save(outputPath);
   });
 });
 ipcMain.handle("ffmpeg:getDuration", async (_event, filePath) => {
@@ -139,7 +138,7 @@ ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks) => {
   const results = [];
   for (const chunk of chunks) {
     await new Promise((resolve, reject) => {
-      ffmpeg(inputPath).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec("libmp3lame").audioBitrate(128).toFormat("mp3").on("end", () => {
+      ffmpeg(inputPath).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec("flac").toFormat("flac").on("end", () => {
         results.push(chunk.outputPath);
         resolve();
       }).on("error", (err) => reject(err.message)).save(chunk.outputPath);
