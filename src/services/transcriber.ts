@@ -36,7 +36,7 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
                 id: generateId(),
                 index: subtitles.length + 1,
                 startTime,
-                endTime: startTime + 3, // Default 3 second duration, will be adjusted
+                endTime: startTime + Math.max(2, cleanText.length * 0.05), // Estimate based on chars (approx 20 chars/sec reading speed)
                 text: cleanText,
             });
         }
@@ -95,18 +95,20 @@ export async function transcribeChunk(
         : `The audio is in ${language}.`;
 
     const prompt = `Transcribe this audio file into text with timestamps. ${languageInstruction}
-
+    
 Format your response as:
 [MM:SS] Transcribed text for this segment
 [MM:SS] Next segment of text
 ...
 
 Rules:
-- Include timestamps at natural speech breaks (every few seconds)
-- Timestamps should be relative to the start of this audio clip (starting at 00:00)
-- Preserve natural speech patterns and punctuation
-- If there's silence, skip to the next speech segment
-- Be accurate with the transcription
+- Transcribe VERBATIM. Do not summarize. Do not omit any speech.
+- Capture every word spoken, even fillers if they are distinct.
+- Include timestamps at natural speech breaks (every few seconds).
+- Timestamps should be relative to the start of this audio clip (starting at 00:00).
+- Preserve natural speech patterns and punctuation.
+- If there's silence, skip to the next speech segment.
+- Be accurate with the transcription.
 
 Transcribe the audio now:`;
 
@@ -127,11 +129,7 @@ Transcribe the audio now:`;
     const adjustedStart = chunk.startTime;
     let subtitles = parseTranscription(text, adjustedStart);
 
-    // We do NOT filter strictly anymore, to allow capturing content missed by previous chunk.
-    // However, if overlap > 0, we might want to trim the very beginning if it's clearly redundant,
-    // but duplicate merging is safer. Let's just filter extreme cases (e.g. content before chunk start time).
-    // The parseTranscription uses adjustedStart which IS chunk.startTime.
-    // So subtitles naturally start at chunk.startTime.
+    // No overlap filtering needed as overlap is 0
 
     return {
         subtitles,

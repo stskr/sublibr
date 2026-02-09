@@ -5,10 +5,10 @@ interface SilenceSegment {
     end: number;
 }
 
-const TARGET_CHUNK_DURATION = 75; // seconds (middle of 60-90 range)
-const MIN_CHUNK_DURATION = 60;
-const MAX_CHUNK_DURATION = 90;
-const OVERLAP_DURATION = 10; // seconds (increased for safety)
+const TARGET_CHUNK_DURATION = 150; // 2.5 minutes
+const MIN_CHUNK_DURATION = 150;
+const MAX_CHUNK_DURATION = 200;
+const OVERLAP_DURATION = 0; // Disabled overlap as requested
 
 export async function createAudioChunks(
     audioPath: string,
@@ -20,7 +20,7 @@ export async function createAudioChunks(
     // Detect silences (threshold: -50dB, min duration: 1s)
     const silences: SilenceSegment[] = await window.electronAPI.detectSilences(
         audioPath,
-        -50,
+        -40,
         1
     );
 
