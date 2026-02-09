@@ -104,7 +104,10 @@ Format your response as:
 Rules:
 - Transcribe VERBATIM. Do not summarize. Do not omit any speech.
 - Capture every word spoken, even fillers if they are distinct.
-- Include timestamps at natural speech breaks (every few seconds).
+- START A NEW SUBTITLE SEGMENT IMMEDIATELY WHEN THE SPEAKER CHANGES.
+- Max 2 lines of text per subtitle.
+- Max 10 words per line (approx 20 words total per subtitle).
+- Keep natural phrases together. Do not break mid-phrase if possible.
 - Timestamps should be relative to the start of this audio clip (starting at 00:00).
 - Preserve natural speech patterns and punctuation.
 - If there's silence, skip to the next speech segment.
@@ -128,6 +131,67 @@ Transcribe the audio now:`;
     // Parse with correct time base (don't add overlap to buffer time)
     const adjustedStart = chunk.startTime;
     let subtitles = parseTranscription(text, adjustedStart);
+
+    // Post-processing: Split long subtitles (Safety Net)
+    // Max chars per subtitle line is usually ~42. Two lines ~84.
+    // We'll set a safe limit of around 90 chars to allow for 2 full lines.
+    const MAX_CHARS = 90;
+
+    const splitSubtitles: Subtitle[] = [];
+
+    for (const sub of subtitles) {
+        if (sub.text.length <= MAX_CHARS) {
+            splitSubtitles.push(sub);
+            continue;
+        }
+
+        // Split long subtitle linearly
+        const words = sub.text.split(' ');
+        const duration = sub.endTime - sub.startTime;
+        const totalLen = sub.text.length;
+
+        // Determine number of splits needed
+        const splitCount = Math.ceil(sub.text.length / MAX_CHARS);
+        const charsPerSplit = Math.ceil(totalLen / splitCount);
+
+        let currentStart = sub.startTime;
+        let currentTextParts: string[] = [];
+        let currentLen = 0;
+
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            currentTextParts.push(word);
+            currentLen += word.length + 1; // +1 for space
+
+            // Check if we reached the limit or it's the last word
+            const isLast = i === words.length - 1;
+            const nextWordLen = !isLast ? words[i + 1].length : 0;
+
+            if (currentLen + nextWordLen > charsPerSplit || isLast) {
+                // Finalize this segment
+                const segmentText = currentTextParts.join(' ');
+                const segmentDuration = (segmentText.length / totalLen) * duration;
+
+                splitSubtitles.push({
+                    ...sub,
+                    id: generateId(),
+                    startTime: currentStart,
+                    endTime: currentStart + segmentDuration,
+                    text: segmentText,
+                    index: 0 // re-index later
+                });
+
+                currentStart += segmentDuration;
+                currentTextParts = [];
+                currentLen = 0;
+            }
+        }
+
+        // Safety: ensure we didn't miss anything? Loop handles it.
+    }
+
+    // Re-index
+    subtitles = splitSubtitles.map((s, i) => ({ ...s, index: i + 1 }));
 
     // MAX SAFETY STRATEGY:
     // We do NOT filter anything here. We let the overlap pass through 100%.
