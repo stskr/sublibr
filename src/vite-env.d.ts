@@ -1,0 +1,24 @@
+/// <reference types="vite/client" />
+
+// Electron API types exposed via preload
+export interface ElectronAPI {
+    getStoreValue: (key: string) => Promise<unknown>;
+    setStoreValue: (key: string, value: unknown) => Promise<void>;
+    openFileDialog: () => Promise<string | null>;
+    saveFileDialog: (defaultName: string) => Promise<string | null>;
+    readFile: (path: string) => Promise<ArrayBuffer>;
+    writeFile: (path: string, data: string) => Promise<void>;
+    getFileInfo: (path: string) => Promise<{ size: number; path: string; name: string; ext: string }>;
+    getTempPath: () => Promise<string>;
+    extractAudio: (inputPath: string, outputPath: string) => Promise<string>;
+    getDuration: (filePath: string) => Promise<number>;
+    detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
+    splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => Promise<string[]>;
+    onProgress: (callback: (progress: number) => void) => void;
+}
+
+declare global {
+    interface Window {
+        electronAPI: ElectronAPI;
+    }
+}
