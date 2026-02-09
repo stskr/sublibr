@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveFileDialog: (defaultName) => ipcRenderer.invoke("dialog:saveFile", defaultName),
   // File operations
   readFile: (path) => ipcRenderer.invoke("file:read", path),
+  readFileAsDataUrl: (path) => ipcRenderer.invoke("file:readAsDataUrl", path),
   writeFile: (path, data) => ipcRenderer.invoke("file:write", path, data),
   getFileInfo: (path) => ipcRenderer.invoke("file:getInfo", path),
   getTempPath: () => ipcRenderer.invoke("file:getTempPath"),

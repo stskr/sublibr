@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // File operations
     readFile: (path: string) => ipcRenderer.invoke('file:read', path),
+    readFileAsDataUrl: (path: string) => ipcRenderer.invoke('file:readAsDataUrl', path),
     writeFile: (path: string, data: string) => ipcRenderer.invoke('file:write', path, data),
     getFileInfo: (path: string) => ipcRenderer.invoke('file:getInfo', path),
     getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
@@ -39,6 +40,7 @@ export interface ElectronAPI {
     openFileDialog: () => Promise<string | null>;
     saveFileDialog: (defaultName: string) => Promise<string | null>;
     readFile: (path: string) => Promise<Buffer>;
+    readFileAsDataUrl: (path: string) => Promise<string>;
     writeFile: (path: string, data: string) => Promise<void>;
     getFileInfo: (path: string) => Promise<{ size: number; path: string; name: string; ext: string }>;
     getTempPath: () => Promise<string>;

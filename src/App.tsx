@@ -191,7 +191,13 @@ function App() {
 
       <main className="app-main">
         {!mediaFile ? (
-          <FileUpload settings={settings} onFileSelect={handleFileSelect} />
+          <FileUpload
+            settings={settings}
+            onFileSelect={handleFileSelect}
+            onLanguageChange={(language, autoDetect) => {
+              setSettings(prev => ({ ...prev, language, autoDetectLanguage: autoDetect }));
+            }}
+          />
         ) : (
           <div className="editor-container">
             <div className="editor-sidebar">

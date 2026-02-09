@@ -5,11 +5,13 @@ import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import ffprobePath from '@ffprobe-installer/ffprobe';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Set ffmpeg path
+// Set ffmpeg and ffprobe paths
 ffmpeg.setFfmpegPath(ffmpegPath.path);
+ffmpeg.setFfprobePath(ffprobePath.path);
 
 // Initialize store for settings
 const store = new Store();
@@ -87,6 +89,26 @@ ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
 // File operations
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   return fs.promises.readFile(filePath);
+});
+
+ipcMain.handle('file:readAsDataUrl', async (_event, filePath: string) => {
+  const data = await fs.promises.readFile(filePath);
+  const ext = path.extname(filePath).toLowerCase().slice(1);
+  const mimeTypes: Record<string, string> = {
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mkv: 'video/x-matroska',
+    mov: 'video/quicktime',
+    avi: 'video/x-msvideo',
+  };
+  const mimeType = mimeTypes[ext] || 'application/octet-stream';
+  return `data:${mimeType};base64,${data.toString('base64')}`;
 });
 
 ipcMain.handle('file:write', async (_event, filePath: string, data: string) => {

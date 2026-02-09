@@ -1,26 +1,34 @@
 import { useState, useCallback } from 'react';
-import { formatFileSize, isVideoFile, estimateCost } from '../utils';
+import { formatFileSize, isVideoFile, estimateCost, LANGUAGES } from '../utils';
 import type { MediaFile, AppSettings } from '../types';
 
 interface FileUploadProps {
     settings: AppSettings;
     onFileSelect: (file: MediaFile) => void;
+    onLanguageChange: (language: string, autoDetect: boolean) => void;
 }
 
 const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
 const MAX_DURATION = 2 * 60 * 60; // 2 hours
 
-export function FileUpload({ settings, onFileSelect }: FileUploadProps) {
+export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUploadProps) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fileInfo, setFileInfo] = useState<MediaFile | null>(null);
+    const [languageSearch, setLanguageSearch] = useState('');
+    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
     const processFile = useCallback(async (filePath: string) => {
         setLoading(true);
         setError(null);
 
         try {
+            // Guard for browser mode
+            if (!window.electronAPI) {
+                throw new Error('File upload requires Electron. Please run the app in Electron.');
+            }
+
             const info = await window.electronAPI.getFileInfo(filePath);
 
             // Validate size
@@ -60,7 +68,6 @@ export function FileUpload({ settings, onFileSelect }: FileUploadProps) {
 
         const file = e.dataTransfer.files[0];
         if (file) {
-            // For Electron, we need the path which is available via webkitRelativePath or path
             const filePath = (file as File & { path?: string }).path;
             if (filePath) {
                 processFile(filePath);
@@ -78,20 +85,91 @@ export function FileUpload({ settings, onFileSelect }: FileUploadProps) {
     }, []);
 
     const handleBrowse = async () => {
+        if (!window.electronAPI) {
+            setError('File browsing requires Electron. Please run the app in Electron.');
+            return;
+        }
         const filePath = await window.electronAPI.openFileDialog();
         if (filePath) {
             processFile(filePath);
         }
     };
 
+    const filteredLanguages = LANGUAGES.filter(lang =>
+        lang.toLowerCase().includes(languageSearch.toLowerCase())
+    );
+
+    const handleLanguageSelect = (lang: string) => {
+        onLanguageChange(lang, false);
+        setLanguageSearch('');
+        setShowLanguageDropdown(false);
+    };
+
     const costEstimate = fileInfo ? estimateCost(fileInfo.duration, settings.model) : null;
+
+    const hasApiKey = settings.apiKey && settings.apiKey.trim().length > 0;
 
     return (
         <div className="file-upload-container">
+            {/* API Key Warning */}
+            {!hasApiKey && (
+                <div className="api-key-warning">
+                    <span className="warning-icon">⚠️</span>
+                    <span>Please add your API key in Settings before uploading files</span>
+                </div>
+            )}
+
+            {/* Language Selection */}
+            <div className="language-selection-inline">
+                <label>Language</label>
+                <div className="language-toggle">
+                    <button
+                        className={`toggle-btn ${!settings.autoDetectLanguage ? 'active' : ''}`}
+                        onClick={() => onLanguageChange(settings.language, false)}
+                    >
+                        Select Language
+                    </button>
+                    <button
+                        className={`toggle-btn ${settings.autoDetectLanguage ? 'active' : ''}`}
+                        onClick={() => onLanguageChange(settings.language, true)}
+                    >
+                        Auto-detect
+                    </button>
+                </div>
+                {!settings.autoDetectLanguage && (
+                    <div className="language-autocomplete">
+                        <input
+                            type="text"
+                            value={languageSearch || settings.language}
+                            onChange={(e) => {
+                                setLanguageSearch(e.target.value);
+                                setShowLanguageDropdown(true);
+                            }}
+                            onFocus={() => setShowLanguageDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowLanguageDropdown(false), 200)}
+                            placeholder="Search languages..."
+                        />
+                        {showLanguageDropdown && filteredLanguages.length > 0 && (
+                            <ul className="language-dropdown">
+                                {filteredLanguages.slice(0, 8).map(lang => (
+                                    <li
+                                        key={lang}
+                                        onClick={() => handleLanguageSelect(lang)}
+                                        className={lang === settings.language ? 'selected' : ''}
+                                    >
+                                        {lang}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
+            </div>
+
             <div
-                className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${loading ? 'loading' : ''}`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
+                className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${loading ? 'loading' : ''} ${!hasApiKey ? 'disabled' : ''}`}
+                onDrop={hasApiKey ? handleDrop : (e) => e.preventDefault()}
+                onDragOver={hasApiKey ? handleDragOver : (e) => e.preventDefault()}
                 onDragLeave={handleDragLeave}
             >
                 {loading ? (
@@ -117,7 +195,7 @@ export function FileUpload({ settings, onFileSelect }: FileUploadProps) {
                         <div className="upload-icon">📁</div>
                         <h3>Drop your audio or video file here</h3>
                         <p>or</p>
-                        <button className="btn-primary" onClick={handleBrowse}>
+                        <button className="btn-primary" onClick={handleBrowse} disabled={!hasApiKey}>
                             Browse Files
                         </button>
                         <p className="upload-hint">
