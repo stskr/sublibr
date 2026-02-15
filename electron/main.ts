@@ -10,8 +10,15 @@ import ffprobePath from '@ffprobe-installer/ffprobe';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Set ffmpeg and ffprobe paths
-ffmpeg.setFfmpegPath(ffmpegPath.path);
-ffmpeg.setFfprobePath(ffprobePath.path);
+// In packaged builds, binaries are in extraResources; in dev, use the npm installer paths
+if (app.isPackaged) {
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  ffmpeg.setFfmpegPath(path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg' + ext));
+  ffmpeg.setFfprobePath(path.join(process.resourcesPath, 'ffprobe', 'ffprobe' + ext));
+} else {
+  ffmpeg.setFfmpegPath(ffmpegPath.path);
+  ffmpeg.setFfprobePath(ffprobePath.path);
+}
 
 // Initialize store for settings
 const store = new Store();
@@ -176,7 +183,7 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
       })
       .on('end', () => resolve(silences))
       .on('error', (err) => reject(err.message))
-      .output('/dev/null')
+      .output(process.platform === 'win32' ? 'NUL' : '/dev/null')
       .run();
   });
 });

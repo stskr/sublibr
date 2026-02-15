@@ -7,8 +7,14 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import ffprobePath from "@ffprobe-installer/ffprobe";
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-ffmpeg.setFfmpegPath(ffmpegPath.path);
-ffmpeg.setFfprobePath(ffprobePath.path);
+if (app.isPackaged) {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
+  ffmpeg.setFfprobePath(path.join(process.resourcesPath, "ffprobe", "ffprobe" + ext));
+} else {
+  ffmpeg.setFfmpegPath(ffmpegPath.path);
+  ffmpeg.setFfprobePath(ffprobePath.path);
+}
 const store = new Store();
 let mainWindow = null;
 function createWindow() {
@@ -131,7 +137,7 @@ ipcMain.handle("ffmpeg:detectSilences", async (_event, filePath, threshold, minD
         silences.push(currentSilence);
         currentSilence = null;
       }
-    }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output("/dev/null").run();
+    }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
 ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks) => {

@@ -1,19 +1,14 @@
-import type { AudioChunk } from '../types';
+import type { AudioChunk, SilenceSegment } from '../types';
 
-interface SilenceSegment {
-    start: number;
-    end: number;
-}
-
-const TARGET_CHUNK_DURATION = 90; // 1.5 minutes (as requested)
-const MIN_CHUNK_DURATION = 90;
-const MAX_CHUNK_DURATION = 130;
-const OVERLAP_DURATION = 20; // 20s Safety buffer to catch EVERYTHING
+const TARGET_CHUNK_DURATION = 210; // 3.5 minutes
+const MIN_CHUNK_DURATION = 180; // 3 mins
+const MAX_CHUNK_DURATION = 240; // 4 mins
+const OVERLAP_DURATION = 20; // 20s overlap
 
 export async function createAudioChunks(
     audioPath: string,
     tempDir: string
-): Promise<AudioChunk[]> {
+): Promise<{ chunks: AudioChunk[], silences: SilenceSegment[] }> {
     // Get total duration
     const duration = await window.electronAPI.getDuration(audioPath);
 
@@ -33,7 +28,7 @@ export async function createAudioChunks(
         const maxEnd = currentStart + MAX_CHUNK_DURATION;
         const minEnd = currentStart + MIN_CHUNK_DURATION;
 
-        // Find the best silence point near our target
+        // Find the best split point near our target
         let bestSplitPoint = Math.min(targetEnd, duration);
 
         // Look for silences between minEnd and maxEnd
@@ -68,7 +63,27 @@ export async function createAudioChunks(
 
         // If we're very close to the end, just include the rest
         if (duration - currentStart < MIN_CHUNK_DURATION / 2) {
-            break;
+            // If the remaining part is too small, just append it to the last chunk,
+            // unless we haven't created any chunks yet
+            if (chunks.length > 0) {
+                // Determine if we should extend the last chunk or add a new one?
+                // The loop breaks, so we should ensure the last chunk covers until duration.
+                // But wait, the loop condition is `while (currentStart < duration)`.
+                // If we update `currentStart` to `bestSplitPoint`, and break, we might miss the tail.
+
+                // Let's just continue loop. The condition `minEnd` might be > duration, 
+                // but `bestSplitPoint` handles `Math.min(..., duration)`.
+
+                // Actually, logic above: `bestSplitPoint` is capped at duration.
+                // If `bestSplitPoint` == duration, `currentStart` becomes duration, loop ends.
+                // So this check is just for small tails that might be technically a new chunk but too short?
+                // The logic: `if (duration - currentStart < MIN_CHUNK_DURATION / 2)` where `currentStart`
+                // is the START of the *next* potential chunk (which is `bestSplitPoint` of current).
+
+                // So if the *remaining* audio after this split is tiny, we should extend THIS split to the end.
+                chunks[chunks.length - 1].end = duration;
+                break;
+            }
         }
     }
 
@@ -82,12 +97,15 @@ export async function createAudioChunks(
     // Split audio using FFmpeg
     await window.electronAPI.splitAudio(audioPath, chunkConfigs);
 
-    // Return AudioChunk objects
-    return chunks.map((chunk, i) => ({
-        index: i,
-        startTime: chunk.start,
-        endTime: chunk.end,
-        filePath: chunkConfigs[i].outputPath,
-        overlap: chunk.overlap,
-    }));
+    // Return AudioChunk objects AND silences
+    return {
+        chunks: chunks.map((chunk, i) => ({
+            index: i,
+            startTime: chunk.start,
+            endTime: chunk.end,
+            filePath: chunkConfigs[i].outputPath,
+            overlap: chunk.overlap,
+        })),
+        silences
+    };
 }

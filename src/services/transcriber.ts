@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Subtitle, AudioChunk } from '../types';
-import { generateId, levenshteinDistance } from '../utils';
+import { generateId } from '../utils';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -95,23 +95,24 @@ export async function transcribeChunk(
         : `The audio is in ${language}.`;
 
     const prompt = `Transcribe this audio file into text with timestamps. ${languageInstruction}
-    
+
 Format your response as:
 [MM:SS] Transcribed text for this segment
 [MM:SS] Next segment of text
 ...
 
 Rules:
-- Transcribe VERBATIM. Do not summarize. Do not omit any speech.
-- Capture every word spoken, even fillers if they are distinct.
+- Transcribe all speech accurately and completely. Do not summarize or omit any words.
+- Capture every word spoken, including distinct fillers.
+- Add proper written punctuation: end sentences with periods, use commas for natural pauses and clause boundaries, use question marks for questions, and exclamation marks where appropriate.
 - START A NEW SUBTITLE SEGMENT IMMEDIATELY WHEN THE SPEAKER CHANGES.
+- Each subtitle should contain a complete thought or natural phrase. Do NOT create very short fragments under 3 words.
+- Aim for 1-4 seconds of speech per subtitle segment. Group short phrases together.
 - Max 2 lines of text per subtitle.
-- Max 10 words per line (approx 20 words total per subtitle).
-- Keep natural phrases together. Do not break mid-phrase if possible.
+- Max 8 words per line.
+- Keep natural phrases together. Do not break mid-phrase.
 - Timestamps should be relative to the start of this audio clip (starting at 00:00).
-- Preserve natural speech patterns and punctuation.
 - If there's silence, skip to the next speech segment.
-- Be accurate with the transcription.
 
 Transcribe the audio now:`;
 
@@ -326,6 +327,125 @@ export function mergeSubtitles(allSubtitles: Subtitle[][]): Subtitle[] {
     }
 
     return cleaned.map((sub, i) => ({ ...sub, index: i + 1 }));
+}
+
+// --- Subtitle Quality Enforcement ---
+
+const QUALITY = {
+    MIN_DURATION: 1.0,       // Minimum display time (seconds)
+    MAX_DURATION: 7.0,       // Maximum display time (seconds)
+    READING_SPEED: 20,       // Characters per second (comfortable pace)
+    MIN_GAP: 0.05,           // Minimum gap between subtitles (50ms)
+    MAX_CHARS_PER_LINE: 42,  // Standard subtitle line width
+    MAX_LINES: 2,
+    MERGE_GAP_LIMIT: 1.0,   // Max gap between subs to consider merging (seconds)
+};
+
+const MAX_CHARS_TOTAL = QUALITY.MAX_CHARS_PER_LINE * QUALITY.MAX_LINES;
+
+function minReadingDuration(text: string): number {
+    return Math.max(QUALITY.MIN_DURATION, text.length / QUALITY.READING_SPEED);
+}
+
+/**
+ * Post-processing pass to ensure all subtitles meet quality standards:
+ * - Minimum display duration (based on reading speed)
+ * - Merge consecutive too-short subtitles where possible
+ * - Extend short subtitles into available space
+ * - Cap maximum duration
+ * - Remove degenerate entries (empty text, zero/negative duration)
+ */
+export function enforceSubtitleQuality(subtitles: Subtitle[]): Subtitle[] {
+    if (subtitles.length === 0) return [];
+
+    // Remove degenerate entries first
+    let subs = subtitles
+        .filter(s => s.text.trim().length > 0 && s.endTime > s.startTime)
+        .sort((a, b) => a.startTime - b.startTime);
+
+    // Phase 1: Merge consecutive subtitles that are too short to read
+    subs = mergeShortSubtitles(subs);
+
+    // Phase 2: Extend short subtitles into available gaps
+    subs = extendShortDurations(subs);
+
+    // Phase 3: Cap maximum duration
+    for (const sub of subs) {
+        if (sub.endTime - sub.startTime > QUALITY.MAX_DURATION) {
+            sub.endTime = sub.startTime + QUALITY.MAX_DURATION;
+        }
+    }
+
+    // Phase 4: Ensure minimum gaps between subtitles
+    for (let i = 0; i < subs.length - 1; i++) {
+        if (subs[i].endTime > subs[i + 1].startTime - QUALITY.MIN_GAP) {
+            subs[i].endTime = subs[i + 1].startTime - QUALITY.MIN_GAP;
+        }
+        // Safety: if this made duration negative, floor it
+        if (subs[i].endTime <= subs[i].startTime) {
+            subs[i].endTime = subs[i].startTime + QUALITY.MIN_DURATION;
+        }
+    }
+
+    return subs.map((s, i) => ({ ...s, index: i + 1 }));
+}
+
+function mergeShortSubtitles(subs: Subtitle[]): Subtitle[] {
+    const merged: Subtitle[] = [];
+    let i = 0;
+
+    while (i < subs.length) {
+        const current = { ...subs[i] };
+        const duration = current.endTime - current.startTime;
+        const minNeeded = minReadingDuration(current.text);
+
+        // If this subtitle is too short, try merging with next
+        if (duration < minNeeded && i + 1 < subs.length) {
+            const next = subs[i + 1];
+            const gap = next.startTime - current.endTime;
+
+            // Only merge if they're close together
+            if (gap < QUALITY.MERGE_GAP_LIMIT) {
+                const combinedText = current.text + '\n' + next.text;
+
+                // Only merge if combined text fits within subtitle limits
+                if (combinedText.length <= MAX_CHARS_TOTAL) {
+                    merged.push({
+                        ...current,
+                        id: current.id,
+                        endTime: next.endTime,
+                        text: combinedText,
+                    });
+                    i += 2; // Skip next since we merged it
+                    continue;
+                }
+            }
+        }
+
+        merged.push(current);
+        i++;
+    }
+
+    return merged;
+}
+
+function extendShortDurations(subs: Subtitle[]): Subtitle[] {
+    for (let i = 0; i < subs.length; i++) {
+        const sub = subs[i];
+        const duration = sub.endTime - sub.startTime;
+        const minNeeded = minReadingDuration(sub.text);
+
+        if (duration < minNeeded) {
+            // Extend end time, but don't overlap with next subtitle
+            const maxEnd = i + 1 < subs.length
+                ? subs[i + 1].startTime - QUALITY.MIN_GAP
+                : sub.startTime + minNeeded;
+
+            sub.endTime = Math.min(sub.startTime + minNeeded, maxEnd);
+        }
+    }
+
+    return subs;
 }
 
 // Generate SRT file content

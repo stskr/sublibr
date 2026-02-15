@@ -24,6 +24,7 @@ export type ProcessingStatus =
     | 'splitting'
     | 'transcribing'
     | 'merging'
+    | 'healing'
     | 'done'
     | 'error';
 
@@ -58,4 +59,9 @@ export interface CostEstimate {
     chunks: number;
     estimatedTokens: number;
     estimatedCostUSD: number;
+}
+
+export interface SilenceSegment {
+    start: number;
+    end: number;
 }

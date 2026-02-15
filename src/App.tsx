@@ -6,7 +6,8 @@ import { AudioPlayer } from './components/AudioPlayer';
 import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { createAudioChunks } from './services/audioProcessor';
-import { transcribeChunk, mergeSubtitles, generateSrt } from './services/transcriber';
+import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt } from './services/transcriber';
+import { healSubtitles } from './services/healer';
 import { LANGUAGES } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
 
@@ -97,7 +98,7 @@ function App() {
 
 
       setProcessing({ status: 'splitting', progress: 25 });
-      const chunks = await createAudioChunks(audioPath, tempDir);
+      const { chunks, silences } = await createAudioChunks(audioPath, tempDir);
 
       // Step 2: Transcribe each chunk
       const allSubtitles: Subtitle[][] = [];
@@ -122,8 +123,28 @@ function App() {
       }
 
       // Step 3: Merge subtitles
-      setProcessing({ status: 'merging', progress: 95 });
-      const merged = mergeSubtitles(allSubtitles);
+      setProcessing({ status: 'merging', progress: 90 });
+      let merged = mergeSubtitles(allSubtitles);
+
+      // Step 4: Heal Gaps
+      setProcessing({ status: 'healing', progress: 95 });
+      try {
+        merged = await healSubtitles(
+          merged,
+          audioPath,
+          silences,
+          settings.apiKey,
+          settings.model,
+          settings.language,
+          settings.autoDetectLanguage
+        );
+      } catch (err) {
+        console.error('Healing failed:', err);
+        // Continue with merged subtitles even if healing fails
+      }
+
+      // Step 5: Enforce subtitle quality (min duration, merge short subs, punctuation)
+      merged = enforceSubtitleQuality(merged);
 
       setSubtitles(merged);
       setProcessing({ status: 'done', progress: 100 });
