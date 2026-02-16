@@ -6,10 +6,12 @@ interface SubtitleEditorProps {
     subtitles: Subtitle[];
     onSubtitlesChange: (subtitles: Subtitle[]) => void;
     currentTime: number;
+    duration?: number; // Total content duration (max of media and subtitles)
+    mediaDuration?: number; // Actual media file duration
     onSeek: (time: number) => void;
 }
 
-export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSeek }: SubtitleEditorProps) {
+export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, duration = 0, mediaDuration, onSeek }: SubtitleEditorProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
@@ -81,57 +83,77 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
                 </div>
             ) : (
                 <div className="subtitle-list">
-                    {subtitles.map((sub) => (
-                        <div
-                            key={sub.id}
-                            ref={isActive(sub) ? activeRef : null}
-                            className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''}`}
-                            onClick={() => onSeek(sub.startTime)}
-                        >
-                            <div className="subtitle-index">{sub.index}</div>
-
-                            <div className="subtitle-times">
-                                <input
-                                    type="text"
-                                    className="time-input"
-                                    value={formatSrtTime(sub.startTime)}
-                                    onChange={(e) => handleTimeChange(sub.id, 'startTime', e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <span className="time-separator">→</span>
-                                <input
-                                    type="text"
-                                    className="time-input"
-                                    value={formatSrtTime(sub.endTime)}
-                                    onChange={(e) => handleTimeChange(sub.id, 'endTime', e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            </div>
-
-                            <textarea
-                                className="subtitle-text"
-                                dir={detectDirection(sub.text)}
-                                value={sub.text}
-                                onChange={(e) => handleTextChange(sub.id, e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                onFocus={() => setEditingId(sub.id)}
-                                onBlur={() => setEditingId(null)}
-                                rows={2}
-                                placeholder="Enter subtitle text..."
-                            />
-
-                            <button
-                                className="delete-btn"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(sub.id);
-                                }}
-                                title="Delete subtitle"
-                            >
-                                <span className="icon icon-sm">close</span>
-                            </button>
+                    {mediaDuration && duration > mediaDuration && (
+                        <div className="media-end-marker" style={{
+                            top: `${(mediaDuration / duration) * 100}%`,
+                            display: 'none' // We are in a list, this absolute positioning strategy won't work well for a list. 
+                            // Instead, we should probably mark the specific subtitle that crosses the boundary or show a global indicator.
+                        }}>
+                            {/* Retracting the inline style approach for list. 
+                                 Better approach for list: Highlight subtitles that are out of bounds? 
+                                 Or just show a warning banner? 
+                                 The user asked for "indicate in and out for each". 
+                                 In the list view, we can mark subtitles that are beyond media duration.
+                             */}
                         </div>
-                    ))}
+                    )}
+
+                    {subtitles.map((sub) => {
+                        const isBeyondMedia = mediaDuration ? sub.startTime > mediaDuration : false;
+
+                        return (
+                            <div
+                                key={sub.id}
+                                ref={isActive(sub) ? activeRef : null}
+                                className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''} ${isBeyondMedia ? 'beyond-media' : ''}`}
+                                onClick={() => onSeek(sub.startTime)}
+                                title={isBeyondMedia ? "This subtitle starts after the media ends" : ""}
+                            >
+                                <div className="subtitle-index">{sub.index}</div>
+
+                                <div className="subtitle-times">
+                                    <input
+                                        type="text"
+                                        className="time-input"
+                                        value={formatSrtTime(sub.startTime)}
+                                        onChange={(e) => handleTimeChange(sub.id, 'startTime', e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className="time-separator">→</span>
+                                    <input
+                                        type="text"
+                                        className="time-input"
+                                        value={formatSrtTime(sub.endTime)}
+                                        onChange={(e) => handleTimeChange(sub.id, 'endTime', e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </div>
+
+                                <textarea
+                                    className="subtitle-text"
+                                    dir={detectDirection(sub.text)}
+                                    value={sub.text}
+                                    onChange={(e) => handleTextChange(sub.id, e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onFocus={() => setEditingId(sub.id)}
+                                    onBlur={() => setEditingId(null)}
+                                    rows={2}
+                                    placeholder="Enter subtitle text..."
+                                />
+
+                                <button
+                                    className="delete-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(sub.id);
+                                    }}
+                                    title="Delete subtitle"
+                                >
+                                    <span className="icon icon-sm">close</span>
+                                </button>
+                            </div>
+                        )
+                    })}
                 </div>
             )}
 
@@ -153,11 +175,12 @@ function wrapTooltip(text: string): string {
 }
 
 // Mini timeline preview component
-export function TimelinePreview({ subtitles, duration, currentTime, onSeek }: {
+export function TimelinePreview({ subtitles, duration, currentTime, onSeek, mediaDuration }: {
     subtitles: Subtitle[];
-    duration: number;
+    duration: number; // Max duration
     currentTime: number;
     onSeek: (time: number) => void;
+    mediaDuration?: number; // Actual media duration
 }) {
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -168,11 +191,29 @@ export function TimelinePreview({ subtitles, duration, currentTime, onSeek }: {
 
     return (
         <div className="timeline-preview" onClick={handleClick}>
+            {/* Media duration background indicator */}
+            {mediaDuration && duration > mediaDuration && (
+                <div
+                    className="timeline-media-zone"
+                    style={{
+                        width: `${(mediaDuration / duration) * 100}%`,
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        borderRight: '1px dashed var(--color-warning)',
+                        pointerEvents: 'none'
+                    }}
+                    title="Media Duration"
+                />
+            )}
+
             <div className="timeline-subtitles">
                 {subtitles.map((sub) => (
                     <div
                         key={sub.id}
-                        className="timeline-segment"
+                        className={`timeline-segment ${mediaDuration && sub.startTime > mediaDuration ? 'beyond-media' : ''}`}
                         title={wrapTooltip(sub.text)}
                         style={{
                             left: `${(sub.startTime / duration) * 100}%`,

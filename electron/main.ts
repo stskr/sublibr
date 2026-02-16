@@ -183,6 +183,10 @@ ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
   return filePath;
 });
 
+ipcMain.handle('dialog:showMessageBox', async (_event, options: Electron.MessageBoxOptions) => {
+  return dialog.showMessageBox(mainWindow!, options);
+});
+
 // File operations
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   const safePath = validatePath(filePath, ...getAllowedDirs());

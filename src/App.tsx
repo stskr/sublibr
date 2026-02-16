@@ -14,7 +14,7 @@ import { healSubtitles } from './services/healer';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { generateId } from './utils';
+import { generateId, formatDisplayTime } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile } from './types';
 import { PROVIDER_LABELS } from './services/providers';
 
@@ -278,6 +278,26 @@ function App() {
         return;
       }
 
+      // Check for duration mismatch
+      if (mediaFile && loaded.length > 0) {
+        const lastSubtitle = loaded[loaded.length - 1];
+        if (lastSubtitle.endTime > mediaFile.duration) {
+          const response = await window.electronAPI.showMessageBox({
+            type: 'warning',
+            buttons: ['Load Anyway', 'Cancel'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Subtitle Duration Warning',
+            message: 'Subtitles are longer than the media file',
+            detail: `The text ends at ${formatDisplayTime(lastSubtitle.endTime)}, but the media ends at ${formatDisplayTime(mediaFile.duration)}.\n\nDo you want to continue?`,
+          });
+
+          if (response.response === 1) {
+            return; // User cancelled
+          }
+        }
+      }
+
       setSubtitles(loaded);
       if (mediaFile) {
         addToRecents(mediaFile, 'opened');
@@ -289,7 +309,7 @@ function App() {
         error: err instanceof Error ? err.message : 'Failed to load subtitle file',
       });
     }
-  }, [setSubtitles]);
+  }, [setSubtitles, mediaFile, addToRecents]);
 
   // Download subtitles
   const handleDownload = useCallback(async () => {
@@ -537,6 +557,11 @@ function App() {
       {
         audioPath && (
           <footer className="app-footer">
+            {mediaFile?.name && (
+              <div className="player-track-info">
+                <div className="player-track-name">{mediaFile.name}</div>
+              </div>
+            )}
             {subtitles.length > 0 && (
               <TimelinePreview
                 subtitles={subtitles}
@@ -551,7 +576,6 @@ function App() {
               duration={duration}
               onTimeUpdate={setCurrentTime}
               onDurationChange={setDuration}
-              fileName={mediaFile?.name}
             />
           </footer>
         )

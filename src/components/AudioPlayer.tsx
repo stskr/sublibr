@@ -1,23 +1,22 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { formatDisplayTime } from '../utils';
-import { MarqueeText } from './MarqueeText';
 
 interface AudioPlayerProps {
     audioPath: string;
     currentTime: number;
-    duration: number;
+    duration: number; // Max duration to display
+    mediaDuration?: number; // Actual media duration
     onTimeUpdate: (time: number) => void;
     onDurationChange: (duration: number) => void;
-    fileName?: string;
 }
 
 export function AudioPlayer({
     audioPath,
     currentTime,
     duration,
+    mediaDuration,
     onTimeUpdate,
-    onDurationChange,
-    fileName
+    onDurationChange
 }: AudioPlayerProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -47,7 +46,14 @@ export function AudioPlayer({
         const audio = audioRef.current;
         if (!audio) return;
 
-        const handleTimeUpdate = () => onTimeUpdate(audio.currentTime);
+        const handleTimeUpdate = () => {
+            // Basic sync
+            // If we are playing and reach end of audio, standard behavior stops.
+            // But our timeline might be longer.
+            // We rely on parent to update current time if we are scrolling in "ghost" zone.
+            // But here we are source of truth when playing audio.
+            onTimeUpdate(audio.currentTime);
+        };
         const handleDurationChange = () => onDurationChange(audio.duration);
         const handleEnded = () => setIsPlaying(false);
 
@@ -62,8 +68,41 @@ export function AudioPlayer({
         };
     }, [onTimeUpdate, onDurationChange]);
 
+    // Handle "ghost" playback or seeking
+    useEffect(() => {
+        if (!audioRef.current) return;
+        // If currentTime provided by parent is different from audio.currentTime
+        // We sync audio to it.
+        // BUT: if currentTime > audio.duration, audio can't seek there.
+        // It stays at duration (ended).
+
+        const audio = audioRef.current;
+        const diff = Math.abs(audio.currentTime - currentTime);
+
+        if (diff > 0.5) {
+            // Need sync
+            if (mediaDuration && currentTime > mediaDuration) {
+                // We are in ghost zone
+                if (!audio.paused) audio.pause();
+                // We can't really seek audio there.
+            } else if (Number.isFinite(audio.duration) && currentTime <= audio.duration) {
+                audio.currentTime = currentTime;
+            }
+        }
+    }, [currentTime, mediaDuration]);
+
+
     const togglePlay = useCallback(() => {
         if (!audioRef.current) return;
+
+        if (mediaDuration && currentTime >= mediaDuration) {
+            // Can't play past end
+            // Optional: Restart from 0?
+            audioRef.current.currentTime = 0;
+            audioRef.current.play();
+            setIsPlaying(true);
+            return;
+        }
 
         if (isPlaying) {
             audioRef.current.pause();
@@ -71,14 +110,23 @@ export function AudioPlayer({
             audioRef.current.play();
         }
         setIsPlaying(!isPlaying);
-    }, [isPlaying]);
+    }, [isPlaying, currentTime, mediaDuration]);
 
     const seek = useCallback((time: number) => {
+        // Optimistic update
+        onTimeUpdate(time);
+
         if (audioRef.current) {
-            audioRef.current.currentTime = time;
-            onTimeUpdate(time);
+            if (mediaDuration && time > mediaDuration) {
+                // Ghost seek
+                // Audio stays at end or pauses
+                audioRef.current.pause();
+                setIsPlaying(false);
+            } else {
+                audioRef.current.currentTime = time;
+            }
         }
-    }, [onTimeUpdate]);
+    }, [onTimeUpdate, mediaDuration]);
 
     const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -112,13 +160,43 @@ export function AudioPlayer({
 
     return (
         <div className="audio-player-wrapper">
-            {fileName && (
-                <div className="player-track-info">
-                    <MarqueeText text={fileName} className="player-track-name" />
+            {/* Audio Timeline Layer */}
+            <div className="audio-timeline-layer">
+                <div className="player-progress" onClick={handleProgressClick}>
+                    {/* Media Duration Marker */}
+                    {mediaDuration && duration > mediaDuration && (
+                        <div
+                            className="progress-media-marker"
+                            style={{
+                                left: `${(mediaDuration / duration) * 100}%`,
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                width: '2px',
+                                backgroundColor: 'var(--color-warning)',
+                                zIndex: 1,
+                                opacity: 0.5
+                            }}
+                            title="End of Audio"
+                        />
+                    )}
+
+                    <div
+                        className="progress-filled"
+                        style={{ width: `${(currentTime / duration) * 100}%` }}
+                    />
                 </div>
-            )}
-            <div className="audio-player">
+
+                <div className="player-time">
+                    {formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}
+                </div>
+            </div>
+
+            {/* Controls Layer */}
+            <div className="audio-player-controls">
                 <audio ref={audioRef} />
+
+                <div className="controls-spacer"></div>
 
                 <div className="player-controls">
                     <button className="control-btn skip" onClick={skipBackward} title="Back 5s">
@@ -132,17 +210,6 @@ export function AudioPlayer({
                     <button className="control-btn skip" onClick={skipForward} title="Forward 5s">
                         <span className="icon">fast_forward</span>
                     </button>
-                </div>
-
-                <div className="player-progress" onClick={handleProgressClick}>
-                    <div
-                        className="progress-filled"
-                        style={{ width: `${(currentTime / duration) * 100}%` }}
-                    />
-                </div>
-
-                <div className="player-time">
-                    {formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}
                 </div>
 
                 <div className="player-volume">

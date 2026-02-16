@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
     openSubtitleFileDialog: () => ipcRenderer.invoke('dialog:openSubtitleFile'),
     saveFileDialog: (defaultName: string) => ipcRenderer.invoke('dialog:saveFile', defaultName),
+    showMessageBox: (options: Electron.MessageBoxOptions) => ipcRenderer.invoke('dialog:showMessageBox', options),
 
     // File operations
     readFile: (path: string) => ipcRenderer.invoke('file:read', path),

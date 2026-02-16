@@ -10,6 +10,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   openFileDialog: () => import_electron.ipcRenderer.invoke("dialog:openFile"),
   openSubtitleFileDialog: () => import_electron.ipcRenderer.invoke("dialog:openSubtitleFile"),
   saveFileDialog: (defaultName) => import_electron.ipcRenderer.invoke("dialog:saveFile", defaultName),
+  showMessageBox: (options) => import_electron.ipcRenderer.invoke("dialog:showMessageBox", options),
   // File operations
   readFile: (path) => import_electron.ipcRenderer.invoke("file:read", path),
   readFileAsDataUrl: (path) => import_electron.ipcRenderer.invoke("file:readAsDataUrl", path),

@@ -138,6 +138,9 @@ ipcMain.handle("dialog:saveFile", async (_event, defaultName) => {
   if (filePath) allowedPaths.add(path.resolve(filePath));
   return filePath;
 });
+ipcMain.handle("dialog:showMessageBox", async (_event, options) => {
+  return dialog.showMessageBox(mainWindow, options);
+});
 ipcMain.handle("file:read", async (_event, filePath) => {
   const safePath = validatePath(filePath, ...getAllowedDirs());
   return fs.promises.readFile(safePath);
