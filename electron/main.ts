@@ -4,20 +4,21 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
-import ffprobePath from '@ffprobe-installer/ffprobe';
+import { createRequire } from 'module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Set ffmpeg and ffprobe paths
-// In packaged builds, binaries are in extraResources; in dev, use the npm installer paths
+// In packaged builds, binaries live in extraResources; in dev, use npm installer packages
 if (app.isPackaged) {
   const ext = process.platform === 'win32' ? '.exe' : '';
   ffmpeg.setFfmpegPath(path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg' + ext));
   ffmpeg.setFfprobePath(path.join(process.resourcesPath, 'ffprobe', 'ffprobe' + ext));
 } else {
-  ffmpeg.setFfmpegPath(ffmpegPath.path);
-  ffmpeg.setFfprobePath(ffprobePath.path);
+  // Dynamic require so vite doesn't bundle the platform-specific binaries
+  const _require = createRequire(import.meta.url);
+  ffmpeg.setFfmpegPath(_require('@ffmpeg-installer/ffmpeg').path);
+  ffmpeg.setFfprobePath(_require('@ffprobe-installer/ffprobe').path);
 }
 
 // Initialize store for settings

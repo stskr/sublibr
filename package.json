@@ -16,8 +16,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@google/generative-ai": "^0.24.1",
     "electron-store": "^11.0.2",
     "fluent-ffmpeg": "^2.1.3",
@@ -25,6 +23,8 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@eslint/js": "^9.39.1",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^24.10.1",
@@ -47,6 +47,9 @@
   "build": {
     "appId": "com.subtitles-gen.app",
     "productName": "Subtitles Generator",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
@@ -55,22 +58,40 @@
       "target": "dmg",
       "category": "public.app-category.productivity",
       "extraResources": [
-        { "from": "node_modules/@ffmpeg-installer/darwin-${arch}/ffmpeg", "to": "ffmpeg/ffmpeg" },
-        { "from": "node_modules/@ffprobe-installer/darwin-${arch}/ffprobe", "to": "ffprobe/ffprobe" }
+        {
+          "from": "node_modules/@ffmpeg-installer/darwin-${arch}/ffmpeg",
+          "to": "ffmpeg/ffmpeg"
+        },
+        {
+          "from": "node_modules/@ffprobe-installer/darwin-${arch}/ffprobe",
+          "to": "ffprobe/ffprobe"
+        }
       ]
     },
     "win": {
       "target": "nsis",
       "extraResources": [
-        { "from": "node_modules/@ffmpeg-installer/win32-${arch}/ffmpeg.exe", "to": "ffmpeg/ffmpeg.exe" },
-        { "from": "node_modules/@ffprobe-installer/win32-${arch}/ffprobe.exe", "to": "ffprobe/ffprobe.exe" }
+        {
+          "from": "node_modules/@ffmpeg-installer/win32-${arch}/ffmpeg.exe",
+          "to": "ffmpeg/ffmpeg.exe"
+        },
+        {
+          "from": "node_modules/@ffprobe-installer/win32-${arch}/ffprobe.exe",
+          "to": "ffprobe/ffprobe.exe"
+        }
       ]
     },
     "linux": {
       "target": "AppImage",
       "extraResources": [
-        { "from": "node_modules/@ffmpeg-installer/linux-${arch}/ffmpeg", "to": "ffmpeg/ffmpeg" },
-        { "from": "node_modules/@ffprobe-installer/linux-${arch}/ffprobe", "to": "ffprobe/ffprobe" }
+        {
+          "from": "node_modules/@ffmpeg-installer/linux-${arch}/ffmpeg",
+          "to": "ffmpeg/ffmpeg"
+        },
+        {
+          "from": "node_modules/@ffprobe-installer/linux-${arch}/ffprobe",
+          "to": "ffprobe/ffprobe"
+        }
       ]
     }
   }
