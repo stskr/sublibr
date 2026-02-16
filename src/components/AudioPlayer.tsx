@@ -186,9 +186,9 @@ export function AudioPlayer({
                         style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
                 </div>
-
-                <div className="player-time">
-                    {formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}
+                <div className="player-times">
+                    <div className="player-time left">{formatDisplayTime(currentTime)}</div>
+                    <div className="player-time right">{formatDisplayTime(duration)}</div>
                 </div>
             </div>
 

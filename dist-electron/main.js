@@ -25,7 +25,7 @@ function getAllowedDirs() {
     app.getPath("userData")
   ];
 }
-const ALLOWED_STORE_KEYS = ["settings"];
+const ALLOWED_STORE_KEYS = ["settings", "recent-files"];
 if (app.isPackaged) {
   const ext = process.platform === "win32" ? ".exe" : "";
   ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));

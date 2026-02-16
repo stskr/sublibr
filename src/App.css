@@ -879,7 +879,7 @@ a:hover {
 
 .subtitle-entry {
   display: grid;
-  grid-template-columns: 40px 1fr 2fr 32px;
+  grid-template-columns: 40px auto 2fr 32px;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   margin-bottom: var(--space-sm);
@@ -916,10 +916,13 @@ a:hover {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  min-width: 240px;
+  max-width: 260px;
 }
 
 .time-input {
-  width: 100px;
+  flex: 1;
+  min-width: 100px;
   padding: var(--space-xs) var(--space-sm);
   background: var(--color-bg-tertiary);
   border: 1px solid transparent;
@@ -1077,10 +1080,15 @@ a:hover {
 /* Audio Timeline Layer - matches subtitle timeline width */
 .audio-timeline-layer {
   display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) 0;
+  flex-direction: column;
+  gap: 4px;
   width: 100%;
+}
+
+.player-times {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Controls Layer - centered playback with right volume */
@@ -1088,7 +1096,7 @@ a:hover {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: var(--space-md) 0;
+  padding: var(--space-sm) 0;
 }
 
 

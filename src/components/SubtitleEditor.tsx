@@ -226,10 +226,6 @@ export function TimelinePreview({ subtitles, duration, currentTime, onSeek, medi
                 className="timeline-cursor"
                 style={{ left: `${(currentTime / duration) * 100}%` }}
             />
-            <div className="timeline-times">
-                <span>{formatDisplayTime(currentTime)}</span>
-                <span>{formatDisplayTime(duration)}</span>
-            </div>
         </div>
     );
 }
