@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { formatSrtTime, parseSrtTime, generateId, formatDisplayTime, detectDirection } from '../utils';
 import type { Subtitle } from '../types';
 
@@ -11,6 +11,14 @@ interface SubtitleEditorProps {
 
 export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSeek }: SubtitleEditorProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [autoScroll, setAutoScroll] = useState(true);
+    const activeRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (autoScroll && activeRef.current) {
+            activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [autoScroll, currentTime]);
 
     const handleTextChange = useCallback((id: string, text: string) => {
         onSubtitlesChange(
@@ -52,7 +60,18 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
         <div className="subtitle-editor">
             <div className="editor-header">
                 <h2>Subtitles</h2>
-                <span className="subtitle-count">{subtitles.length} entries</span>
+                <div className="editor-header-actions">
+                    <label className="auto-scroll-toggle" title="Auto-scroll to active subtitle">
+                        <input
+                            type="checkbox"
+                            checked={autoScroll}
+                            onChange={(e) => setAutoScroll(e.target.checked)}
+                        />
+                        <span className="icon icon-sm">swap_vert</span>
+                        Auto-scroll
+                    </label>
+                    <span className="subtitle-count">{subtitles.length} entries</span>
+                </div>
             </div>
 
             {subtitles.length === 0 ? (
@@ -65,6 +84,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
                     {subtitles.map((sub) => (
                         <div
                             key={sub.id}
+                            ref={isActive(sub) ? activeRef : null}
                             className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''}`}
                             onClick={() => onSeek(sub.startTime)}
                         >

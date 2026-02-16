@@ -672,6 +672,31 @@ a:hover {
   font-weight: 600;
 }
 
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.auto-scroll-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-scroll-toggle input {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.auto-scroll-toggle:has(input:checked) {
+  color: var(--color-text-primary);
+}
+
 .subtitle-count {
   font-size: 13px;
   color: var(--color-text-muted);
@@ -828,19 +853,15 @@ a:hover {
    ============================================ */
 .timeline-preview {
   position: relative;
-  height: 24px;
   margin-bottom: var(--space-sm);
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .timeline-subtitles {
-  position: absolute;
-  top: 4px;
-  left: 0;
-  right: 0;
-  height: 8px;
+  position: relative;
+  height: 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
 }
 
 .timeline-segment {
@@ -855,18 +876,15 @@ a:hover {
   position: absolute;
   top: 0;
   width: 2px;
-  height: 100%;
+  height: 12px;
   background: var(--color-text-primary);
   border-radius: 1px;
 }
 
 .timeline-times {
-  position: absolute;
-  bottom: 2px;
-  left: var(--space-sm);
-  right: var(--space-sm);
   display: flex;
   justify-content: space-between;
+  margin-top: var(--space-xs);
   font-size: 10px;
   color: var(--color-text-muted);
 }
