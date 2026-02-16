@@ -1,4 +1,14 @@
 /* ============================================
+   FONTS
+   ============================================ */
+@font-face {
+  font-family: 'Signika';
+  src: url('./assets/Fonts/Signika/Signika-VariableFont_GRAD,wght.ttf') format('truetype');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+/* ============================================
    DESIGN TOKENS
    ============================================ */
 :root {
@@ -44,8 +54,9 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Signika', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-subtitle: Arial, 'Helvetica Neue', Helvetica, sans-serif;
 
   /* Transitions */
   --transition-fast: 150ms ease;
@@ -61,6 +72,13 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 html,
@@ -766,6 +784,7 @@ a:hover {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
+  font-family: var(--font-subtitle);
   font-size: 13px;
   resize: none;
   overflow: hidden;
@@ -1161,6 +1180,7 @@ a:hover {
   background: rgba(0, 0, 0, 0.8);
   border-radius: var(--radius-sm);
   color: white;
+  font-family: var(--font-subtitle);
   font-size: 18px;
   text-align: center;
   max-width: 80%;
