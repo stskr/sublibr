@@ -517,7 +517,7 @@ function App() {
               {subtitles.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
                   <label className="sidebar-label">Export Format</label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                     <CustomSelect
                       options={[
                         { value: 'srt', label: 'SRT' },
