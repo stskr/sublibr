@@ -15,7 +15,7 @@ import './App.css';
 
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
-  model: 'gemini-1.5-flash',
+  model: 'gemini-2.5-flash',
   language: 'English',
   autoDetectLanguage: false,
 };

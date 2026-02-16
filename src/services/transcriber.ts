@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Subtitle, AudioChunk } from '../types';
-import { generateId } from '../utils';
+import { generateId, formatSrtTime } from '../utils';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -79,13 +79,7 @@ export async function transcribeChunk(
     autoDetect: boolean
 ): Promise<TranscriptionResult> {
     const genAI = new GoogleGenerativeAI(apiKey);
-
-    // Handle legacy/deprecated model names by upgrading to 2.5
-    let effectiveModel = model;
-    if (model.includes('gemini-1.5-flash')) effectiveModel = 'gemini-2.5-flash';
-    if (model.includes('gemini-1.5-pro')) effectiveModel = 'gemini-2.5-pro';
-
-    const geminiModel = genAI.getGenerativeModel({ model: effectiveModel });
+    const geminiModel = genAI.getGenerativeModel({ model });
 
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
@@ -129,9 +123,7 @@ Transcribe the audio now:`;
     const response = await result.response;
     const text = response.text();
 
-    // Parse with correct time base (don't add overlap to buffer time)
-    const adjustedStart = chunk.startTime;
-    let subtitles = parseTranscription(text, adjustedStart);
+    let subtitles = parseTranscription(text, chunk.startTime);
 
     // Post-processing: Split long subtitles (Safety Net)
     // Max chars per subtitle line is usually ~42. Two lines ~84.
@@ -188,16 +180,10 @@ Transcribe the audio now:`;
             }
         }
 
-        // Safety: ensure we didn't miss anything? Loop handles it.
     }
 
     // Re-index
     subtitles = splitSubtitles.map((s, i) => ({ ...s, index: i + 1 }));
-
-    // MAX SAFETY STRATEGY:
-    // We do NOT filter anything here. We let the overlap pass through 100%.
-    // We rely entirely on the fuzzy matcher in 'mergeSubtitles' to handle deduplication.
-    // This ensures that if a sentence was missed in the previous chunk but caught here, it stays.
 
     return {
         subtitles,
@@ -258,11 +244,6 @@ export function mergeSubtitles(allSubtitles: Subtitle[][]): Subtitle[] {
             cutTime = overlapEnd;
             const nextChunkClean = nextChunkSubs.filter(s => s.startTime >= cutTime);
 
-            // Handle Straddling found in the Old Chunk (if any sub crosses overlapEnd)
-            // Actually, if we keep Old Chunk, we just append New Chunk.
-            // But we must ensure the previous sub doesn't overlap the new first sub.
-            // (Handled by the final cleanup pass)
-
             finalSubtitles.push(...nextChunkClean);
         }
     }
@@ -286,22 +267,13 @@ export function mergeSubtitles(allSubtitles: Subtitle[][]): Subtitle[] {
             const normA = normalize(prev.text);
             const normB = normalize(current.text);
 
-            // Check short substring vs long
             if (normA.includes(normB) || normB.includes(normA) || overlap > 0.5) {
-                // Determine which to keep based on length
                 if (current.text.length > prev.text.length) {
-                    // Current is better, replace prev
-                    // But we must respect prev's start time? No, keep current's timing.
-                    // Actually, if we replace, we might create a gap before it.
-                    // Best strategy: Trim prev to current.startTime
+                    // Current is longer — trim prev to make room
                     prev.endTime = current.startTime - 0.05;
                 } else {
-                    // Prev is better (or equal), drop current?
-                    // If we drop current, we lose it.
-                    // But if it's a duplicate, we want to lose it.
-                    if (overlap > 1.0) continue; // Skip current
-
-                    // If overlap is small, just trim prev
+                    // Prev is longer or equal — drop duplicate if significant overlap
+                    if (overlap > 1.0) continue;
                     prev.endTime = current.startTime - 0.05;
                 }
             } else {
@@ -451,14 +423,6 @@ function extendShortDurations(subs: Subtitle[]): Subtitle[] {
 // Generate SRT file content
 export function generateSrt(subtitles: Subtitle[]): string {
     return subtitles.map((sub, i) => {
-        const formatTime = (seconds: number) => {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const secs = Math.floor(seconds % 60);
-            const ms = Math.floor((seconds % 1) * 1000);
-            return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
-        };
-
-        return `${i + 1}\n${formatTime(sub.startTime)} --> ${formatTime(sub.endTime)}\n${sub.text}\n`;
+        return `${i + 1}\n${formatSrtTime(sub.startTime)} --> ${formatSrtTime(sub.endTime)}\n${sub.text}\n`;
     }).join('\n');
 }

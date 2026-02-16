@@ -39,7 +39,7 @@ export interface ProcessingState {
 // Settings
 export interface AppSettings {
     apiKey: string;
-    model: 'gemini-1.5-flash' | 'gemini-1.5-pro';
+    model: 'gemini-2.5-flash' | 'gemini-2.5-pro';
     language: string;
     autoDetectLanguage: boolean;
 }
@@ -52,13 +52,6 @@ export interface MediaFile {
     size: number;
     duration: number;
     isVideo: boolean;
-}
-
-// Cost estimation
-export interface CostEstimate {
-    chunks: number;
-    estimatedTokens: number;
-    estimatedCostUSD: number;
 }
 
 export interface SilenceSegment {

@@ -56,7 +56,7 @@ export function estimateCost(durationSeconds: number, model: string): { chunks: 
     // Pricing (approximate, varies by model)
     // Flash: ~$0.075/1M input, ~$0.30/1M output
     // Pro: ~$1.25/1M input, ~$5.00/1M output
-    const ratePerMillion = model === 'gemini-1.5-flash' ? 0.30 : 5.00;
+    const ratePerMillion = model === 'gemini-2.5-flash' ? 0.30 : 5.00;
     const estimatedCostUSD = (estimatedTokens / 1_000_000) * ratePerMillion;
 
     return { chunks, estimatedTokens, estimatedCostUSD };
@@ -90,24 +90,6 @@ export const LANGUAGES = [
     'Yiddish', 'Yoruba',
     'Zulu'
 ];
-
-// Levenshtein distance for fuzzy string matching
-export function levenshteinDistance(s: string, t: string): number {
-    if (!s) return t.length;
-    if (!t) return s.length;
-
-    const d: number[][] = [];
-    for (let i = 0; i <= s.length; i++) d[i] = [i];
-    for (let j = 0; j <= t.length; j++) d[0][j] = j;
-
-    for (let i = 1; i <= s.length; i++) {
-        for (let j = 1; j <= t.length; j++) {
-            const cost = s[i - 1] === t[j - 1] ? 0 : 1;
-            d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-        }
-    }
-    return d[s.length][t.length];
-}
 
 // Detect text direction
 export function detectDirection(text: string): 'rtl' | 'ltr' {
