@@ -192,6 +192,22 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-title">
+          {mediaFile && (
+            <button
+              className="btn-icon"
+              onClick={() => {
+                setMediaFile(null);
+                setAudioPath(null);
+                setSubtitles([]);
+                setCurrentTime(0);
+                setDuration(0);
+                setProcessing({ status: 'idle', progress: 0 });
+              }}
+              title="Back to main screen"
+            >
+              <span className="icon">arrow_back</span>
+            </button>
+          )}
           <h1><span className="icon">subtitles</span> Subtitles Generator</h1>
         </div>
         <div className="header-actions">

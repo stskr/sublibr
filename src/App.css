@@ -137,6 +137,13 @@ a:hover {
   -webkit-app-region: drag;
 }
 
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  -webkit-app-region: no-drag;
+}
+
 .header-title h1 {
   font-size: 18px;
   font-weight: 600;
