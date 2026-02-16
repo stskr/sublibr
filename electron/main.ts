@@ -8,6 +8,42 @@ import { createRequire } from 'module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ============== Security: Path Validation ==============
+
+// Track file paths the user explicitly selected via native dialogs
+const allowedPaths = new Set<string>();
+
+function validatePath(filePath: string, ...allowedDirs: string[]): string {
+  if (typeof filePath !== 'string') throw new Error('Invalid path: must be a string');
+
+  const resolved = path.resolve(filePath);
+
+  // Allow paths the user explicitly chose via a native dialog
+  if (allowedPaths.has(resolved)) return resolved;
+
+  // Allow paths inside permitted directories (temp, userData, etc.)
+  for (const dir of allowedDirs) {
+    const resolvedDir = path.resolve(dir);
+    if (resolved === resolvedDir || resolved.startsWith(resolvedDir + path.sep)) {
+      return resolved;
+    }
+  }
+
+  throw new Error(`Access denied: path is outside allowed directories`);
+}
+
+// Directories that IPC handlers are allowed to access
+function getAllowedDirs(): string[] {
+  return [
+    app.getPath('temp'),
+    app.getPath('userData'),
+  ];
+}
+
+// ============== Security: Store Key Allowlist ==============
+
+const ALLOWED_STORE_KEYS = ['settings'];
+
 // Set ffmpeg and ffprobe paths
 // In packaged builds, binaries live in extraResources; in dev, use npm installer packages
 if (app.isPackaged) {
@@ -36,7 +72,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // sandbox: true, // Default is true, explicit for clarity
+      sandbox: true,
     },
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0a0a0f',
@@ -58,6 +94,21 @@ app.on('window-all-closed', () => {
   }
 });
 
+// Clean up temp audio files on quit
+app.on('before-quit', () => {
+  try {
+    const tempDir = app.getPath('temp');
+    const entries = fs.readdirSync(tempDir);
+    for (const entry of entries) {
+      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(entry)) {
+        fs.unlinkSync(path.join(tempDir, entry));
+      }
+    }
+  } catch {
+    // Best-effort cleanup — don't block quit
+  }
+});
+
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
@@ -68,10 +119,16 @@ app.on('activate', () => {
 
 // Settings
 ipcMain.handle('store:get', (_event, key: string) => {
+  if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
   return store.get(key);
 });
 
 ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
+  if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
   store.set(key, value);
 });
 
@@ -83,7 +140,9 @@ ipcMain.handle('dialog:openFile', async () => {
       { name: 'Media Files', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'] },
     ],
   });
-  return result.filePaths[0] || null;
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
 
 ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
@@ -91,17 +150,21 @@ ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
     defaultPath: defaultName,
     filters: [{ name: 'SRT Subtitle', extensions: ['srt'] }],
   });
-  return result.filePath || null;
+  const filePath = result.filePath || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
 
 // File operations
 ipcMain.handle('file:read', async (_event, filePath: string) => {
-  return fs.promises.readFile(filePath);
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return fs.promises.readFile(safePath);
 });
 
 ipcMain.handle('file:readAsDataUrl', async (_event, filePath: string) => {
-  const data = await fs.promises.readFile(filePath);
-  const ext = path.extname(filePath).toLowerCase().slice(1);
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  const data = await fs.promises.readFile(safePath);
+  const ext = path.extname(safePath).toLowerCase().slice(1);
   const mimeTypes: Record<string, string> = {
     mp3: 'audio/mpeg',
     wav: 'audio/wav',
@@ -120,16 +183,18 @@ ipcMain.handle('file:readAsDataUrl', async (_event, filePath: string) => {
 });
 
 ipcMain.handle('file:write', async (_event, filePath: string, data: string) => {
-  await fs.promises.writeFile(filePath, data, 'utf-8');
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  await fs.promises.writeFile(safePath, data, 'utf-8');
 });
 
 ipcMain.handle('file:getInfo', async (_event, filePath: string) => {
-  const stats = await fs.promises.stat(filePath);
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  const stats = await fs.promises.stat(safePath);
   return {
     size: stats.size,
-    path: filePath,
-    name: path.basename(filePath),
-    ext: path.extname(filePath).toLowerCase(),
+    path: safePath,
+    name: path.basename(safePath),
+    ext: path.extname(safePath).toLowerCase(),
   };
 });
 
@@ -137,22 +202,25 @@ ipcMain.handle('file:getTempPath', () => {
   return app.getPath('temp');
 });
 
-// FFmpeg: Extract audio to MP3
+// FFmpeg: Extract audio to FLAC
 ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPath: string) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    ffmpeg(safeInput)
       .audioCodec('flac')
       .toFormat('flac')
-      .on('end', () => resolve(outputPath))
+      .on('end', () => resolve(safeOutput))
       .on('error', (err) => reject(err.message))
-      .save(outputPath);
+      .save(safeOutput);
   });
 });
 
 // FFmpeg: Get media duration
 ipcMain.handle('ffmpeg:getDuration', async (_event, filePath: string) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
   return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, data) => {
+    ffmpeg.ffprobe(safePath, (err, data) => {
       if (err) reject(err.message);
       else resolve(data.format.duration || 0);
     });
@@ -161,11 +229,20 @@ ipcMain.handle('ffmpeg:getDuration', async (_event, filePath: string) => {
 
 // FFmpeg: Detect silences
 ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, threshold: number, minDuration: number) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+
+  if (!Number.isFinite(threshold) || threshold < -100 || threshold > 0) {
+    throw new Error('Invalid threshold: must be between -100 and 0');
+  }
+  if (!Number.isFinite(minDuration) || minDuration < 0.1 || minDuration > 60) {
+    throw new Error('Invalid minDuration: must be between 0.1 and 60');
+  }
+
   return new Promise((resolve, reject) => {
     const silences: { start: number; end: number }[] = [];
     let currentSilence: { start: number; end?: number } | null = null;
 
-    ffmpeg(filePath)
+    ffmpeg(safePath)
       .audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`)
       .format('null')
       .on('stderr', (line: string) => {
@@ -191,21 +268,23 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
 
 // FFmpeg: Split audio at specific times
 ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const results: string[] = [];
 
   for (const chunk of chunks) {
+    const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
     await new Promise<void>((resolve, reject) => {
-      ffmpeg(inputPath)
+      ffmpeg(safeInput)
         .setStartTime(chunk.start)
         .setDuration(chunk.end - chunk.start)
         .audioCodec('flac')
         .toFormat('flac')
         .on('end', () => {
-          results.push(chunk.outputPath);
+          results.push(safeOutput);
           resolve();
         })
         .on('error', (err) => reject(err.message))
-        .save(chunk.outputPath);
+        .save(safeOutput);
     });
   }
 

@@ -27,7 +27,9 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
             // Actually, currently GoogleGenerativeAI doesn't expose listModels directly on the main class in some versions.
             // We might need to fetch it manually via fetch if the SDK doesn't support it directly yet or use the model manager.
             // Let's try a direct fetch to be sure.
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+                headers: { 'x-goog-api-key': apiKey },
+            });
             const data = await response.json();
             console.log('Available Models:', data);
             alert('Models listed in console (Developer Tools)');
