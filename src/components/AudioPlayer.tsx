@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { formatDisplayTime } from '../utils';
+import { MarqueeText } from './MarqueeText';
 
 interface AudioPlayerProps {
     audioPath: string;
@@ -7,6 +8,7 @@ interface AudioPlayerProps {
     duration: number;
     onTimeUpdate: (time: number) => void;
     onDurationChange: (duration: number) => void;
+    fileName?: string;
 }
 
 export function AudioPlayer({
@@ -14,7 +16,8 @@ export function AudioPlayer({
     currentTime,
     duration,
     onTimeUpdate,
-    onDurationChange
+    onDurationChange,
+    fileName
 }: AudioPlayerProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -125,11 +128,18 @@ export function AudioPlayer({
                 </button>
             </div>
 
-            <div className="player-progress" onClick={handleProgressClick}>
-                <div
-                    className="progress-filled"
-                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                />
+            <div className="player-center">
+                {fileName && (
+                    <div className="player-track-info">
+                        <MarqueeText text={fileName} className="player-track-name" />
+                    </div>
+                )}
+                <div className="player-progress" onClick={handleProgressClick}>
+                    <div
+                        className="progress-filled"
+                        style={{ width: `${(currentTime / duration) * 100}%` }}
+                    />
+                </div>
             </div>
 
             <div className="player-time">

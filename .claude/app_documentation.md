@@ -364,6 +364,7 @@ All components are **functional React components** using hooks. No class compone
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
 | `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (API key, model) |
 | `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
+| `MarqueeText` | [MarqueeText.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/MarqueeText.tsx) | Smart scrolling text for long filenames |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 
 ---
@@ -491,6 +492,7 @@ interface AudioPlayerProps {
   duration: number;
   onTimeUpdate: (time: number) => void;
   onDurationChange: (duration: number) => void;
+  fileName?: string;
 }
 ```
 
@@ -501,6 +503,7 @@ interface AudioPlayerProps {
 - Clickable progress bar
 - Volume slider
 - Time display (current / total)
+- **Integrated Filename**: Displays current file name with smart scrolling (marquee) for long names
 - Loads audio via data URL (IPC) to avoid file protocol restrictions
 
 **UX Details**:
@@ -578,6 +581,26 @@ type ProcessingStatus =
   | 'done'                // "Complete!"
   | 'error';              // "Error occurred" + error details
 ```
+
+---
+
+#### **MarqueeText**
+
+**Props**:
+```typescript
+interface MarqueeTextProps {
+  text: string;
+  className?: string;
+}
+```
+
+**Features**:
+- Detects overflow automatically
+- Scrolls text back and forth on hover (marquee effect)
+- Stays static if text fits container
+- Smooth CSS animations
+
+---
 
 > [!NOTE]
 > The `'healing'` status exists in TypeScript types but has no corresponding UI message in `ProgressIndicator`. If used, it will display with a default sync icon and no status message.

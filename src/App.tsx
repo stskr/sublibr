@@ -357,11 +357,7 @@ function App() {
           <div className="editor-container">
             <div className="editor-sidebar">
               <div className="file-summary">
-                <span className="icon icon-lg file-icon">{mediaFile.isVideo ? 'movie' : 'music_note'}</span>
-                <div className="file-info">
-                  <strong title={mediaFile.name}>{mediaFile.name}</strong>
-                  <span>{Math.floor(duration / 60)}m {Math.floor(duration % 60)}s</span>
-                </div>
+                {/* File Info moved to AudioPlayer */}
               </div>
 
               {!isProcessing && subtitles.length === 0 && (
@@ -439,6 +435,7 @@ function App() {
               duration={duration}
               onTimeUpdate={setCurrentTime}
               onDurationChange={setDuration}
+              fileName={mediaFile?.name}
             />
           </footer>
         )
