@@ -1,6 +1,6 @@
 # SUBLIBR - Application Documentation
 
-> **Last Updated**: February 16, 2026  
+> **Last Updated**: February 17, 2026  
 > **Version**: 1.0.0
 
 ---
@@ -32,7 +32,7 @@
 - **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
-- **Video Overlay**: Real-time subtitle preview over video playback
+- **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
 - **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
 
 ### Tech Stack
@@ -66,6 +66,7 @@ subtitles-gen/
 │   │   ├── ProgressIndicator.tsx
 │   │   ├── Settings.tsx
 │   │   ├── SubtitleEditor.tsx
+│   │   ├── SubtitlePreview.tsx
 │   │   └── VideoPreview.tsx
 │   │
 │   ├── services/               # Core business logic
@@ -98,7 +99,7 @@ subtitles-gen/
 
 ### File Counts & Organization
 
-- **React Components**: 7 files
+- **React Components**: 8 files
 - **Services**: 4 core modules
 - **Electron Process Files**: 2 (main + preload)
 - **Total Source Files**: ~15 TypeScript/TSX files
@@ -376,7 +377,8 @@ All components are **functional React components** using hooks. No class compone
 | `App` | [App.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/App.tsx) | Root component, orchestrates state |
 | `FileUpload` | [FileUpload.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/FileUpload.tsx) | Drag-and-drop + file selection |
 | `SubtitleEditor` | [SubtitleEditor.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitleEditor.tsx) | Timeline-based subtitle editor |
-| `VideoPreview` | [VideoPreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/VideoPreview.tsx) | Video player with subtitle overlay |
+| `SubtitlePreview` | [SubtitlePreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitlePreview.tsx) | Inline preview (video or cinema screen with subtitles) |
+| `VideoPreview` | [VideoPreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/VideoPreview.tsx) | Video player with subtitle overlay (full-screen modal) |
 | `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
 | `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (multi-provider, API key testing, active model) |
@@ -398,6 +400,7 @@ All components are **functional React components** using hooks. No class compone
 const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
 const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
 const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
 const [processingState, setProcessingState] = useState<ProcessingState>({
   status: 'idle',
@@ -410,10 +413,13 @@ const [processingState, setProcessingState] = useState<ProcessingState>({
 - Manage file selection
 - Orchestrate subtitle generation pipeline
 - Handle errors and processing state
+- Toggle between subtitle editor and inline preview
 
 **Views**:
 1. File upload view (no file selected)
 2. Editor view (file selected, with/without subtitles)
+   - Subtitles view (default): subtitle list editor
+   - Preview view: video with subtitle overlay or cinema screen for audio
 
 ---
 
@@ -475,6 +481,34 @@ interface SubtitleEditorProps {
 - Monospaced timecode inputs
 - Textarea auto-resize for text
 - Hover states on entries
+
+---
+
+#### **SubtitlePreview**
+
+**Props**:
+```typescript
+interface SubtitlePreviewProps {
+  subtitles: Subtitle[];
+  currentTime: number;
+  mediaFile: MediaFile;
+  audioPath: string | null;
+}
+```
+
+**Features**:
+- Inline preview that renders inside the editor-main area (not a modal)
+- Toggle between "Subtitles" view and "Preview" view via tab bar
+- **Video files**: Muted `<video>` element synced to the audio player's currentTime, with subtitle overlay at bottom
+- **Audio files**: Dark cinema screen (app background) with centered subtitle text
+- RTL direction detection for Hebrew/Arabic subtitles
+- Syncs play/pause state with the footer audio player
+
+**UX Details**:
+- Video loads via data URL (same approach as AudioPlayer)
+- Subtitle text uses same font family (`--font-subtitle`) as VideoPreview
+- Cinema mode shows a muted subtitles icon when no subtitle is active
+- Toggle bar only visible when subtitles exist
 
 ---
 
@@ -978,35 +1012,34 @@ graph TD
 **Layout**:
 ```
 ┌─────────────────────────────────────────────┐
-│  Header: Title | Settings | Download        │
+│  Header: Title | Shortcuts | Settings       │
 ├──────────┬──────────────────────────────────┤
+│          │  [Subtitles] [Preview]  (toggle) │
+│ Sidebar  ├──────────────────────────────────┤
 │          │                                   │
-│ Sidebar  │      Main Editor                 │
-│          │                                   │
-│ - File   │  ┌─────────────────────────────┐ │
-│   Info   │  │ Video Preview               │ │
-│          │  │ (with subtitle overlay)     │ │
-│ - Lang   │  └─────────────────────────────┘ │
-│   Select │                                   │
+│ - Back   │  Subtitles view (default):       │
 │          │  ┌─────────────────────────────┐ │
-│ - Re-gen │  │ Subtitle List               │ │
-│   Button │  │ [1] 00:01→00:03  Hello...   │ │
+│ - Lang   │  │ Subtitle List               │ │
+│   Select │  │ [1] 00:01→00:03  Hello...   │ │
 │          │  │ [2] 00:03→00:06  Welcome... │ │
-│          │  │ ...                         │ │
+│ - Export │  └─────────────────────────────┘ │
+│          │                                   │
+│          │  Preview view (toggled):         │
+│          │  ┌─────────────────────────────┐ │
+│          │  │ Video (muted, synced) or    │ │
+│          │  │ Cinema screen with subtitle │ │
 │          │  └─────────────────────────────┘ │
 └──────────┴──────────────────────────────────┘
 ```
 
 **Sidebar** (280px wide):
-- File summary card
+- Back to home button
 - Language selector (can change and re-generate)
-- "Generate Subtitles" button
+- Export format + Download button
 
-**Main Area**:
-- Video/Audio preview at top
-- Subtitle editor below
-- Auto-scroll toggle
-- Subtitle count
+**Main Area** (with view toggle when subtitles exist):
+- **Subtitles view**: Subtitle list editor with auto-scroll toggle
+- **Preview view**: Inline video preview (muted, synced to audio player) or dark cinema screen for audio files
 
 #### 5. **Settings Modal**
 
@@ -1400,6 +1433,7 @@ npm run build:electron
 - [x] **Multi-AI provider support** (Gemini, Claude, OpenAI) with API key validation
 - [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
 - [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
+- [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

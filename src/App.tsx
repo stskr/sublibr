@@ -4,7 +4,7 @@ import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor, TimelinePreview } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AudioPlayer } from './components/AudioPlayer';
-import { VideoPreview } from './components/VideoPreview';
+import { SubtitlePreview } from './components/SubtitlePreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
 import { CustomSelect } from './components/CustomSelect';
@@ -45,7 +45,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
-  const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
@@ -456,12 +456,6 @@ function App() {
           <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '18px' }} /> SUBLIBR</h1>
         </div>
         <div className="header-actions">
-          {mediaFile?.isVideo && subtitles.length > 0 && (
-            <button className="btn-secondary" onClick={() => setShowVideoPreview(true)}>
-              <span className="icon icon-sm">visibility</span> Preview
-            </button>
-          )}
-
           <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts">
             <span className="icon">keyboard</span>
           </button>
@@ -563,12 +557,40 @@ function App() {
             </div>
 
             <div className="editor-main">
-              <SubtitleEditor
-                subtitles={subtitles}
-                onSubtitlesChange={setSubtitles}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-              />
+              {subtitles.length > 0 && (
+                <div className="view-toggle-bar">
+                  <button
+                    className={`view-toggle-btn${editorView === 'subtitles' ? ' active' : ''}`}
+                    onClick={() => setEditorView('subtitles')}
+                  >
+                    <span className="icon icon-sm">list</span> Subtitles
+                  </button>
+                  <button
+                    className={`view-toggle-btn${editorView === 'preview' ? ' active' : ''}`}
+                    onClick={() => setEditorView('preview')}
+                  >
+                    <span className="icon icon-sm">visibility</span> Preview
+                  </button>
+                </div>
+              )}
+
+              {editorView === 'subtitles' || subtitles.length === 0 ? (
+                <SubtitleEditor
+                  subtitles={subtitles}
+                  onSubtitlesChange={setSubtitles}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                />
+              ) : (
+                mediaFile && (
+                  <SubtitlePreview
+                    subtitles={subtitles}
+                    currentTime={currentTime}
+                    mediaFile={mediaFile}
+                    audioPath={audioPath}
+                  />
+                )
+              )}
             </div>
           </div>
         )}
@@ -610,16 +632,6 @@ function App() {
             settings={settings}
             onSettingsChange={handleSettingsChange}
             onClose={() => setShowSettings(false)}
-          />
-        )
-      }
-
-      {
-        showVideoPreview && mediaFile?.isVideo && (
-          <VideoPreview
-            videoPath={mediaFile.path}
-            subtitles={subtitles}
-            onClose={() => setShowVideoPreview(false)}
           />
         )
       }

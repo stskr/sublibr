@@ -5,5 +5,5 @@
 6. As a system I offer SRT (SubRip) and VTT (WebVTT) subtitle files.
 8. Plan about popup with details about the app and developer (Stas Krylov, Tel Aviv).
 9. ~~Add a solution for the app to be updated (let's say a new version comes up and I want to release the new app, I would like an easy way for users to update their existing app (which wasn't yet released)).~~ **DONE** — Auto-updater via electron-updater + GitHub Releases with check+prompt UX. NOTE: Set `owner` and `repo` in `package.json` → `build.publish` before first release.
-10. As a user I have an option to toggle between Subtitles View and Video View, I either see the subtitles on the video/blank screen if it's only audio with the subtitles as if it was a video player.
+10. ~~As a user I have an option to toggle between Subtitles View and Video View, I either see the subtitles on the video/blank screen if it's only audio with the subtitles as if it was a video player.~~ **DONE** — Inline preview toggle in editor-main: Subtitles view (editor) or Preview view (video with subtitle overlay / cinema screen for audio).
 11. Code review.

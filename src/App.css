@@ -1631,6 +1631,116 @@ a:hover {
   animation: spin 1s linear infinite;
 }
 
+/* ============================================
+   VIEW TOGGLE BAR
+   ============================================ */
+.view-toggle-bar {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.view-toggle-btn:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+}
+
+.view-toggle-btn.active {
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+}
+
+/* ============================================
+   INLINE SUBTITLE PREVIEW
+   ============================================ */
+.subtitle-preview {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+/* Video preview */
+.preview-video-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: black;
+}
+
+.preview-video-wrapper video {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.preview-subtitle {
+  position: absolute;
+  bottom: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: var(--radius-sm);
+  color: white;
+  font-family: var(--font-subtitle);
+  font-size: 20px;
+  text-align: center;
+  max-width: 80%;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* Cinema screen (audio files) */
+.preview-cinema {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+}
+
+.cinema-subtitle {
+  position: static;
+  transform: none;
+  font-size: 28px;
+  max-width: 70%;
+  padding: var(--space-md) var(--space-lg);
+}
+
+.preview-cinema-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-muted);
+  opacity: 0.3;
+}
+
 /* Sidebar Back Button */
 .sidebar-back-btn {
   display: flex;
