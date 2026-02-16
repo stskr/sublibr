@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { formatFileSize, isVideoFile, estimateCost, LANGUAGES } from '../utils';
 import type { MediaFile, AppSettings } from '../types';
 
@@ -18,6 +18,20 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
     const [fileInfo, setFileInfo] = useState<MediaFile | null>(null);
     const [languageSearch, setLanguageSearch] = useState('');
     const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+
+    // Prevent default browser behavior of opening dropped files
+    useEffect(() => {
+        const preventDefaults = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        document.addEventListener('dragover', preventDefaults);
+        document.addEventListener('drop', preventDefaults);
+        return () => {
+            document.removeEventListener('dragover', preventDefaults);
+            document.removeEventListener('drop', preventDefaults);
+        };
+    }, []);
 
     const processFile = useCallback(async (filePath: string) => {
         setLoading(true);
