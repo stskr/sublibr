@@ -1,4 +1,4 @@
-# Subtitles Generator - Application Documentation
+# SUBLIBR - Application Documentation
 
 > **Last Updated**: February 16, 2026  
 > **Version**: 1.0.0
@@ -20,7 +20,7 @@
 
 ## Overview
 
-**Subtitles Generator** is a desktop application that generates high-quality subtitles from audio and video files using Google's Gemini AI. The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
+**SUBLIBR** is a desktop application that generates high-quality subtitles from audio and video files using Google's Gemini AI. The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
 
 ### Key Features
 

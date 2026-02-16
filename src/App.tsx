@@ -17,6 +17,8 @@ import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types'
 
 import './App.css';
 
+import logoWhite from './assets/Logo/logo-white.svg';
+
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   model: 'gemini-2.5-flash',
@@ -309,7 +311,7 @@ function App() {
               <span className="icon">arrow_back</span>
             </button>
           )}
-          <h1><span className="icon">subtitles</span> Subtitles Generator</h1>
+          <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '32px' }} /> SUBLIBR</h1>
         </div>
         <div className="header-actions">
           {subtitles.length > 0 && (

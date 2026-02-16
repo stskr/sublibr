@@ -1,9 +1,9 @@
 {
-  "name": "subtitles-gen",
+  "name": "sublibr",
   "private": true,
   "version": "1.0.0",
   "description": "Local subtitle generator using Gemini AI",
-  "author": "Subtitles Gen",
+  "author": "SUBLIBR",
   "license": "MIT",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -47,8 +47,8 @@
     "vitest": "^4.0.18"
   },
   "build": {
-    "appId": "com.subtitles-gen.app",
-    "productName": "Subtitles Generator",
+    "appId": "com.sublibr.app",
+    "productName": "SUBLIBR",
     "directories": {
       "output": "release"
     },
