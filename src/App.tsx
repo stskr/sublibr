@@ -5,10 +5,10 @@ import { SubtitleEditor, TimelinePreview } from './components/SubtitleEditor';
 import { AudioPlayer } from './components/AudioPlayer';
 import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
+import { LanguageSelector } from './components/LanguageSelector';
 import { createAudioChunks } from './services/audioProcessor';
 import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt } from './services/transcriber';
 import { healSubtitles } from './services/healer';
-import { LANGUAGES } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
 
 import './App.css';
@@ -249,33 +249,13 @@ function App() {
 
               {!isProcessing && subtitles.length === 0 && (
                 <div className="sidebar-section">
-                  <div className="language-selector-sidebar">
-                    <label className="sidebar-label">Subtitle Language</label>
-                    <select
-                      value={settings.autoDetectLanguage ? 'auto' : settings.language}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === 'auto') {
-                          setSettings(s => ({ ...s, autoDetectLanguage: true }));
-                        } else {
-                          setSettings(s => ({ ...s, autoDetectLanguage: false, language: val }));
-                        }
-                      }}
-                      className="language-select full-width"
-                    >
-                      <option value="auto">✨ Auto-detect</option>
-                      <optgroup label="Common Languages">
-                        {LANGUAGES.slice(0, 10).map(lang => (
-                          <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="All Languages">
-                        {LANGUAGES.slice(10).map(lang => (
-                          <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </div>
+                  <LanguageSelector
+                    language={settings.language}
+                    autoDetect={settings.autoDetectLanguage}
+                    onLanguageChange={(language, autoDetect) => {
+                      setSettings(s => ({ ...s, language, autoDetectLanguage: autoDetect }));
+                    }}
+                  />
 
                   <button
                     className="btn-primary generate-btn"

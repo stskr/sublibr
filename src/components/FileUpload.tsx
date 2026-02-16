@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { formatFileSize, isVideoFile, estimateCost, LANGUAGES } from '../utils';
+import { formatFileSize, isVideoFile, estimateCost } from '../utils';
+import { LanguageSelector } from './LanguageSelector';
 import type { MediaFile, AppSettings } from '../types';
 
 interface FileUploadProps {
@@ -16,9 +17,6 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fileInfo, setFileInfo] = useState<MediaFile | null>(null);
-    const [languageSearch, setLanguageSearch] = useState('');
-    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-
     // Prevent default browser behavior of opening dropped files
     useEffect(() => {
         const preventDefaults = (e: DragEvent) => {
@@ -109,16 +107,6 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
         }
     };
 
-    const filteredLanguages = LANGUAGES.filter(lang =>
-        lang.toLowerCase().includes(languageSearch.toLowerCase())
-    );
-
-    const handleLanguageSelect = (lang: string) => {
-        onLanguageChange(lang, false);
-        setLanguageSearch('');
-        setShowLanguageDropdown(false);
-    };
-
     const costEstimate = fileInfo ? estimateCost(fileInfo.duration, settings.model) : null;
 
     const hasApiKey = settings.apiKey && settings.apiKey.trim().length > 0;
@@ -133,52 +121,11 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
                 </div>
             )}
 
-            {/* Language Selection */}
-            <div className="language-selection-inline">
-                <label>Language</label>
-                <div className="language-toggle">
-                    <button
-                        className={`toggle-btn ${!settings.autoDetectLanguage ? 'active' : ''}`}
-                        onClick={() => onLanguageChange(settings.language, false)}
-                    >
-                        Select Language
-                    </button>
-                    <button
-                        className={`toggle-btn ${settings.autoDetectLanguage ? 'active' : ''}`}
-                        onClick={() => onLanguageChange(settings.language, true)}
-                    >
-                        Auto-detect
-                    </button>
-                </div>
-                {!settings.autoDetectLanguage && (
-                    <div className="language-autocomplete">
-                        <input
-                            type="text"
-                            value={languageSearch || settings.language}
-                            onChange={(e) => {
-                                setLanguageSearch(e.target.value);
-                                setShowLanguageDropdown(true);
-                            }}
-                            onFocus={() => setShowLanguageDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowLanguageDropdown(false), 200)}
-                            placeholder="Search languages..."
-                        />
-                        {showLanguageDropdown && filteredLanguages.length > 0 && (
-                            <ul className="language-dropdown">
-                                {filteredLanguages.slice(0, 8).map(lang => (
-                                    <li
-                                        key={lang}
-                                        onClick={() => handleLanguageSelect(lang)}
-                                        className={lang === settings.language ? 'selected' : ''}
-                                    >
-                                        {lang}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                )}
-            </div>
+            <LanguageSelector
+                language={settings.language}
+                autoDetect={settings.autoDetectLanguage}
+                onLanguageChange={onLanguageChange}
+            />
 
             <div
                 className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${loading ? 'loading' : ''} ${!hasApiKey ? 'disabled' : ''}`}
