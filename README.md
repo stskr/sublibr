@@ -10,7 +10,10 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
 - **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware overlap.
 - **🩹 Gap Healing**: intelligently detects and fills in missing subtitles that AI might have skipped.
+- **📤 Multi-Format Export**: Support for SRT, WebVTT, and ASS formats.
 - **⚡ Quality Control**: Enforces reading speeds, line limits, and minimum durations for professional-looking subtitles.
+- **🛠️ Customizable**: Extensive language support and editor features.
+- **⌨️ Keyboard Shortcuts**: Control playback and editing with global shortcuts (Space, Arrows, Undo/Redo).
 - **🎬 Visual Editor**: Built-in timeline editor with real-time video preview.
 - **🔒 Private & Local**: Your files stay on your machine (except for the audio chunks sent securely to Gemini API).
 

@@ -363,6 +363,7 @@ All components are **functional React components** using hooks. No class compone
 | `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
 | `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (API key, model) |
+| `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 
 ---
@@ -742,6 +743,21 @@ Today we're talking about subtitles.
 **Interface Language**: English (hardcoded)
 
 **Supported Subtitle Languages**: 92+ languages via Gemini AI
+
+### Keyboard Shortcuts
+
+The application supports global keyboard shortcuts for efficient workflow. A reference modal can be opened by clicking the keyboard icon in the header.
+
+| Action | Shortcut | Context |
+|--------|----------|---------|
+| **Play / Pause** | `Space` | Global (unless in text input) |
+| **Seek Backward 5s** | `←` (Left Arrow) | Global (unless in text input) |
+| **Seek Forward 5s** | `→` (Right Arrow) | Global (unless in text input) |
+| **Undo** | `Ctrl` + `Z` / `Cmd` + `Z` | Editor |
+| **Redo** | `Ctrl` + `Shift` + `Z` / `Cmd` + `Shift` + `Z` | Editor |
+| **Insert Subtitle** | `Alt` + `N` | Editor (at current time) |
+| **Delete Subtitle** | `Alt` + `Delete` / `Backspace` | Editor (active subtitle) |
+| **Save / Download** | `Ctrl` + `S` / `Cmd` + `S` | Global |
 
 ### User Workflow
 
@@ -1217,12 +1233,14 @@ npm run build:electron
 ---
 
 ### Planned Features
-- [ ] **Keyboard shortcuts** (Play/pause, seek, insert/delete subtitle)
 - [ ] **Dark/light theme toggle**
-- [ ] **Subtitle export formats** (WebVTT, ASS)
 - [ ] **Translation**: Option to translate subtitles *after* generation (e.g., Generate English → Translate to Spanish)
 - [ ] **Waveform visualization**: For audio-only files to aid navigation
 - [ ] **Advanced editing**: Split and merge tools (currently missing from editor)
+
+### Completed Features
+- [x] **Subtitle export formats** (WebVTT, ASS)
+- [x] **Keyboard shortcuts** (Play/pause, seek, insert/delete, Undo/Redo)
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

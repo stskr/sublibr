@@ -95,10 +95,17 @@ export function AudioPlayer({
     const skipBackward = () => seek(Math.max(0, currentTime - 5));
     const skipForward = () => seek(Math.min(duration, currentTime + 5));
 
-    // Expose seek for external use
+    // Expose seek and toggle for external use
     useEffect(() => {
-        (window as { seekAudio?: (time: number) => void }).seekAudio = seek;
-    }, [seek]);
+        const win = window as { seekAudio?: (time: number) => void; toggleAudio?: () => void };
+        win.seekAudio = seek;
+        win.toggleAudio = togglePlay;
+
+        return () => {
+            win.seekAudio = undefined;
+            win.toggleAudio = undefined;
+        };
+    }, [seek, togglePlay]);
 
     return (
         <div className="audio-player">

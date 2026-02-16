@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Settings } from './components/Settings';
 import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor, TimelinePreview } from './components/SubtitleEditor';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { AudioPlayer } from './components/AudioPlayer';
 import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
@@ -9,6 +10,9 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { createAudioChunks } from './services/audioProcessor';
 import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss } from './services/transcriber';
 import { healSubtitles } from './services/healer';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { generateId } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
 
 import './App.css';
@@ -23,9 +27,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
   const [audioPath, setAudioPath] = useState<string | null>(null);
-  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  const [subtitles, setSubtitles, undoSubtitles, redoSubtitles, canUndo, canRedo, resetSubtitles] = useUndoRedo<Subtitle[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
@@ -59,7 +64,7 @@ function App() {
   // Handle file selection
   const handleFileSelect = useCallback(async (file: MediaFile) => {
     setMediaFile(file);
-    setSubtitles([]);
+    resetSubtitles([]);
     setDuration(file.duration);
 
     // If it's a video, extract audio; otherwise use directly
@@ -205,6 +210,82 @@ function App() {
     if (seekFn) seekFn(time);
   }, []);
 
+  // Keyboard Shortcuts Handlers
+  const handleUndo = useCallback(() => {
+    if (canUndo) undoSubtitles();
+  }, [canUndo, undoSubtitles]);
+
+  const handleRedo = useCallback(() => {
+    if (canRedo) redoSubtitles();
+  }, [canRedo, redoSubtitles]);
+
+  const handlePlayPause = useCallback(() => {
+    const toggleFn = (window as { toggleAudio?: () => void }).toggleAudio;
+    if (toggleFn) toggleFn();
+  }, []);
+
+  const handleSeekBackward = useCallback(() => {
+    handleSeek(Math.max(0, currentTime - 5));
+  }, [currentTime, handleSeek]);
+
+  const handleSeekForward = useCallback(() => {
+    handleSeek(Math.min(duration, currentTime + 5));
+  }, [currentTime, duration, handleSeek]);
+
+  const handleInsertSubtitle = useCallback(() => {
+    const newId = generateId();
+    // Insert at current time
+    // Find where to insert
+    const insertIndex = subtitles.findIndex(s => s.startTime > currentTime);
+
+    // Default: 2 seconds duration
+    let startTime = currentTime;
+    // Avoid overlap with previous if possible
+    const prevSub = subtitles[insertIndex - 1] || subtitles[subtitles.length - 1];
+    if (prevSub && prevSub.endTime > startTime) {
+      startTime = prevSub.endTime + 0.1;
+    }
+
+    const newSub: Subtitle = {
+      id: newId,
+      index: 0, // Will act as placeholder, re-indexing could happen on save/render if needed mostly visual
+      startTime: startTime,
+      endTime: startTime + 2,
+      text: ''
+    };
+
+    const newSubtitles = [...subtitles];
+    if (insertIndex === -1) {
+      newSubtitles.push(newSub);
+    } else {
+      newSubtitles.splice(insertIndex, 0, newSub);
+    }
+
+    // Re-index
+    const reindexed = newSubtitles.map((s, i) => ({ ...s, index: i + 1 }));
+    setSubtitles(reindexed);
+  }, [subtitles, currentTime, setSubtitles]);
+
+  const handleDeleteSubtitle = useCallback(() => {
+    // Find subtitle active at current time
+    const activeSub = subtitles.find(s => currentTime >= s.startTime && currentTime <= s.endTime);
+    if (activeSub) {
+      const filtered = subtitles.filter(s => s.id !== activeSub.id).map((s, i) => ({ ...s, index: i + 1 }));
+      setSubtitles(filtered);
+    }
+  }, [subtitles, currentTime, setSubtitles]);
+
+  useKeyboardShortcuts({
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onSave: handleDownload, // Shortcut for saving/downloading
+    onPlayPause: handlePlayPause,
+    onSeekBackward: handleSeekBackward,
+    onSeekForward: handleSeekForward,
+    onInsertSubtitle: handleInsertSubtitle,
+    onDeleteSubtitle: handleDeleteSubtitle
+  });
+
   const canGenerate = audioPath && settings.apiKey && processing.status === 'idle';
   const isProcessing = processing.status !== 'idle' && processing.status !== 'done' && processing.status !== 'error';
 
@@ -218,7 +299,7 @@ function App() {
               onClick={() => {
                 setMediaFile(null);
                 setAudioPath(null);
-                setSubtitles([]);
+                resetSubtitles([]);
                 setCurrentTime(0);
                 setDuration(0);
                 setProcessing({ status: 'idle', progress: 0 });
@@ -253,11 +334,15 @@ function App() {
               <span className="icon icon-sm">visibility</span> Preview
             </button>
           )}
+
+          <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts">
+            <span className="icon">keyboard</span>
+          </button>
           <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings">
             <span className="icon">settings</span>
           </button>
         </div>
-      </header>
+      </header >
 
       <main className="app-main">
         {!mediaFile ? (
@@ -337,42 +422,54 @@ function App() {
         )}
       </main>
 
-      {audioPath && (
-        <footer className="app-footer">
-          {subtitles.length > 0 && (
-            <TimelinePreview
-              subtitles={subtitles}
-              duration={duration}
+      {
+        audioPath && (
+          <footer className="app-footer">
+            {subtitles.length > 0 && (
+              <TimelinePreview
+                subtitles={subtitles}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+              />
+            )}
+            <AudioPlayer
+              audioPath={audioPath}
               currentTime={currentTime}
-              onSeek={handleSeek}
+              duration={duration}
+              onTimeUpdate={setCurrentTime}
+              onDurationChange={setDuration}
             />
-          )}
-          <AudioPlayer
-            audioPath={audioPath}
-            currentTime={currentTime}
-            duration={duration}
-            onTimeUpdate={setCurrentTime}
-            onDurationChange={setDuration}
+          </footer>
+        )
+      }
+
+      {
+        showSettings && (
+          <Settings
+            settings={settings}
+            onSettingsChange={handleSettingsChange}
+            onClose={() => setShowSettings(false)}
           />
-        </footer>
-      )}
+        )
+      }
 
-      {showSettings && (
-        <Settings
-          settings={settings}
-          onSettingsChange={handleSettingsChange}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+      {
+        showVideoPreview && mediaFile?.isVideo && (
+          <VideoPreview
+            videoPath={mediaFile.path}
+            subtitles={subtitles}
+            onClose={() => setShowVideoPreview(false)}
+          />
+        )
+      }
 
-      {showVideoPreview && mediaFile?.isVideo && (
-        <VideoPreview
-          videoPath={mediaFile.path}
-          subtitles={subtitles}
-          onClose={() => setShowVideoPreview(false)}
-        />
-      )}
-    </div>
+      {
+        showShortcuts && (
+          <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+        )
+      }
+    </div >
   );
 }
 

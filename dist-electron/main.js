@@ -1,4 +1,3 @@
-// electron/main.ts
 import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
 import fs from "fs";
@@ -6,8 +5,8 @@ import { fileURLToPath } from "url";
 import Store from "electron-store";
 import ffmpeg from "fluent-ffmpeg";
 import { createRequire } from "module";
-var __dirname = path.dirname(fileURLToPath(import.meta.url));
-var allowedPaths = /* @__PURE__ */ new Set();
+const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
+const allowedPaths = /* @__PURE__ */ new Set();
 function validatePath(filePath, ...allowedDirs) {
   if (typeof filePath !== "string") throw new Error("Invalid path: must be a string");
   const resolved = path.resolve(filePath);
@@ -26,7 +25,7 @@ function getAllowedDirs() {
     app.getPath("userData")
   ];
 }
-var ALLOWED_STORE_KEYS = ["settings"];
+const ALLOWED_STORE_KEYS = ["settings"];
 if (app.isPackaged) {
   const ext = process.platform === "win32" ? ".exe" : "";
   ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
@@ -36,8 +35,8 @@ if (app.isPackaged) {
   ffmpeg.setFfmpegPath(_require("@ffmpeg-installer/ffmpeg").path);
   ffmpeg.setFfprobePath(_require("@ffprobe-installer/ffprobe").path);
 }
-var store = new Store();
-var mainWindow = null;
+const store = new Store();
+let mainWindow = null;
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -45,7 +44,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname$1, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -70,7 +69,7 @@ function createWindow() {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
+    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
   }
 }
 app.whenReady().then(createWindow);
