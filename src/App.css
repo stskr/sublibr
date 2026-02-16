@@ -13,26 +13,26 @@
    ============================================ */
 :root {
   /* Colors */
-  --color-bg-primary: #0a0a0f;
-  --color-bg-secondary: #12121a;
-  --color-bg-tertiary: #1a1a25;
-  --color-bg-hover: #22222f;
-  --color-bg-active: #2a2a3a;
+  --color-bg-primary: #0c0a14;
+  --color-bg-secondary: #13111e;
+  --color-bg-tertiary: #1b1828;
+  --color-bg-hover: #231f33;
+  --color-bg-active: #2d283e;
 
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-accent-dim: rgba(99, 102, 241, 0.15);
+  --color-accent: #8075EB;
+  --color-accent-hover: #9990F0;
+  --color-accent-dim: rgba(128, 117, 235, 0.15);
 
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
+  --color-success: #75EBBB;
+  --color-warning: #E0EB75;
+  --color-error: #EB75A5;
 
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
+  --color-text-primary: #f0eef8;
+  --color-text-secondary: #9b95b8;
+  --color-text-muted: #6b6488;
 
-  --color-border: #2a2a3a;
-  --color-border-focus: #6366f1;
+  --color-border: #2d283e;
+  --color-border-focus: #8075EB;
 
   /* Spacing */
   --space-xs: 4px;
@@ -329,7 +329,7 @@ a:hover {
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(224, 235, 117, 0.1);
   border: 1px solid var(--color-warning);
   border-radius: var(--radius-md);
   color: var(--color-warning);
@@ -431,7 +431,7 @@ a:hover {
   gap: var(--space-sm);
   margin-top: var(--space-md);
   padding: var(--space-sm) var(--space-md);
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(235, 117, 165, 0.1);
   border: 1px solid var(--color-error);
   border-radius: var(--radius-md);
   color: var(--color-error);
@@ -992,7 +992,7 @@ a:hover {
 
 .progress-indicator.error {
   border: 1px solid var(--color-error);
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(235, 117, 165, 0.1);
 }
 
 .progress-header {
@@ -1035,7 +1035,7 @@ a:hover {
 .progress-error {
   margin-top: var(--space-sm);
   padding: var(--space-sm);
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(235, 117, 165, 0.15);
   border-radius: var(--radius-sm);
   color: var(--color-error);
   font-size: 12px;
