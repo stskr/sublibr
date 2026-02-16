@@ -2,11 +2,11 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files using Google's Gemini AI.
+A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini, Anthropic Claude, and OpenAI.
 
 ## ✨ Features
 
-- **🎙️ AI Transcription**: Powered by Google Gemini (Flash & Pro models) for industry-leading accuracy.
+- **🎙️ AI Transcription**: Multi-provider support — Google Gemini, Anthropic Claude, and OpenAI — with per-provider API key validation.
 - **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
 - **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware overlap.
 - **🩹 Gap Healing**: intelligently detects and fills in missing subtitles that AI might have skipped.
@@ -15,14 +15,17 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **🛠️ Customizable**: Extensive language support and editor features.
 - **⌨️ Keyboard Shortcuts**: Control playback (Space, Arrows) and editing (Undo/Redo, Insert/Delete) with global shortcuts.
 - **🎬 Visual Editor**: Built-in timeline editor with real-time video preview and integrated file info.
-- **🔒 Private & Local**: Your files stay on your machine (except for the audio chunks sent securely to Gemini API).
+- **🔒 Private & Local**: Your files stay on your machine (except for the audio chunks sent securely to the selected AI provider).
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
 - **Node.js**: v18 or newer
-- **Google Gemini API Key**: You can get a free key from [Google AI Studio](https://aistudio.google.com/apikey).
+- **AI Provider API Key** (at least one):
+  - [Google AI Studio](https://aistudio.google.com/apikey) (Gemini)
+  - [Anthropic Console](https://console.anthropic.com/settings/keys) (Claude)
+  - [OpenAI Platform](https://platform.openai.com/api-keys) (GPT)
 
 ### Installation
 
@@ -59,20 +62,20 @@ npm run build && npx electron-builder --linux
 
 ## 🛠️ How to Use
 
-1.  **Set API Key**: Click the **Settings** (gear icon) in the top right and paste your Google Gemini API Key.
+1.  **Set API Key**: Click the **Settings** (gear icon) in the top right, toggle the providers you want, paste an API key for each, and click **Test** to verify. Select your active model from the hero dropdown.
 2.  **Load Media**: Drop a video or audio file into the main window.
 3.  **Generate**: Select your language (or leave as Auto-detect) and click **Generate Subtitles**.
 4.  **Edit & Export**: Review the generated subtitles in the timeline editor, make any fixes, and click **Download SRT** to save.
 
 ## ⚙️ Configuration
 
-- **Model Selection**: Switch between `Gemini 2.5 Flash` (faster, cheaper) and `Gemini 2.5 Pro` (higher accuracy) in Settings.
+- **Model Selection**: Choose from models across all enabled providers in the "Active Model" dropdown (e.g. Gemini 2.5 Flash, Claude Sonnet 4.5, GPT-4o).
 - **Theme**: The app defaults to a modern dark theme optimized for video editing.
 
 ## 🏗️ Tech Stack
 
 - **Core**: Electron, React 19, TypeScript, Vite
-- **AI**: Google Generative AI SDK
+- **AI**: Google Gemini, Anthropic Claude, OpenAI (multi-provider)
 - **Media**: FFmpeg (via `@ffmpeg-installer` for easy distribution)
 - **Styling**: Vanilla CSS with comprehensive design tokens
 

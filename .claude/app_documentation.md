@@ -20,11 +20,11 @@
 
 ## Overview
 
-**SUBLIBR** is a desktop application that generates high-quality subtitles from audio and video files using Google's Gemini AI. The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
+**SUBLIBR** is a desktop application that generates high-quality subtitles from audio and video files using multiple AI providers (Google Gemini, Anthropic Claude, OpenAI). The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
 
 ### Key Features
 
-- **AI-Powered Transcription**: Uses Google Gemini AI (Flash or Pro models) for accurate speech-to-text conversion
+- **Multi-Provider AI Transcription**: Supports Google Gemini, Anthropic Claude, and OpenAI with per-provider API key validation and a unified "Active Model" selector
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
 - **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
@@ -40,7 +40,7 @@
 | **React 19** | UI framework with hooks |
 | **TypeScript** | Type-safe development |
 | **Vite** | Build tool and dev server |
-| **Google Gemini AI** | Speech-to-text transcription |
+| **Google Gemini / Anthropic Claude / OpenAI** | Speech-to-text transcription (multi-provider) |
 | **FFmpeg** | Audio/video processing (extract audio, detect silences, split chunks) |
 | **electron-store** | Persistent settings storage |
 | **fluent-ffmpeg** | Node.js wrapper for FFmpeg |
@@ -68,6 +68,7 @@ subtitles-gen/
 │   ├── services/               # Core business logic
 │   │   ├── audioProcessor.ts   # Audio chunking & silence detection
 │   │   ├── healer.ts          # Gap detection & healing
+│   │   ├── providers.ts       # Multi-provider dispatch, API key testing
 │   │   └── transcriber.ts     # AI transcription & quality enforcement
 │   │
 │   ├── assets/                 # Static assets
@@ -95,7 +96,7 @@ subtitles-gen/
 ### File Counts & Organization
 
 - **React Components**: 7 files
-- **Services**: 3 core modules
+- **Services**: 4 core modules
 - **Electron Process Files**: 2 (main + preload)
 - **Total Source Files**: ~15 TypeScript/TSX files
 - **Lines of Code**: ~2,500 (excluding dependencies)
@@ -200,7 +201,7 @@ Responsibilities:
 
 ### 4. **Service Layer**
 
-Three core services handle subtitle processing:
+Four core services handle subtitle processing:
 
 #### **audioProcessor.ts**
 - Chunks audio into 3-4 minute segments
@@ -224,7 +225,9 @@ Three core services handle subtitle processing:
 
 | API/Tool | Purpose | Configuration |
 |----------|---------|---------------|
-| **Google Gemini API** | Transcription | API key stored in settings |
+| **Google Gemini API** | Transcription | API key stored in settings, tested via `GET /v1beta/models` |
+| **Anthropic Claude API** | Transcription | API key stored in settings, tested via 1-token message |
+| **OpenAI API** | Transcription | API key stored in settings, tested via `GET /v1/models` |
 | **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
 | **ffprobe** | Media metadata | Bundled with FFmpeg |
 
@@ -362,7 +365,7 @@ All components are **functional React components** using hooks. No class compone
 | `VideoPreview` | [VideoPreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/VideoPreview.tsx) | Video player with subtitle overlay |
 | `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
-| `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (API key, model) |
+| `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (multi-provider, API key testing, active model) |
 | `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
 | `MarqueeText` | [MarqueeText.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/MarqueeText.tsx) | Smart scrolling text for long filenames |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
@@ -546,16 +549,25 @@ interface SettingsProps {
 }
 ```
 
-**Fields**:
-1. **API Key**: Password input
-2. **Model**: Dropdown (`gemini-2.5-flash` | `gemini-2.5-pro`)
-3. **Check Available Models**: Debug button to test API connection
+**Layout**:
+1. **Active Model Hero** — Always-visible accent-bordered dropdown listing all models from enabled providers (e.g. "Google Gemini — Gemini 2.5 Flash (Fast)"). When no API keys exist, shows an info banner instead: "Toggle the providers you'd like to use below and paste an API key for each one." Disabled when no providers are toggled.
+2. **Provider Sections** — One card per provider (Gemini, Claude, OpenAI) with:
+   - Toggle switch to enable/disable
+   - API Key input + **Test** button (validates key via lightweight API call)
+   - Key status indicator: green checkmark (valid), red X + error (invalid), spinner (testing)
+   - Link to get API key from the provider's console
+3. **Save Settings** — Disabled until the active provider's API key is verified. Shows hint: "Test the active provider's API key first" when blocked.
+
+**Key Testing**:
+- Keys matching previously saved values initialize as `valid` (skip re-testing)
+- Changing a key resets status to `idle` and disables Save
+- Test calls are the cheapest possible per provider (free model-list endpoints for Gemini/OpenAI, 1-token message for Anthropic)
 
 **UX**:
 - Modal overlay (backdrop)
-- Close on backdrop click or "X" button
-- Save button (primary action)
-- Link to get API key
+- Close via "X" button
+- Save gated on key verification
+- Links to provider consoles for key creation
 
 ---
 
@@ -617,7 +629,29 @@ interface MarqueeTextProps {
 
 ### Core Services
 
-#### **1. audioProcessor.ts**
+#### **1. providers.ts**
+
+**Exported Functions**:
+
+##### `callProvider(provider, apiKey, model, prompt, audioBase64)`
+Dispatches transcription requests to the selected AI provider (Gemini, Anthropic, or OpenAI).
+
+##### `testApiKey(provider, apiKey)`
+Validates an API key with the cheapest possible call per provider:
+- **Gemini**: `GET /v1beta/models` (free, lists models)
+- **Anthropic**: `POST /v1/messages` with 1 max token (minimal cost)
+- **OpenAI**: `GET /v1/models` (free, lists models)
+
+Returns `{ ok: true }` or `{ ok: false, error: "..." }`.
+
+**Exported Constants**:
+- `PROVIDER_LABELS` — Display names for each provider
+- `MODEL_OPTIONS` — Available models per provider
+- `PROVIDER_KEY_URLS` — Links to get API keys
+
+---
+
+#### **2. audioProcessor.ts**
 
 **Main Function**: `createAudioChunks(audioPath, tempDir)`
 
@@ -653,7 +687,7 @@ interface MarqueeTextProps {
 
 ---
 
-#### **2. transcriber.ts**
+#### **3. transcriber.ts**
 
 **Main Functions**:
 
@@ -726,7 +760,7 @@ Today we're talking about subtitles.
 
 ---
 
-#### **3. healer.ts**
+#### **4. healer.ts**
 
 **Main Function**: `healSubtitles(subtitles, audioPath, silences, ...)`
 
@@ -885,12 +919,10 @@ graph TD
 #### 5. **Settings Modal**
 
 - Overlay modal (dark backdrop)
-- Form fields:
-  - API Key (password input)
-  - Model selection (dropdown)
-  - Language + auto-detect
-- Save button
-- Link to get API key
+- **Active Model Hero**: Accent-bordered dropdown at top — lists models from all enabled providers. Shows info banner when no keys are configured.
+- **Provider Cards** (Gemini, Claude, OpenAI): Toggle + API key input with Test button + status indicators
+- **Save**: Gated — requires active provider's key to be verified
+- Links to each provider's API key console
 
 ---
 
@@ -913,7 +945,8 @@ graph TD
 
 | Error | Display | Recovery |
 |-------|---------|----------|
-| **Missing API Key** | Yellow warning banner | Directs to settings |
+| **Missing API Key** | Yellow warning banner / info banner in settings hero | Directs to settings, prompts to toggle providers and add keys |
+| **Invalid API Key** | Red X icon + error text in settings | Re-enter key and click Test again |
 | **Invalid File** | Red error message | Prompt to select different file |
 | **Transcription Failure** | Error state in progress | Display error message + retry option |
 | **FFmpeg Error** | Error state | Show technical details for debugging |
@@ -1202,9 +1235,17 @@ export interface ProcessingState {
   error?: string;
 }
 
-export interface AppSettings {
+export type AIProvider = 'gemini' | 'anthropic' | 'openai';
+
+export interface ProviderConfig {
+  enabled: boolean;
   apiKey: string;
-  model: 'gemini-2.5-flash' | 'gemini-2.5-pro';
+  model: string;
+}
+
+export interface AppSettings {
+  activeProvider: AIProvider;
+  providers: Record<AIProvider, ProviderConfig>;
   language: string;
   autoDetectLanguage: boolean;
 }
@@ -1264,6 +1305,7 @@ npm run build:electron
 ### Completed Features
 - [x] **Subtitle export formats** (WebVTT, ASS)
 - [x] **Keyboard shortcuts** (Play/pause, seek, insert/delete, Undo/Redo)
+- [x] **Multi-AI provider support** (Gemini, Claude, OpenAI) with API key validation
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*
@@ -1284,7 +1326,7 @@ npm run build:electron
 
 **Tech Stack**:
 - Electron, React, TypeScript, Vite
-- Google Gemini AI (Intelligence)
+- Google Gemini, Anthropic Claude, OpenAI (Multi-provider AI)
 - FFmpeg (Media Processing)
 
 **Acknowledgments**:

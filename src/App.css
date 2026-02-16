@@ -285,6 +285,17 @@ a:hover {
 
 .select-field {
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239b95b8' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.select-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ============================================
@@ -1204,10 +1215,111 @@ a:hover {
 
 .settings-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-lg);
   border-top: 1px solid var(--color-border);
+}
+
+/* Active Provider Hero */
+.active-provider-hero {
+  padding: var(--space-md);
+  background: var(--color-bg-tertiary);
+  border: 1.5px solid var(--color-accent);
+  border-radius: var(--radius-md);
+}
+
+.active-provider-hero label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.hero-info-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-accent-dim);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  color: var(--color-accent-hover);
+  font-size: 13px;
+  margin-top: var(--space-sm);
+}
+
+.active-provider-hero .select-field {
+  font-size: 16px;
+  padding: var(--space-sm) var(--space-md);
+  border-color: var(--color-accent);
+}
+
+/* API Key Row */
+.api-key-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.api-key-row .input-field {
+  flex: 1;
+}
+
+/* Test Key Button */
+.test-key-btn {
+  flex-shrink: 0;
+  min-width: 56px;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.test-key-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Key Status Icons */
+.key-status-valid {
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.key-status-invalid {
+  color: var(--color-error);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.key-error-text {
+  color: var(--color-error) !important;
+}
+
+/* Inline Spinner for Test Button */
+.key-status-testing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner-inline {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-bg-tertiary);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Save Hint */
+.save-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-right: auto;
 }
 
 /* ============================================

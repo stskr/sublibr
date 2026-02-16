@@ -30,6 +30,62 @@ export const PROVIDER_KEY_URLS: Record<AIProvider, { label: string; url: string 
     openai: { label: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys' },
 };
 
+// --- API Key Testing ---
+
+export async function testApiKey(
+    provider: AIProvider,
+    apiKey: string,
+): Promise<{ ok: boolean; error?: string }> {
+    try {
+        switch (provider) {
+            case 'gemini': {
+                const res = await fetch(
+                    'https://generativelanguage.googleapis.com/v1beta/models',
+                    { headers: { 'x-goog-api-key': apiKey } },
+                );
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+                }
+                return { ok: true };
+            }
+            case 'anthropic': {
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01',
+                        'anthropic-dangerous-direct-browser-access': 'true',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-haiku-4-5-20251001',
+                        max_tokens: 1,
+                        messages: [{ role: 'user', content: 'ping' }],
+                    }),
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+                }
+                return { ok: true };
+            }
+            case 'openai': {
+                const res = await fetch('https://api.openai.com/v1/models', {
+                    headers: { 'Authorization': `Bearer ${apiKey}` },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+                }
+                return { ok: true };
+            }
+        }
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : 'Network error' };
+    }
+}
+
 // --- Provider Dispatch ---
 
 export async function callProvider(
