@@ -64,7 +64,7 @@ npm run build && npx electron-builder --linux
 ## 🛠️ How to Use
 
 1.  **Set API Key**: Click the **Settings** (gear icon) in the top right, toggle the providers you want, paste an API key for each, and click **Test** to verify. Select your active model from the hero dropdown.
-2.  **Load Media**: Drop a video or audio file into the main window.
+2.  **Import Media**: Drag & drop a file, or click to browse. Robustly supports audio (mp3, wav, flac, etc.) and video (mp4, mkv, mov, etc.).
 3.  **Generate**: Select your language (or leave as Auto-detect) and click **Generate Subtitles**.
 4.  **Edit & Export**: Review the generated subtitles in the timeline editor, make any fixes, and click **Download SRT** to save.
 

@@ -414,8 +414,8 @@ interface FileUploadProps {
 ```
 
 **Features**:
-- Drag-and-drop zone
-- File type validation (audio/video)
+- Drag-and-drop zone with instant file path registration
+- Strict file type validation (audio/video)
 - File info display (name, size, duration)
 - API cost estimation
 - Recent Files list (last 10 items)
@@ -424,7 +424,9 @@ interface FileUploadProps {
 **UX Details**:
 - Animated spinner during file info loading
 - Drag-over visual feedback
-- Supports: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.mp3`, `.wav`, `.m4a`, `.flac`
+- Explicit error messages for unsupported file types
+- Auto-handles file access permissions via `registerPath` IPC
+- Supports: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mts`, `.m2ts`, `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`, `.aac`, `.wma`, `.alac`, `.aiff`
 
 ---
 

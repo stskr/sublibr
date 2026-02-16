@@ -1,114 +1,152 @@
-import { app as l, BrowserWindow as y, ipcMain as r, dialog as P, shell as E } from "electron";
-import a from "path";
-import g from "fs";
-import { fileURLToPath as D } from "url";
-import I from "electron-store";
-import m from "fluent-ffmpeg";
-import { createRequire as T } from "module";
-const F = a.dirname(D(import.meta.url)), v = /* @__PURE__ */ new Set();
-function f(n, ...e) {
-  if (typeof n != "string") throw new Error("Invalid path: must be a string");
-  const t = a.resolve(n);
-  if (v.has(t)) return t;
-  for (const s of e) {
-    const o = a.resolve(s);
-    if (t === o || t.startsWith(o + a.sep))
-      return t;
+import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import Store from "electron-store";
+import ffmpeg from "fluent-ffmpeg";
+import { createRequire } from "module";
+const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
+const allowedPaths = /* @__PURE__ */ new Set();
+function validatePath(filePath, ...allowedDirs) {
+  if (typeof filePath !== "string") throw new Error("Invalid path: must be a string");
+  const resolved = path.resolve(filePath);
+  if (allowedPaths.has(resolved)) return resolved;
+  for (const dir of allowedDirs) {
+    const resolvedDir = path.resolve(dir);
+    if (resolved === resolvedDir || resolved.startsWith(resolvedDir + path.sep)) {
+      return resolved;
+    }
   }
-  throw new Error("Access denied: path is outside allowed directories");
+  throw new Error(`Access denied: path is outside allowed directories`);
 }
-function d() {
+function getAllowedDirs() {
   return [
-    l.getPath("temp"),
-    l.getPath("userData")
+    app.getPath("temp"),
+    app.getPath("userData")
   ];
 }
-const S = ["settings"];
-if (l.isPackaged) {
-  const n = process.platform === "win32" ? ".exe" : "";
-  m.setFfmpegPath(a.join(process.resourcesPath, "ffmpeg", "ffmpeg" + n)), m.setFfprobePath(a.join(process.resourcesPath, "ffprobe", "ffprobe" + n));
+const ALLOWED_STORE_KEYS = ["settings"];
+if (app.isPackaged) {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
+  ffmpeg.setFfprobePath(path.join(process.resourcesPath, "ffprobe", "ffprobe" + ext));
 } else {
-  const n = T(import.meta.url);
-  m.setFfmpegPath(n("@ffmpeg-installer/ffmpeg").path), m.setFfprobePath(n("@ffprobe-installer/ffprobe").path);
+  const _require = createRequire(import.meta.url);
+  ffmpeg.setFfmpegPath(_require("@ffmpeg-installer/ffmpeg").path);
+  ffmpeg.setFfprobePath(_require("@ffprobe-installer/ffprobe").path);
 }
-const x = new I();
-let p = null;
-function R() {
-  p = new y({
+const store = new Store();
+let mainWindow = null;
+function createWindow() {
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: a.join(F, "preload.js"),
-      contextIsolation: !0,
-      nodeIntegration: !1,
-      sandbox: !0
+      preload: path.join(__dirname$1, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     },
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0a0a0f"
-  }), p.webContents.setWindowOpenHandler(({ url: n }) => ((n.startsWith("http://") || n.startsWith("https://")) && E.openExternal(n), { action: "deny" })), p.webContents.on("will-navigate", (n, e) => {
-    const t = process.env.VITE_DEV_SERVER_URL || "file://";
-    e.startsWith(t) || (n.preventDefault(), E.openExternal(e));
-  }), process.env.VITE_DEV_SERVER_URL ? (p.loadURL(process.env.VITE_DEV_SERVER_URL), p.webContents.openDevTools()) : p.loadFile(a.join(F, "../dist/index.html"));
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const appUrl = process.env.VITE_DEV_SERVER_URL || "file://";
+    if (!url.startsWith(appUrl)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
+  }
 }
-l.whenReady().then(R);
-l.on("window-all-closed", () => {
-  process.platform !== "darwin" && l.quit();
+app.whenReady().then(createWindow);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
-l.on("before-quit", () => {
+app.on("before-quit", () => {
   try {
-    const n = l.getPath("temp"), e = g.readdirSync(n);
-    for (const t of e)
-      /^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(t) && g.unlinkSync(a.join(n, t));
+    const tempDir = app.getPath("temp");
+    const entries = fs.readdirSync(tempDir);
+    for (const entry of entries) {
+      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(entry)) {
+        fs.unlinkSync(path.join(tempDir, entry));
+      }
+    }
   } catch {
   }
 });
-l.on("activate", () => {
-  y.getAllWindows().length === 0 && R();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
-r.handle("store:get", (n, e) => {
-  if (typeof e != "string" || !S.includes(e))
-    throw new Error(`Invalid store key: ${e}`);
-  return x.get(e);
+ipcMain.handle("store:get", (_event, key) => {
+  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  return store.get(key);
 });
-r.handle("store:set", (n, e, t) => {
-  if (typeof e != "string" || !S.includes(e))
-    throw new Error(`Invalid store key: ${e}`);
-  x.set(e, t);
+ipcMain.handle("store:set", (_event, key, value) => {
+  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  store.set(key, value);
 });
-r.handle("dialog:openFile", async () => {
-  const e = (await P.showOpenDialog(p, {
+ipcMain.handle("dialog:openFile", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
     filters: [
       { name: "Media Files", extensions: ["mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "aac", "m4a", "ogg", "flac"] }
     ]
-  })).filePaths[0] || null;
-  return e && v.add(a.resolve(e)), e;
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-r.handle("dialog:openSubtitleFile", async () => {
-  const e = (await P.showOpenDialog(p, {
+ipcMain.handle("dialog:openSubtitleFile", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
     filters: [
       { name: "Subtitle Files", extensions: ["srt", "vtt", "ass", "ssa"] }
     ]
-  })).filePaths[0] || null;
-  return e && v.add(a.resolve(e)), e;
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-r.handle("dialog:saveFile", async (n, e) => {
-  const s = (await P.showSaveDialog(p, {
-    defaultPath: e,
+ipcMain.handle("dialog:saveFile", async (_event, defaultName) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultName,
     filters: [{ name: "SRT Subtitle", extensions: ["srt"] }]
-  })).filePath || null;
-  return s && v.add(a.resolve(s)), s;
+  });
+  const filePath = result.filePath || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-r.handle("file:read", async (n, e) => {
-  const t = f(e, ...d());
-  return g.promises.readFile(t);
+ipcMain.handle("file:read", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return fs.promises.readFile(safePath);
 });
-r.handle("file:readAsDataUrl", async (n, e) => {
-  const t = f(e, ...d()), s = await g.promises.readFile(t), o = a.extname(t).toLowerCase().slice(1);
-  return `data:${{
+ipcMain.handle("file:readAsDataUrl", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  const data = await fs.promises.readFile(safePath);
+  const ext = path.extname(safePath).toLowerCase().slice(1);
+  const mimeTypes = {
     mp3: "audio/mpeg",
     wav: "audio/wav",
     ogg: "audio/ogg",
@@ -120,62 +158,84 @@ r.handle("file:readAsDataUrl", async (n, e) => {
     mkv: "video/x-matroska",
     mov: "video/quicktime",
     avi: "video/x-msvideo"
-  }[o] || "application/octet-stream"};base64,${s.toString("base64")}`;
+  };
+  const mimeType = mimeTypes[ext] || "application/octet-stream";
+  return `data:${mimeType};base64,${data.toString("base64")}`;
 });
-r.handle("file:write", async (n, e, t) => {
-  const s = f(e, ...d());
-  await g.promises.writeFile(s, t, "utf-8");
+ipcMain.handle("file:write", async (_event, filePath, data) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  await fs.promises.writeFile(safePath, data, "utf-8");
 });
-r.handle("file:getInfo", async (n, e) => {
-  const t = f(e, ...d());
+ipcMain.handle("file:getInfo", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  const stats = await fs.promises.stat(safePath);
   return {
-    size: (await g.promises.stat(t)).size,
-    path: t,
-    name: a.basename(t),
-    ext: a.extname(t).toLowerCase()
+    size: stats.size,
+    path: safePath,
+    name: path.basename(safePath),
+    ext: path.extname(safePath).toLowerCase()
   };
 });
-r.handle("file:getTempPath", () => l.getPath("temp"));
-r.handle("ffmpeg:extractAudio", async (n, e, t) => {
-  const s = f(e, ...d()), o = f(t, ...d());
-  return new Promise((i, c) => {
-    m(s).audioCodec("flac").toFormat("flac").on("end", () => i(o)).on("error", (h) => c(h.message)).save(o);
+ipcMain.handle("file:getTempPath", () => {
+  return app.getPath("temp");
+});
+ipcMain.handle("file:registerPath", (_event, filePath) => {
+  if (typeof filePath === "string") {
+    allowedPaths.add(path.resolve(filePath));
+  }
+});
+ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+  return new Promise((resolve, reject) => {
+    ffmpeg(safeInput).audioCodec("flac").toFormat("flac").on("end", () => resolve(safeOutput)).on("error", (err) => reject(err.message)).save(safeOutput);
   });
 });
-r.handle("ffmpeg:getDuration", async (n, e) => {
-  const t = f(e, ...d());
-  return new Promise((s, o) => {
-    m.ffprobe(t, (i, c) => {
-      i ? o(i.message) : s(c.format.duration || 0);
+ipcMain.handle("ffmpeg:getDuration", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(safePath, (err, data) => {
+      if (err) reject(err.message);
+      else resolve(data.format.duration || 0);
     });
   });
 });
-r.handle("ffmpeg:detectSilences", async (n, e, t, s) => {
-  const o = f(e, ...d());
-  if (!Number.isFinite(t) || t < -100 || t > 0)
+ipcMain.handle("ffmpeg:detectSilences", async (_event, filePath, threshold, minDuration) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  if (!Number.isFinite(threshold) || threshold < -100 || threshold > 0) {
     throw new Error("Invalid threshold: must be between -100 and 0");
-  if (!Number.isFinite(s) || s < 0.1 || s > 60)
+  }
+  if (!Number.isFinite(minDuration) || minDuration < 0.1 || minDuration > 60) {
     throw new Error("Invalid minDuration: must be between 0.1 and 60");
-  return new Promise((i, c) => {
-    const h = [];
-    let u = null;
-    m(o).audioFilters(`silencedetect=noise=${t}dB:d=${s}`).format("null").on("stderr", (w) => {
-      const b = w.match(/silence_start:\s*([\d.]+)/);
-      b && (u = { start: parseFloat(b[1]) });
-      const _ = w.match(/silence_end:\s*([\d.]+)/);
-      _ && u && (u.end = parseFloat(_[1]), h.push(u), u = null);
-    }).on("end", () => i(h)).on("error", (w) => c(w.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
+  }
+  return new Promise((resolve, reject) => {
+    const silences = [];
+    let currentSilence = null;
+    ffmpeg(safePath).audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`).format("null").on("stderr", (line) => {
+      const startMatch = line.match(/silence_start:\s*([\d.]+)/);
+      if (startMatch) {
+        currentSilence = { start: parseFloat(startMatch[1]) };
+      }
+      const endMatch = line.match(/silence_end:\s*([\d.]+)/);
+      if (endMatch && currentSilence) {
+        currentSilence.end = parseFloat(endMatch[1]);
+        silences.push(currentSilence);
+        currentSilence = null;
+      }
+    }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
-r.handle("ffmpeg:splitAudio", async (n, e, t) => {
-  const s = f(e, ...d()), o = [];
-  for (const i of t) {
-    const c = f(i.outputPath, ...d());
-    await new Promise((h, u) => {
-      m(s).setStartTime(i.start).setDuration(i.end - i.start).audioCodec("flac").toFormat("flac").on("end", () => {
-        o.push(c), h();
-      }).on("error", (w) => u(w.message)).save(c);
+ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const results = [];
+  for (const chunk of chunks) {
+    const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
+    await new Promise((resolve, reject) => {
+      ffmpeg(safeInput).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec("flac").toFormat("flac").on("end", () => {
+        results.push(safeOutput);
+        resolve();
+      }).on("error", (err) => reject(err.message)).save(safeOutput);
     });
   }
-  return o;
+  return results;
 });

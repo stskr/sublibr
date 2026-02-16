@@ -230,6 +230,12 @@ ipcMain.handle('file:getTempPath', () => {
   return app.getPath('temp');
 });
 
+ipcMain.handle('file:registerPath', (_event, filePath: string) => {
+  if (typeof filePath === 'string') {
+    allowedPaths.add(path.resolve(filePath));
+  }
+});
+
 // FFmpeg: Extract audio to FLAC
 ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPath: string) => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());

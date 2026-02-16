@@ -58,10 +58,20 @@ export function formatFileSize(bytes: number): string {
 }
 
 // Video extensions
-const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
+const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts', '.mts', '.m2ts'];
+// Audio extensions
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.alac', '.aiff'];
 
 export function isVideoFile(ext: string): boolean {
     return VIDEO_EXTENSIONS.includes(ext.toLowerCase());
+}
+
+export function isAudioFile(ext: string): boolean {
+    return AUDIO_EXTENSIONS.includes(ext.toLowerCase());
+}
+
+export function isSupportedFile(ext: string): boolean {
+    return isVideoFile(ext) || isAudioFile(ext);
 }
 
 // Per-model output pricing ($/1M tokens, approximate)

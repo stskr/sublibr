@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { formatFileSize, isVideoFile, estimateCost } from '../utils';
+import { formatFileSize, isVideoFile, estimateCost, isSupportedFile } from '../utils';
 import { RecentFiles } from './RecentFiles';
 import type { MediaFile, AppSettings, RecentFile } from '../types';
 
@@ -38,9 +38,14 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
         setError(null);
 
         try {
-            // Guard for browser mode
             if (!window.electronAPI) {
                 throw new Error('File upload requires Electron. Please run the app in Electron.');
+            }
+
+            // Quick extension check before calling API
+            const ext = filePath.split('.').pop();
+            if (ext && !isSupportedFile(`.${ext}`)) {
+                throw new Error(`Unsupported file type: .${ext}. Please use a supported audio or video file.`);
             }
 
             const info = await window.electronAPI.getFileInfo(filePath);
@@ -78,16 +83,65 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragOver(false);
+
+        // Check API key availability
+        const activeProvider = settings.activeProvider;
+        const config = settings.providers[activeProvider];
+        const hasKey = config?.apiKey && config.apiKey.trim().length > 0;
+
+        if (!hasKey) {
+            setError(`Please set a valid API key for ${activeProvider} in Settings to continue.`);
+            return;
+        }
 
         const file = e.dataTransfer.files[0];
         if (file) {
-            const filePath = (file as File & { path?: string }).path;
+            // Try to get path via webUtils first (most reliable in recent Electron)
+            let filePath: string = '';
+
+            try {
+                if (window.electronAPI?.getFilePath) {
+                    filePath = window.electronAPI.getFilePath(file);
+                } else {
+                    // Fallback for older Electron versions or dev mode if webUtils not exposed
+                    filePath = (file as File & { path?: string }).path || '';
+                }
+            } catch (err) {
+                console.error('Error getting file path:', err);
+                filePath = (file as File & { path?: string }).path || '';
+            }
+
             if (filePath) {
-                processFile(filePath);
+                // Register dropped file to allow access
+                if (window.electronAPI?.registerPath) {
+                    // Start registration but don't strictly await if we want to be optimistic, 
+                    // but awaiting ensures validation passes in processFile
+                    try {
+                        // We must wait for registration or getFileInfo will fail
+                        // Note: Using a self-invoking async function or just calling it if we don't want to block UI?
+                        // processFile is async, so better to just call processFile and let it handle...
+                        // But processFile doesn't register.
+                        // We can't await here directly easily because handleDrop isn't async? 
+                        // It is a callback. We can make it async.
+                        window.electronAPI.registerPath(filePath).then(() => {
+                            processFile(filePath);
+                        }).catch(err => {
+                            console.error('Failed to register file path:', err);
+                            setError('Failed to access file. Please try again.');
+                        });
+                    } catch (e) {
+                        processFile(filePath); // Fallback try
+                    }
+                } else {
+                    processFile(filePath);
+                }
+            } else {
+                setError('Could not get file path. Please try browsing for the file instead.');
             }
         }
-    }, [processFile]);
+    }, [processFile, settings]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -126,8 +180,8 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
 
             <div
                 className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${loading ? 'loading' : ''} ${!hasApiKey ? 'disabled' : ''}`}
-                onDrop={hasApiKey ? handleDrop : (e) => e.preventDefault()}
-                onDragOver={hasApiKey ? handleDragOver : (e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
             >
                 {loading ? (

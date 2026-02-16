@@ -1,7 +1,10 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 // Expose safe APIs to renderer
 contextBridge.exposeInMainWorld('electronAPI', {
+    // Utils
+    getFilePath: (file: File) => webUtils.getPathForFile(file),
+
     // Settings
     getStoreValue: (key: string) => ipcRenderer.invoke('store:get', key),
     setStoreValue: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
@@ -17,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     writeFile: (path: string, data: string) => ipcRenderer.invoke('file:write', path, data),
     getFileInfo: (path: string) => ipcRenderer.invoke('file:getInfo', path),
     getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
+    registerPath: (path: string) => ipcRenderer.invoke('file:registerPath', path),
 
     // FFmpeg operations
     extractAudio: (inputPath: string, outputPath: string) =>
