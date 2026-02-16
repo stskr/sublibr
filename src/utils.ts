@@ -64,6 +64,16 @@ export function isVideoFile(ext: string): boolean {
     return VIDEO_EXTENSIONS.includes(ext.toLowerCase());
 }
 
+// Per-model output pricing ($/1M tokens, approximate)
+const MODEL_PRICING: Record<string, number> = {
+    'gemini-2.5-flash': 0.30,
+    'gemini-2.5-pro': 5.00,
+    'claude-sonnet-4-5-20250929': 15.00,
+    'claude-haiku-4-5-20251001': 1.25,
+    'gpt-4o-mini': 0.60,
+    'gpt-4o': 10.00,
+};
+
 // Estimate API cost based on audio duration
 export function estimateCost(durationSeconds: number, model: string): { chunks: number; estimatedTokens: number; estimatedCostUSD: number } {
     // Estimate ~80 tokens per second of audio transcription output
@@ -73,10 +83,7 @@ export function estimateCost(durationSeconds: number, model: string): { chunks: 
     const tokensPerChunk = 80 * chunkDuration + 100; // output + prompt
     const estimatedTokens = chunks * tokensPerChunk;
 
-    // Pricing (approximate, varies by model)
-    // Flash: ~$0.075/1M input, ~$0.30/1M output
-    // Pro: ~$1.25/1M input, ~$5.00/1M output
-    const ratePerMillion = model === 'gemini-2.5-flash' ? 0.30 : 5.00;
+    const ratePerMillion = MODEL_PRICING[model] ?? 0.30;
     const estimatedCostUSD = (estimatedTokens / 1_000_000) * ratePerMillion;
 
     return { chunks, estimatedTokens, estimatedCostUSD };

@@ -1,4 +1,4 @@
-import type { Subtitle, SilenceSegment } from '../types';
+import type { Subtitle, SilenceSegment, AIProvider } from '../types';
 import { transcribeChunk } from './transcriber';
 
 // Interface for a gap that needs healing
@@ -16,6 +16,7 @@ export async function healSubtitles(
     subtitles: Subtitle[],
     audioPath: string,
     silences: SilenceSegment[],
+    provider: AIProvider,
     apiKey: string,
     model: string,
     language: string,
@@ -118,6 +119,7 @@ export async function healSubtitles(
 
             const result = await transcribeChunk(
                 tempChunk,
+                provider,
                 apiKey,
                 model,
                 language,

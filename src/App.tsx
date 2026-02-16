@@ -13,15 +13,20 @@ import { healSubtitles } from './services/healer';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId } from './utils';
-import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
+import type { Subtitle, MediaFile, AppSettings, ProcessingState, AIProvider } from './types';
+import { PROVIDER_LABELS } from './services/providers';
 
 import './App.css';
 
 import logoWhite from './assets/Logo/logo-white.svg';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  apiKey: '',
-  model: 'gemini-2.5-flash',
+  activeProvider: 'gemini',
+  providers: {
+    gemini: { enabled: true, apiKey: '', model: 'gemini-2.5-flash' },
+    anthropic: { enabled: false, apiKey: '', model: 'claude-sonnet-4-5-20250929' },
+    openai: { enabled: false, apiKey: '', model: 'gpt-4o-mini' },
+  },
   language: 'English',
   autoDetectLanguage: false,
 };
@@ -47,9 +52,28 @@ function App() {
         console.warn('Running in browser mode - Electron APIs not available');
         return;
       }
-      const savedSettings = await window.electronAPI.getStoreValue('settings');
-      if (savedSettings) {
-        setSettings(savedSettings as AppSettings);
+      const saved = await window.electronAPI.getStoreValue('settings') as Record<string, unknown> | null;
+      if (saved) {
+        // Migrate old flat format (apiKey/model) to new multi-provider format
+        if ('apiKey' in saved && !('providers' in saved)) {
+          const migrated: AppSettings = {
+            ...DEFAULT_SETTINGS,
+            providers: {
+              ...DEFAULT_SETTINGS.providers,
+              gemini: {
+                enabled: true,
+                apiKey: (saved.apiKey as string) || '',
+                model: (saved.model as string) || 'gemini-2.5-flash',
+              },
+            },
+            language: (saved.language as string) || 'English',
+            autoDetectLanguage: (saved.autoDetectLanguage as boolean) ?? false,
+          };
+          setSettings(migrated);
+          await window.electronAPI.setStoreValue('settings', migrated);
+        } else {
+          setSettings(saved as unknown as AppSettings);
+        }
       }
     }
     loadSettings();
@@ -92,12 +116,16 @@ function App() {
 
   // Generate subtitles
   const handleGenerate = useCallback(async () => {
-    if (!audioPath || !settings.apiKey) {
-      if (!settings.apiKey) {
+    const activeConfig = settings.providers[settings.activeProvider];
+    if (!audioPath || !activeConfig.apiKey) {
+      if (!activeConfig.apiKey) {
         setShowSettings(true);
       }
       return;
     }
+
+    const { apiKey, model } = activeConfig;
+    const provider = settings.activeProvider;
 
     try {
       // Step 1: Detect silences and create chunks
@@ -122,8 +150,9 @@ function App() {
 
         const result = await transcribeChunk(
           chunks[i],
-          settings.apiKey,
-          settings.model,
+          provider,
+          apiKey,
+          model,
           settings.language,
           settings.autoDetectLanguage
         );
@@ -141,8 +170,9 @@ function App() {
           merged,
           audioPath,
           silences,
-          settings.apiKey,
-          settings.model,
+          provider,
+          apiKey,
+          model,
           settings.language,
           settings.autoDetectLanguage
         );
@@ -288,7 +318,8 @@ function App() {
     onDeleteSubtitle: handleDeleteSubtitle
   });
 
-  const canGenerate = audioPath && settings.apiKey && processing.status === 'idle';
+  const activeConfig = settings.providers[settings.activeProvider];
+  const canGenerate = audioPath && activeConfig.enabled && activeConfig.apiKey && processing.status === 'idle';
   const isProcessing = processing.status !== 'idle' && processing.status !== 'done' && processing.status !== 'error';
 
   return (
@@ -405,7 +436,7 @@ function App() {
                 </div>
               )}
 
-              <ProgressIndicator state={processing} />
+              <ProgressIndicator state={processing} providerLabel={PROVIDER_LABELS[settings.activeProvider]} />
             </div>
 
             <div className="editor-main">

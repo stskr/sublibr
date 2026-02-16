@@ -36,10 +36,19 @@ export interface ProcessingState {
     error?: string;
 }
 
+// AI Providers
+export type AIProvider = 'gemini' | 'anthropic' | 'openai';
+
+export interface ProviderConfig {
+    enabled: boolean;
+    apiKey: string;
+    model: string;
+}
+
 // Settings
 export interface AppSettings {
-    apiKey: string;
-    model: 'gemini-2.5-flash' | 'gemini-2.5-pro';
+    activeProvider: AIProvider;
+    providers: Record<AIProvider, ProviderConfig>;
     language: string;
     autoDetectLanguage: boolean;
 }

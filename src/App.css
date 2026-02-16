@@ -1064,7 +1064,7 @@ a:hover {
 
 .settings-modal {
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1108,6 +1108,8 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .setting-group label {
@@ -1121,6 +1123,83 @@ a:hover {
   font-size: 12px;
   color: var(--color-text-muted);
   margin-top: var(--space-xs);
+}
+
+/* Provider sections */
+.provider-section {
+  padding: var(--space-md);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: opacity var(--transition-fast);
+}
+
+.provider-section.provider-disabled {
+  opacity: 0.5;
+}
+
+.provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.provider-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Toggle switch */
+.provider-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.provider-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg-active);
+  border-radius: var(--radius-full);
+  transition: background var(--transition-fast);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.provider-toggle-switch input:checked + .toggle-slider {
+  background: var(--color-accent);
+}
+
+.provider-toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+  background: white;
 }
 
 .settings-footer {

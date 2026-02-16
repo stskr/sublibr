@@ -2,6 +2,7 @@ import type { ProcessingState } from '../types';
 
 interface ProgressIndicatorProps {
     state: ProcessingState;
+    providerLabel?: string;
 }
 
 const STATUS_ICONS: Record<string, string> = {
@@ -26,12 +27,16 @@ const STATUS_MESSAGES: Record<string, string> = {
     'error': 'Error occurred',
 };
 
-export function ProgressIndicator({ state }: ProgressIndicatorProps) {
+export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorProps) {
     const { status, progress, currentChunk, totalChunks, error } = state;
 
     if (status === 'idle' || status === 'done') {
         return null;
     }
+
+    const message = status === 'transcribing' && providerLabel
+        ? `Transcribing with ${providerLabel}...`
+        : STATUS_MESSAGES[status];
 
     return (
         <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`}>
@@ -40,7 +45,7 @@ export function ProgressIndicator({ state }: ProgressIndicatorProps) {
                     <span className={`icon icon-sm ${status === 'transcribing' ? 'spin' : ''}`}>
                         {STATUS_ICONS[status] || 'sync'}
                     </span>
-                    {STATUS_MESSAGES[status]}
+                    {message}
                 </span>
                 {status === 'transcribing' && totalChunks && (
                     <span className="progress-chunks">

@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { Subtitle, AudioChunk } from '../types';
+import type { Subtitle, AudioChunk, AIProvider } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
+import { callProvider } from './providers';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -73,14 +73,12 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
 
 export async function transcribeChunk(
     chunk: AudioChunk,
+    provider: AIProvider,
     apiKey: string,
     model: string,
     language: string,
     autoDetect: boolean
 ): Promise<TranscriptionResult> {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ model });
-
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
 
@@ -110,18 +108,7 @@ Rules:
 
 Transcribe the audio now:`;
 
-    const result = await geminiModel.generateContent([
-        prompt,
-        {
-            inlineData: {
-                mimeType: 'audio/flac',
-                data: audioBase64,
-            },
-        },
-    ]);
-
-    const response = await result.response;
-    const text = response.text();
+    const text = await callProvider(provider, apiKey, model, prompt, audioBase64);
 
     let subtitles = parseTranscription(text, chunk.startTime);
 

@@ -107,9 +107,10 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
         }
     };
 
-    const costEstimate = fileInfo ? estimateCost(fileInfo.duration, settings.model) : null;
+    const activeConfig = settings.providers[settings.activeProvider];
+    const costEstimate = fileInfo ? estimateCost(fileInfo.duration, activeConfig.model) : null;
 
-    const hasApiKey = settings.apiKey && settings.apiKey.trim().length > 0;
+    const hasApiKey = activeConfig.apiKey && activeConfig.apiKey.trim().length > 0;
 
     return (
         <div className="file-upload-container">
