@@ -68,6 +68,21 @@ export interface SilenceSegment {
     end: number;
 }
 
+// Token usage tracking
+export interface TokenUsage {
+    inputTokens: number;
+    outputTokens: number;
+    provider: AIProvider;
+    model: string;
+    timestamp: number;
+}
+
+export interface SessionTokenStats {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    calls: TokenUsage[];
+}
+
 export interface RecentFile {
     path: string;
     name: string;

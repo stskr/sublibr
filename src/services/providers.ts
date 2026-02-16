@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AIProvider } from '../types';
+import type { AIProvider, TokenUsage } from '../types';
 
 // --- UI Constants ---
 
@@ -29,6 +29,30 @@ export const PROVIDER_KEY_URLS: Record<AIProvider, { label: string; url: string 
     anthropic: { label: 'Anthropic Console', url: 'https://console.anthropic.com/settings/keys' },
     openai: { label: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys' },
 };
+
+// --- Pricing (USD per 1M tokens) ---
+
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+    // Gemini
+    'gemini-2.5-flash': { input: 0.15, output: 0.60 },
+    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
+    // Anthropic
+    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+    'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
+    // OpenAI
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },
+    'gpt-4o': { input: 2.50, output: 10.00 },
+};
+
+export function calculateCost(tokenUsages: TokenUsage[]): number {
+    return tokenUsages.reduce((total, usage) => {
+        const pricing = MODEL_PRICING[usage.model];
+        if (!pricing) return total;
+        const inputCost = (usage.inputTokens / 1_000_000) * pricing.input;
+        const outputCost = (usage.outputTokens / 1_000_000) * pricing.output;
+        return total + inputCost + outputCost;
+    }, 0);
+}
 
 // --- API Key Testing ---
 
@@ -88,13 +112,18 @@ export async function testApiKey(
 
 // --- Provider Dispatch ---
 
+export interface ProviderResponse {
+    text: string;
+    tokenUsage: TokenUsage;
+}
+
 export async function callProvider(
     provider: AIProvider,
     apiKey: string,
     model: string,
     prompt: string,
     audioBase64: string,
-): Promise<string> {
+): Promise<ProviderResponse> {
     switch (provider) {
         case 'gemini':
             return callGemini(apiKey, model, prompt, audioBase64);
@@ -112,7 +141,7 @@ async function callGemini(
     model: string,
     prompt: string,
     audioBase64: string,
-): Promise<string> {
+): Promise<ProviderResponse> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const geminiModel = genAI.getGenerativeModel({ model });
 
@@ -127,7 +156,18 @@ async function callGemini(
     ]);
 
     const response = await result.response;
-    return response.text();
+    const usage = response.usageMetadata;
+
+    return {
+        text: response.text(),
+        tokenUsage: {
+            inputTokens: usage?.promptTokenCount ?? 0,
+            outputTokens: usage?.candidatesTokenCount ?? 0,
+            provider: 'gemini',
+            model,
+            timestamp: Date.now(),
+        },
+    };
 }
 
 // --- Anthropic (fetch) ---
@@ -137,7 +177,7 @@ async function callAnthropic(
     model: string,
     prompt: string,
     audioBase64: string,
-): Promise<string> {
+): Promise<ProviderResponse> {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -178,7 +218,17 @@ async function callAnthropic(
 
     const data = await response.json();
     const textBlock = data.content?.find((b: { type: string }) => b.type === 'text');
-    return textBlock?.text ?? '';
+
+    return {
+        text: textBlock?.text ?? '',
+        tokenUsage: {
+            inputTokens: data.usage?.input_tokens ?? 0,
+            outputTokens: data.usage?.output_tokens ?? 0,
+            provider: 'anthropic',
+            model,
+            timestamp: Date.now(),
+        },
+    };
 }
 
 // --- OpenAI (fetch) ---
@@ -188,7 +238,7 @@ async function callOpenAI(
     model: string,
     prompt: string,
     audioBase64: string,
-): Promise<string> {
+): Promise<ProviderResponse> {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -224,5 +274,15 @@ async function callOpenAI(
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content ?? '';
+
+    return {
+        text: data.choices?.[0]?.message?.content ?? '',
+        tokenUsage: {
+            inputTokens: data.usage?.prompt_tokens ?? 0,
+            outputTokens: data.usage?.completion_tokens ?? 0,
+            provider: 'openai',
+            model,
+            timestamp: Date.now(),
+        },
+    };
 }

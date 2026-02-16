@@ -194,6 +194,17 @@ a:hover {
   padding: var(--space-md);
 }
 
+.footer-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.footer-bottom-row .audio-player-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ============================================
    BUTTONS
    ============================================ */
@@ -1766,4 +1777,175 @@ a:hover {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* ============================================
+   TOKEN USAGE DISPLAY
+   ============================================ */
+.token-usage-wrapper {
+  position: relative;
+}
+
+.token-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.token-usage-badge:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.token-usage-badge .icon-sm {
+  font-size: 14px;
+  color: var(--color-accent);
+}
+
+.token-usage-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.token-usage-cost {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-success);
+  padding-left: var(--space-xs);
+  border-left: 1px solid var(--color-border);
+}
+
+/* Token Usage Popup */
+.token-usage-popup {
+  position: absolute;
+  bottom: calc(100% + var(--space-sm));
+  right: 0;
+  width: 320px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 500;
+  overflow: hidden;
+}
+
+.token-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.token-popup-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.token-popup-calls {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.token-popup-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.token-popup-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.token-popup-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.token-popup-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.token-popup-value.accent {
+  color: var(--color-accent);
+}
+
+.token-popup-breakdown {
+  padding: var(--space-md);
+}
+
+.token-popup-breakdown h4 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.token-popup-provider {
+  padding: var(--space-sm);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+}
+
+.token-popup-provider:last-child {
+  margin-bottom: 0;
+}
+
+.token-popup-provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xs);
+}
+
+.token-popup-provider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.token-popup-provider-model {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.token-popup-provider-stats {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.token-popup-provider-stats .accent {
+  color: var(--color-success);
+}
+
+.token-popup-pricing {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }

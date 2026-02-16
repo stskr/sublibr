@@ -29,6 +29,7 @@
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
 - **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
 - **Recent Files History**: Tracks the last 10 generated or opened files for quick access
+- **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
 - **Video Overlay**: Real-time subtitle preview over video playback
@@ -371,6 +372,7 @@ All components are **functional React components** using hooks. No class compone
 | `MarqueeText` | [MarqueeText.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/MarqueeText.tsx) | Smart scrolling text for long filenames |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 | `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
+| `TokenUsageDisplay` | [TokenUsageDisplay.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/TokenUsageDisplay.tsx) | Session token usage badge + detailed popup |
 
 ---
 
@@ -648,6 +650,33 @@ interface RecentFilesProps {
 
 ---
 
+#### **TokenUsageDisplay**
+
+**Props**:
+```typescript
+interface TokenUsageDisplayProps {
+  stats: SessionTokenStats;
+}
+```
+
+**Features**:
+- Displays session token count and estimated cost as a compact badge in the footer
+- Clickable badge opens a detailed popup with:
+  - Input/output token breakdown
+  - Total tokens and cost
+  - Per-provider/model breakdown with pricing info
+- Session-scoped: resets when the app is restarted (in-memory state)
+- Supports all three providers (Gemini, Anthropic, OpenAI)
+- Cost calculated using per-model pricing rates
+
+**UX Details**:
+- Only visible when tokens have been used (hidden at 0)
+- Popup closes on outside click
+- Monospaced font for token counts
+- Accent color for totals, green for cost values
+
+---
+
 ## Services & Processing
 
 ### Core Services
@@ -657,7 +686,7 @@ interface RecentFilesProps {
 **Exported Functions**:
 
 ##### `callProvider(provider, apiKey, model, prompt, audioBase64)`
-Dispatches transcription requests to the selected AI provider (Gemini, Anthropic, or OpenAI).
+Dispatches transcription requests to the selected AI provider (Gemini, Anthropic, or OpenAI). Returns a `ProviderResponse` containing both the text response and `TokenUsage` data (input/output token counts, provider, model, timestamp).
 
 ##### `testApiKey(provider, apiKey)`
 Validates an API key with the cheapest possible call per provider:
@@ -667,10 +696,14 @@ Validates an API key with the cheapest possible call per provider:
 
 Returns `{ ok: true }` or `{ ok: false, error: "..." }`.
 
+##### `calculateCost(tokenUsages)`
+Calculates the total estimated cost in USD for an array of `TokenUsage` entries, using per-model pricing rates from `MODEL_PRICING`.
+
 **Exported Constants**:
 - `PROVIDER_LABELS` — Display names for each provider
 - `MODEL_OPTIONS` — Available models per provider
 - `PROVIDER_KEY_URLS` — Links to get API keys
+- `MODEL_PRICING` — Per-model pricing (USD per 1M tokens) for input and output tokens
 
 ---
 
@@ -1329,6 +1362,7 @@ npm run build:electron
 - [x] **Subtitle export formats** (WebVTT, ASS)
 - [x] **Keyboard shortcuts** (Play/pause, seek, insert/delete, Undo/Redo)
 - [x] **Multi-AI provider support** (Gemini, Claude, OpenAI) with API key validation
+- [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

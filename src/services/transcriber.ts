@@ -1,10 +1,11 @@
-import type { Subtitle, AudioChunk, AIProvider } from '../types';
+import type { Subtitle, AudioChunk, AIProvider, TokenUsage } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
 import { callProvider } from './providers';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
     rawText: string;
+    tokenUsage: TokenUsage;
 }
 
 // Convert audio file to base64
@@ -108,7 +109,8 @@ Rules:
 
 Transcribe the audio now:`;
 
-    const text = await callProvider(provider, apiKey, model, prompt, audioBase64);
+    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64);
+    const text = providerResponse.text;
 
     let subtitles = parseTranscription(text, chunk.startTime);
 
@@ -175,6 +177,7 @@ Transcribe the audio now:`;
     return {
         subtitles,
         rawText: text,
+        tokenUsage: providerResponse.tokenUsage,
     };
 }
 

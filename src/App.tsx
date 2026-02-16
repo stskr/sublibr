@@ -15,8 +15,9 @@ import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId, formatDisplayTime } from './utils';
-import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile } from './types';
+import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats } from './types';
 import { PROVIDER_LABELS } from './services/providers';
+import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 
 import './App.css';
 
@@ -46,6 +47,19 @@ function App() {
   const [showVideoPreview, setShowVideoPreview] = useState(false);
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    calls: [],
+  });
+
+  const addTokenUsage = useCallback((usage: TokenUsage) => {
+    setTokenStats(prev => ({
+      totalInputTokens: prev.totalInputTokens + usage.inputTokens,
+      totalOutputTokens: prev.totalOutputTokens + usage.outputTokens,
+      calls: [...prev.calls, usage],
+    }));
+  }, []);
 
   // Load settings on mount
   useEffect(() => {
@@ -209,6 +223,7 @@ function App() {
           settings.autoDetectLanguage
         );
         allSubtitles.push(result.subtitles);
+        addTokenUsage(result.tokenUsage);
       }
 
       // Step 3: Merge subtitles
@@ -218,7 +233,7 @@ function App() {
       // Step 4: Heal Gaps
       setProcessing({ status: 'healing', progress: 95 });
       try {
-        merged = await healSubtitles(
+        const healResult = await healSubtitles(
           merged,
           audioPath,
           silences,
@@ -228,6 +243,8 @@ function App() {
           settings.language,
           settings.autoDetectLanguage
         );
+        merged = healResult.subtitles;
+        healResult.tokenUsages.forEach(addTokenUsage);
       } catch (err) {
         console.error('Healing failed:', err);
         // Continue with merged subtitles even if healing fails
@@ -254,7 +271,7 @@ function App() {
         error: error instanceof Error ? error.message : 'Transcription failed',
       });
     }
-  }, [audioPath, settings]);
+  }, [audioPath, settings, addTokenUsage]);
 
   // Load subtitles from file
   const handleLoadSubtitles = useCallback(async () => {
@@ -570,13 +587,16 @@ function App() {
                 onSeek={handleSeek}
               />
             )}
-            <AudioPlayer
-              audioPath={audioPath}
-              currentTime={currentTime}
-              duration={duration}
-              onTimeUpdate={setCurrentTime}
-              onDurationChange={setDuration}
-            />
+            <div className="footer-bottom-row">
+              <AudioPlayer
+                audioPath={audioPath}
+                currentTime={currentTime}
+                duration={duration}
+                onTimeUpdate={setCurrentTime}
+                onDurationChange={setDuration}
+              />
+              <TokenUsageDisplay stats={tokenStats} />
+            </div>
           </footer>
         )
       }

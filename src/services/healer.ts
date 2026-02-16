@@ -1,4 +1,4 @@
-import type { Subtitle, SilenceSegment, AIProvider } from '../types';
+import type { Subtitle, SilenceSegment, AIProvider, TokenUsage } from '../types';
 import { transcribeChunk } from './transcriber';
 
 // Interface for a gap that needs healing
@@ -12,6 +12,11 @@ interface Gap {
  * Identify gaps in subtitles that are not covered by known silences
  * and attempt to fill them by re-transcribing those specific segments.
  */
+export interface HealResult {
+    subtitles: Subtitle[];
+    tokenUsages: TokenUsage[];
+}
+
 export async function healSubtitles(
     subtitles: Subtitle[],
     audioPath: string,
@@ -22,8 +27,8 @@ export async function healSubtitles(
     language: string,
     autoDetect: boolean,
     onProgress?: (progress: number) => void
-): Promise<Subtitle[]> {
-    if (subtitles.length === 0) return subtitles;
+): Promise<HealResult> {
+    if (subtitles.length === 0) return { subtitles, tokenUsages: [] };
 
     const MIN_GAP_DURATION = 2.0; // Minimum gap to consider for healing (seconds)
     const SILENCE_PADDING = 0.5; // Padding around silence to consider it "covering" a gap
@@ -71,13 +76,14 @@ export async function healSubtitles(
     }
 
     if (actionableGaps.length === 0) {
-        return subtitles;
+        return { subtitles, tokenUsages: [] };
     }
 
     console.log(`Healing: Found ${actionableGaps.length} gaps to process.`);
 
     // 3. Heal gaps
     const newSubtitles: Subtitle[] = [];
+    const tokenUsages: TokenUsage[] = [];
 
     for (let i = 0; i < actionableGaps.length; i++) {
         const gap = actionableGaps[i];
@@ -130,6 +136,7 @@ export async function healSubtitles(
                 // Add found subtitles
                 newSubtitles.push(...result.subtitles);
             }
+            tokenUsages.push(result.tokenUsage);
 
             // Cleanup temp file? (OS usually handles temp, but good practice if API exists)
             // await window.electronAPI.deleteFile(chunkPath);
@@ -182,5 +189,8 @@ export async function healSubtitles(
         }
     }
 
-    return merged.map((s, i) => ({ ...s, index: i + 1 }));
+    return {
+        subtitles: merged.map((s, i) => ({ ...s, index: i + 1 })),
+        tokenUsages,
+    };
 }
