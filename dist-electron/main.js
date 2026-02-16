@@ -1,23 +1,23 @@
-import { app as l, BrowserWindow as y, ipcMain as r, dialog as F, shell as b } from "electron";
-import o from "path";
+import { app as l, BrowserWindow as y, ipcMain as r, dialog as P, shell as E } from "electron";
+import a from "path";
 import g from "fs";
-import { fileURLToPath as I } from "url";
-import D from "electron-store";
+import { fileURLToPath as D } from "url";
+import I from "electron-store";
 import m from "fluent-ffmpeg";
 import { createRequire as T } from "module";
-const E = o.dirname(I(import.meta.url)), v = /* @__PURE__ */ new Set();
+const F = a.dirname(D(import.meta.url)), v = /* @__PURE__ */ new Set();
 function f(n, ...e) {
   if (typeof n != "string") throw new Error("Invalid path: must be a string");
-  const t = o.resolve(n);
+  const t = a.resolve(n);
   if (v.has(t)) return t;
-  for (const a of e) {
-    const s = o.resolve(a);
-    if (t === s || t.startsWith(s + o.sep))
+  for (const s of e) {
+    const o = a.resolve(s);
+    if (t === o || t.startsWith(o + a.sep))
       return t;
   }
   throw new Error("Access denied: path is outside allowed directories");
 }
-function c() {
+function d() {
   return [
     l.getPath("temp"),
     l.getPath("userData")
@@ -26,12 +26,12 @@ function c() {
 const S = ["settings"];
 if (l.isPackaged) {
   const n = process.platform === "win32" ? ".exe" : "";
-  m.setFfmpegPath(o.join(process.resourcesPath, "ffmpeg", "ffmpeg" + n)), m.setFfprobePath(o.join(process.resourcesPath, "ffprobe", "ffprobe" + n));
+  m.setFfmpegPath(a.join(process.resourcesPath, "ffmpeg", "ffmpeg" + n)), m.setFfprobePath(a.join(process.resourcesPath, "ffprobe", "ffprobe" + n));
 } else {
   const n = T(import.meta.url);
   m.setFfmpegPath(n("@ffmpeg-installer/ffmpeg").path), m.setFfprobePath(n("@ffprobe-installer/ffprobe").path);
 }
-const x = new D();
+const x = new I();
 let p = null;
 function R() {
   p = new y({
@@ -40,17 +40,17 @@ function R() {
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: o.join(E, "preload.js"),
+      preload: a.join(F, "preload.js"),
       contextIsolation: !0,
       nodeIntegration: !1,
       sandbox: !0
     },
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0a0a0f"
-  }), p.webContents.setWindowOpenHandler(({ url: n }) => ((n.startsWith("http://") || n.startsWith("https://")) && b.openExternal(n), { action: "deny" })), p.webContents.on("will-navigate", (n, e) => {
+  }), p.webContents.setWindowOpenHandler(({ url: n }) => ((n.startsWith("http://") || n.startsWith("https://")) && E.openExternal(n), { action: "deny" })), p.webContents.on("will-navigate", (n, e) => {
     const t = process.env.VITE_DEV_SERVER_URL || "file://";
-    e.startsWith(t) || (n.preventDefault(), b.openExternal(e));
-  }), process.env.VITE_DEV_SERVER_URL ? (p.loadURL(process.env.VITE_DEV_SERVER_URL), p.webContents.openDevTools()) : p.loadFile(o.join(E, "../dist/index.html"));
+    e.startsWith(t) || (n.preventDefault(), E.openExternal(e));
+  }), process.env.VITE_DEV_SERVER_URL ? (p.loadURL(process.env.VITE_DEV_SERVER_URL), p.webContents.openDevTools()) : p.loadFile(a.join(F, "../dist/index.html"));
 }
 l.whenReady().then(R);
 l.on("window-all-closed", () => {
@@ -60,7 +60,7 @@ l.on("before-quit", () => {
   try {
     const n = l.getPath("temp"), e = g.readdirSync(n);
     for (const t of e)
-      /^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(t) && g.unlinkSync(o.join(n, t));
+      /^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(t) && g.unlinkSync(a.join(n, t));
   } catch {
   }
 });
@@ -78,27 +78,36 @@ r.handle("store:set", (n, e, t) => {
   x.set(e, t);
 });
 r.handle("dialog:openFile", async () => {
-  const e = (await F.showOpenDialog(p, {
+  const e = (await P.showOpenDialog(p, {
     properties: ["openFile"],
     filters: [
       { name: "Media Files", extensions: ["mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "aac", "m4a", "ogg", "flac"] }
     ]
   })).filePaths[0] || null;
-  return e && v.add(o.resolve(e)), e;
+  return e && v.add(a.resolve(e)), e;
+});
+r.handle("dialog:openSubtitleFile", async () => {
+  const e = (await P.showOpenDialog(p, {
+    properties: ["openFile"],
+    filters: [
+      { name: "Subtitle Files", extensions: ["srt", "vtt", "ass", "ssa"] }
+    ]
+  })).filePaths[0] || null;
+  return e && v.add(a.resolve(e)), e;
 });
 r.handle("dialog:saveFile", async (n, e) => {
-  const a = (await F.showSaveDialog(p, {
+  const s = (await P.showSaveDialog(p, {
     defaultPath: e,
     filters: [{ name: "SRT Subtitle", extensions: ["srt"] }]
   })).filePath || null;
-  return a && v.add(o.resolve(a)), a;
+  return s && v.add(a.resolve(s)), s;
 });
 r.handle("file:read", async (n, e) => {
-  const t = f(e, ...c());
+  const t = f(e, ...d());
   return g.promises.readFile(t);
 });
 r.handle("file:readAsDataUrl", async (n, e) => {
-  const t = f(e, ...c()), a = await g.promises.readFile(t), s = o.extname(t).toLowerCase().slice(1);
+  const t = f(e, ...d()), s = await g.promises.readFile(t), o = a.extname(t).toLowerCase().slice(1);
   return `data:${{
     mp3: "audio/mpeg",
     wav: "audio/wav",
@@ -111,62 +120,62 @@ r.handle("file:readAsDataUrl", async (n, e) => {
     mkv: "video/x-matroska",
     mov: "video/quicktime",
     avi: "video/x-msvideo"
-  }[s] || "application/octet-stream"};base64,${a.toString("base64")}`;
+  }[o] || "application/octet-stream"};base64,${s.toString("base64")}`;
 });
 r.handle("file:write", async (n, e, t) => {
-  const a = f(e, ...c());
-  await g.promises.writeFile(a, t, "utf-8");
+  const s = f(e, ...d());
+  await g.promises.writeFile(s, t, "utf-8");
 });
 r.handle("file:getInfo", async (n, e) => {
-  const t = f(e, ...c());
+  const t = f(e, ...d());
   return {
     size: (await g.promises.stat(t)).size,
     path: t,
-    name: o.basename(t),
-    ext: o.extname(t).toLowerCase()
+    name: a.basename(t),
+    ext: a.extname(t).toLowerCase()
   };
 });
 r.handle("file:getTempPath", () => l.getPath("temp"));
 r.handle("ffmpeg:extractAudio", async (n, e, t) => {
-  const a = f(e, ...c()), s = f(t, ...c());
-  return new Promise((i, d) => {
-    m(a).audioCodec("flac").toFormat("flac").on("end", () => i(s)).on("error", (h) => d(h.message)).save(s);
+  const s = f(e, ...d()), o = f(t, ...d());
+  return new Promise((i, c) => {
+    m(s).audioCodec("flac").toFormat("flac").on("end", () => i(o)).on("error", (h) => c(h.message)).save(o);
   });
 });
 r.handle("ffmpeg:getDuration", async (n, e) => {
-  const t = f(e, ...c());
-  return new Promise((a, s) => {
-    m.ffprobe(t, (i, d) => {
-      i ? s(i.message) : a(d.format.duration || 0);
+  const t = f(e, ...d());
+  return new Promise((s, o) => {
+    m.ffprobe(t, (i, c) => {
+      i ? o(i.message) : s(c.format.duration || 0);
     });
   });
 });
-r.handle("ffmpeg:detectSilences", async (n, e, t, a) => {
-  const s = f(e, ...c());
+r.handle("ffmpeg:detectSilences", async (n, e, t, s) => {
+  const o = f(e, ...d());
   if (!Number.isFinite(t) || t < -100 || t > 0)
     throw new Error("Invalid threshold: must be between -100 and 0");
-  if (!Number.isFinite(a) || a < 0.1 || a > 60)
+  if (!Number.isFinite(s) || s < 0.1 || s > 60)
     throw new Error("Invalid minDuration: must be between 0.1 and 60");
-  return new Promise((i, d) => {
+  return new Promise((i, c) => {
     const h = [];
     let u = null;
-    m(s).audioFilters(`silencedetect=noise=${t}dB:d=${a}`).format("null").on("stderr", (w) => {
-      const P = w.match(/silence_start:\s*([\d.]+)/);
-      P && (u = { start: parseFloat(P[1]) });
+    m(o).audioFilters(`silencedetect=noise=${t}dB:d=${s}`).format("null").on("stderr", (w) => {
+      const b = w.match(/silence_start:\s*([\d.]+)/);
+      b && (u = { start: parseFloat(b[1]) });
       const _ = w.match(/silence_end:\s*([\d.]+)/);
       _ && u && (u.end = parseFloat(_[1]), h.push(u), u = null);
-    }).on("end", () => i(h)).on("error", (w) => d(w.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
+    }).on("end", () => i(h)).on("error", (w) => c(w.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
 r.handle("ffmpeg:splitAudio", async (n, e, t) => {
-  const a = f(e, ...c()), s = [];
+  const s = f(e, ...d()), o = [];
   for (const i of t) {
-    const d = f(i.outputPath, ...c());
+    const c = f(i.outputPath, ...d());
     await new Promise((h, u) => {
-      m(a).setStartTime(i.start).setDuration(i.end - i.start).audioCodec("flac").toFormat("flac").on("end", () => {
-        s.push(d), h();
-      }).on("error", (w) => u(w.message)).save(d);
+      m(s).setStartTime(i.start).setDuration(i.end - i.start).audioCodec("flac").toFormat("flac").on("end", () => {
+        o.push(c), h();
+      }).on("error", (w) => u(w.message)).save(c);
     });
   }
-  return s;
+  return o;
 });

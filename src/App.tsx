@@ -10,6 +10,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { createAudioChunks } from './services/audioProcessor';
 import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss } from './services/transcriber';
 import { healSubtitles } from './services/healer';
+import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId } from './utils';
@@ -201,7 +202,38 @@ function App() {
     }
   }, [audioPath, settings]);
 
-  // Download SRT
+  // Load subtitles from file
+  const handleLoadSubtitles = useCallback(async () => {
+    if (!window.electronAPI) return;
+
+    const filePath = await window.electronAPI.openSubtitleFileDialog();
+    if (!filePath) return;
+
+    try {
+      const buffer = await window.electronAPI.readFile(filePath);
+      const text = new TextDecoder('utf-8').decode(new Uint8Array(buffer));
+      const ext = filePath.split('.').pop() || '';
+      const loaded = parseSubtitleFile(text, ext);
+
+      if (loaded.length === 0) {
+        setProcessing({
+          status: 'error',
+          progress: 0,
+          error: 'No subtitles found in the file. Please check the file format.',
+        });
+        return;
+      }
+
+      setSubtitles(loaded);
+    } catch (err) {
+      setProcessing({
+        status: 'error',
+        progress: 0,
+        error: err instanceof Error ? err.message : 'Failed to load subtitle file',
+      });
+    }
+  }, [setSubtitles]);
+
   // Download subtitles
   const handleDownload = useCallback(async () => {
     if (subtitles.length === 0) return;
@@ -410,6 +442,18 @@ function App() {
                     style={{ marginTop: '1rem' }}
                   >
                     <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
+                  </button>
+
+                  <div className="sidebar-divider">
+                    <span>or</span>
+                  </div>
+
+                  <button
+                    className="btn-secondary"
+                    onClick={handleLoadSubtitles}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <span className="icon icon-sm">upload_file</span> Load Subtitles
                   </button>
                 </div>
               )}

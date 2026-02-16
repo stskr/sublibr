@@ -6,6 +6,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   setStoreValue: (key, value) => import_electron.ipcRenderer.invoke("store:set", key, value),
   // File dialogs
   openFileDialog: () => import_electron.ipcRenderer.invoke("dialog:openFile"),
+  openSubtitleFileDialog: () => import_electron.ipcRenderer.invoke("dialog:openSubtitleFile"),
   saveFileDialog: (defaultName) => import_electron.ipcRenderer.invoke("dialog:saveFile", defaultName),
   // File operations
   readFile: (path) => import_electron.ipcRenderer.invoke("file:read", path),

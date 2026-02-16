@@ -161,6 +161,18 @@ ipcMain.handle('dialog:openFile', async () => {
   return filePath;
 });
 
+ipcMain.handle('dialog:openSubtitleFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Subtitle Files', extensions: ['srt', 'vtt', 'ass', 'ssa'] },
+    ],
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
+});
+
 ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
   const result = await dialog.showSaveDialog(mainWindow!, {
     defaultPath: defaultName,

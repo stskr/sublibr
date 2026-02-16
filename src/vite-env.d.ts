@@ -5,6 +5,7 @@ export interface ElectronAPI {
     getStoreValue: (key: string) => Promise<unknown>;
     setStoreValue: (key: string, value: unknown) => Promise<void>;
     openFileDialog: () => Promise<string | null>;
+    openSubtitleFileDialog: () => Promise<string | null>;
     saveFileDialog: (defaultName: string) => Promise<string | null>;
     readFile: (path: string) => Promise<ArrayBuffer>;
     readFileAsDataUrl: (path: string) => Promise<string>;

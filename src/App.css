@@ -414,6 +414,25 @@ a:hover {
   width: 100%;
 }
 
+.sidebar-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-divider::before,
+.sidebar-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+
 .file-icon {
   font-size: 32px;
 }
