@@ -18,6 +18,7 @@ import { generateId, formatDisplayTime } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats } from './types';
 import { PROVIDER_LABELS } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
+import { UpdateNotification } from './components/UpdateNotification';
 
 import './App.css';
 
@@ -469,6 +470,8 @@ function App() {
           </button>
         </div>
       </header >
+
+      <UpdateNotification />
 
       <main className="app-main">
         {!mediaFile ? (

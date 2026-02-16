@@ -33,6 +33,7 @@
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
 - **Video Overlay**: Real-time subtitle preview over video playback
+- **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
 
 ### Tech Stack
 
@@ -174,6 +175,16 @@ window.electronAPI = {
   onProgress: (callback: (progress: number) => void) => {
     ipcRenderer.on('progress', (_event, progress) => callback(progress));
   },
+
+  // App updates
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
+  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
+  onUpdateProgress: (callback) => ipcRenderer.on('update-download-progress', (_, progress) => callback(progress)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_, info) => callback(info)),
+  onUpdateError: (callback) => ipcRenderer.on('update-error', (_, message) => callback(message)),
 }
 ```
 
@@ -232,6 +243,7 @@ Four core services handle subtitle processing:
 | **OpenAI API** | Transcription | API key stored in settings, tested via `GET /v1/models` |
 | **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
 | **ffprobe** | Media metadata | Bundled with FFmpeg |
+| **electron-updater** | Auto-updates | GitHub Releases backend, check+prompt UX |
 
 ---
 
@@ -373,6 +385,7 @@ All components are **functional React components** using hooks. No class compone
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 | `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
 | `TokenUsageDisplay` | [TokenUsageDisplay.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/TokenUsageDisplay.tsx) | Session token usage badge + detailed popup |
+| `UpdateNotification` | [UpdateNotification.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/UpdateNotification.tsx) | Auto-update banner (available, downloading, ready) |
 
 ---
 
@@ -647,6 +660,29 @@ interface RecentFilesProps {
 - Shows filename, date (relative time), and last action (Generated/Opened)
 - Click to instantly reload file and state
 - Persistent storage via `electron-store`
+
+---
+
+#### **UpdateNotification**
+
+**Props**: None (self-contained, listens to Electron IPC events internally)
+
+**Features**:
+- Listens for auto-update events from the main process via `electronAPI`
+- Four states:
+  1. **Available**: Shows version number + "Download" and "Later" buttons
+  2. **Downloading**: Shows progress bar with percentage
+  3. **Ready**: Shows "Restart Now" and "Later" buttons
+  4. **Error**: Shows "Retry" and "Dismiss" buttons
+- Dismissible — user can hide the notification and continue working
+- Non-intrusive banner below the app header
+
+**UX Details**:
+- Uses `electron-updater` via GitHub Releases backend
+- Auto-checks on app startup (5s delay, packaged builds only)
+- Manual check available via IPC
+- No auto-download — user must explicitly click "Download"
+- `autoInstallOnAppQuit` enabled for convenience
 
 ---
 
@@ -1363,6 +1399,7 @@ npm run build:electron
 - [x] **Keyboard shortcuts** (Play/pause, seek, insert/delete, Undo/Redo)
 - [x] **Multi-AI provider support** (Gemini, Claude, OpenAI) with API key validation
 - [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
+- [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

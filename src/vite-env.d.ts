@@ -21,6 +21,16 @@ export interface ElectronAPI {
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
     splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => Promise<string[]>;
     onProgress: (callback: (progress: number) => void) => void;
+
+    // App updates
+    getVersion: () => Promise<string>;
+    checkForUpdates: () => Promise<{ updateAvailable: boolean }>;
+    downloadUpdate: () => Promise<void>;
+    installUpdate: () => void;
+    onUpdateAvailable: (callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void) => void;
+    onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void;
+    onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
+    onUpdateError: (callback: (message: string) => void) => void;
 }
 
 declare global {

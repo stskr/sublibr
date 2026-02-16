@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
+import { autoUpdater } from 'electron-updater';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -130,6 +131,49 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+// ============== Auto-Updater ==============
+
+// Only enable auto-updates in packaged builds (not during development)
+if (app.isPackaged) {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // Check for updates after a short delay on startup
+  app.whenReady().then(() => {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => {
+        // Silently ignore — network may be unavailable
+      });
+    }, 5000);
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+      releaseDate: info.releaseDate,
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-download-progress', {
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update-downloaded', {
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('update-error', err.message);
+  });
+}
 
 // ============== IPC Handlers ==============
 
@@ -327,4 +371,29 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
   }
 
   return results;
+});
+
+// ============== App Update IPC ==============
+
+ipcMain.handle('app:getVersion', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('app:checkForUpdates', async () => {
+  if (!app.isPackaged) return { updateAvailable: false };
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { updateAvailable: !!result?.updateInfo };
+  } catch {
+    return { updateAvailable: false };
+  }
+});
+
+ipcMain.handle('app:downloadUpdate', async () => {
+  if (!app.isPackaged) return;
+  await autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle('app:installUpdate', () => {
+  autoUpdater.quitAndInstall(false, true);
 });
