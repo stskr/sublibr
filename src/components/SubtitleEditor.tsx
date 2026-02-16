@@ -142,6 +142,16 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
     );
 }
 
+// Wrap subtitle text to max 8 words per line for tooltip
+function wrapTooltip(text: string): string {
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    for (let i = 0; i < words.length; i += 8) {
+        lines.push(words.slice(i, i + 8).join(' '));
+    }
+    return lines.join('\n');
+}
+
 // Mini timeline preview component
 export function TimelinePreview({ subtitles, duration, currentTime, onSeek }: {
     subtitles: Subtitle[];
@@ -163,6 +173,7 @@ export function TimelinePreview({ subtitles, duration, currentTime, onSeek }: {
                     <div
                         key={sub.id}
                         className="timeline-segment"
+                        title={wrapTooltip(sub.text)}
                         style={{
                             left: `${(sub.startTime / duration) * 100}%`,
                             width: `${((sub.endTime - sub.startTime) / duration) * 100}%`,

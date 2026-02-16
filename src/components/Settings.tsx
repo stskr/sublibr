@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AppSettings, AIProvider } from '../types';
 import { PROVIDER_LABELS, MODEL_OPTIONS, PROVIDER_KEY_URLS, testApiKey } from '../services/providers';
+import { CustomSelect } from './CustomSelect';
 
 interface SettingsProps {
     settings: AppSettings;
@@ -109,13 +110,12 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                     <div className="active-provider-hero">
                         <label htmlFor="activeModel">Active Model</label>
                         {hasAnyKey ? (
-                            <select
+                            <CustomSelect
                                 id="activeModel"
-                                className="select-field"
                                 value={enabledProviders.length > 0 ? `${draft.activeProvider}:${draft.providers[draft.activeProvider].model}` : ''}
                                 disabled={enabledProviders.length === 0}
-                                onChange={(e) => {
-                                    const [provider, model] = e.target.value.split(':') as [AIProvider, string];
+                                onChange={(val) => {
+                                    const [provider, model] = val.split(':') as [AIProvider, string];
                                     setDraft(prev => ({
                                         ...prev,
                                         activeProvider: provider,
@@ -125,18 +125,16 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                         },
                                     }));
                                 }}
-                            >
-                                {enabledProviders.length === 0 && (
-                                    <option value="" disabled>Enable a provider below</option>
-                                )}
-                                {enabledProviders.map(p =>
-                                    MODEL_OPTIONS[p].map(m => (
-                                        <option key={`${p}:${m.value}`} value={`${p}:${m.value}`}>
-                                            {PROVIDER_LABELS[p]} — {m.label}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
+                                options={[
+                                    ...(enabledProviders.length === 0 ? [{ value: '', label: 'Enable a provider below', disabled: true }] : []),
+                                    ...enabledProviders.flatMap(p =>
+                                        MODEL_OPTIONS[p].map(m => ({
+                                            value: `${p}:${m.value}`,
+                                            label: `${PROVIDER_LABELS[p]} — ${m.label}`,
+                                        }))
+                                    ),
+                                ]}
+                            />
                         ) : (
                             <div className="hero-info-banner">
                                 <span className="icon icon-sm">info</span>

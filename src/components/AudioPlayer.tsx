@@ -111,52 +111,52 @@ export function AudioPlayer({
     }, [seek, togglePlay]);
 
     return (
-        <div className="audio-player">
-            <audio ref={audioRef} />
+        <div className="audio-player-wrapper">
+            {fileName && (
+                <div className="player-track-info">
+                    <MarqueeText text={fileName} className="player-track-name" />
+                </div>
+            )}
+            <div className="audio-player">
+                <audio ref={audioRef} />
 
-            <div className="player-controls">
-                <button className="control-btn skip" onClick={skipBackward} title="Back 5s">
-                    <span className="icon">fast_rewind</span>
-                </button>
+                <div className="player-controls">
+                    <button className="control-btn skip" onClick={skipBackward} title="Back 5s">
+                        <span className="icon">fast_rewind</span>
+                    </button>
 
-                <button className="control-btn play" onClick={togglePlay}>
-                    <span className="icon">{isPlaying ? 'pause' : 'play_arrow'}</span>
-                </button>
+                    <button className="control-btn play" onClick={togglePlay}>
+                        <span className="icon">{isPlaying ? 'pause' : 'play_arrow'}</span>
+                    </button>
 
-                <button className="control-btn skip" onClick={skipForward} title="Forward 5s">
-                    <span className="icon">fast_forward</span>
-                </button>
-            </div>
+                    <button className="control-btn skip" onClick={skipForward} title="Forward 5s">
+                        <span className="icon">fast_forward</span>
+                    </button>
+                </div>
 
-            <div className="player-center">
-                {fileName && (
-                    <div className="player-track-info">
-                        <MarqueeText text={fileName} className="player-track-name" />
-                    </div>
-                )}
                 <div className="player-progress" onClick={handleProgressClick}>
                     <div
                         className="progress-filled"
                         style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
                 </div>
-            </div>
 
-            <div className="player-time">
-                {formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}
-            </div>
+                <div className="player-time">
+                    {formatDisplayTime(currentTime)} / {formatDisplayTime(duration)}
+                </div>
 
-            <div className="player-volume">
-                <span className="icon icon-sm volume-icon">{volume === 0 ? 'volume_off' : volume < 0.5 ? 'volume_down' : 'volume_up'}</span>
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={volume}
-                    onChange={handleVolumeChange}
-                    className="volume-slider"
-                />
+                <div className="player-volume">
+                    <span className="icon icon-sm volume-icon">{volume === 0 ? 'volume_off' : volume < 0.5 ? 'volume_down' : 'volume_up'}</span>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={volume}
+                        onChange={handleVolumeChange}
+                        className="volume-slider"
+                    />
+                </div>
             </div>
         </div>
     );

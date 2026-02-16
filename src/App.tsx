@@ -7,6 +7,7 @@ import { AudioPlayer } from './components/AudioPlayer';
 import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
+import { CustomSelect } from './components/CustomSelect';
 import { createAudioChunks } from './services/audioProcessor';
 import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss } from './services/transcriber';
 import { healSubtitles } from './services/healer';
@@ -377,23 +378,6 @@ function App() {
           <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '32px' }} /> SUBLIBR</h1>
         </div>
         <div className="header-actions">
-          {subtitles.length > 0 && (
-            <div className="flex gap-2">
-              <select
-                className="select-input"
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ass')}
-                style={{ width: 'auto', paddingRight: '2rem' }}
-              >
-                <option value="srt">SRT</option>
-                <option value="vtt">WebVTT</option>
-                <option value="ass">ASS</option>
-              </select>
-              <button className="btn-secondary" onClick={handleDownload}>
-                <span className="icon icon-sm">download</span> Download
-              </button>
-            </div>
-          )}
           {mediaFile?.isVideo && subtitles.length > 0 && (
             <button className="btn-secondary" onClick={() => setShowVideoPreview(true)}>
               <span className="icon icon-sm">visibility</span> Preview
@@ -421,10 +405,6 @@ function App() {
         ) : (
           <div className="editor-container">
             <div className="editor-sidebar">
-              <div className="file-summary">
-                {/* File Info moved to AudioPlayer */}
-              </div>
-
               {!isProcessing && subtitles.length === 0 && (
                 <div className="sidebar-section">
                   <LanguageSelector
@@ -459,24 +439,27 @@ function App() {
               )}
 
               {subtitles.length > 0 && (
-                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                  <select
-                    className="select-input"
-                    value={exportFormat}
-                    onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ass')}
-                    style={{ width: '80px' }}
-                  >
-                    <option value="srt">SRT</option>
-                    <option value="vtt">VTT</option>
-                    <option value="ass">ASS</option>
-                  </select>
-                  <button
-                    className="btn-primary download-btn"
-                    onClick={handleDownload}
-                    style={{ flex: 1, justifyContent: 'center' }}
-                  >
-                    <span className="icon icon-sm">download</span> Download
-                  </button>
+                <div style={{ marginTop: '1rem' }}>
+                  <label className="sidebar-label">Export Format</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <CustomSelect
+                      options={[
+                        { value: 'srt', label: 'SRT' },
+                        { value: 'vtt', label: 'VTT' },
+                        { value: 'ass', label: 'ASS' },
+                      ]}
+                      value={exportFormat}
+                      onChange={(v) => setExportFormat(v as 'srt' | 'vtt' | 'ass')}
+                      style={{ width: '100px' }}
+                    />
+                    <button
+                      className="btn-primary download-btn"
+                      onClick={handleDownload}
+                      style={{ flex: 1, justifyContent: 'center' }}
+                    >
+                      <span className="icon icon-sm">download</span> Download
+                    </button>
+                  </div>
                 </div>
               )}
 
