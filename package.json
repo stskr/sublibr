@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Local subtitle generator using Gemini AI",
   "author": "Subtitles Gen",
+  "license": "MIT",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {

@@ -8,6 +8,26 @@ export function formatSrtTime(seconds: number): string {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }
 
+// Format seconds to WebVTT timecode: HH:MM:SS.mmm
+export function formatVttTime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+}
+
+// Format seconds to ASS timecode: H:MM:SS.cc (centiseconds)
+export function formatAssTime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const cs = Math.floor(((seconds % 1) * 100)); // centiseconds
+
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${cs.toString().padStart(2, '0')}`;
+}
+
 // Parse SRT timecode to seconds
 export function parseSrtTime(timecode: string): number {
     const match = timecode.match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/);

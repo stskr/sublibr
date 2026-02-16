@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Subtitle, AudioChunk } from '../types';
-import { generateId, formatSrtTime } from '../utils';
+import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -425,4 +425,35 @@ export function generateSrt(subtitles: Subtitle[]): string {
     return subtitles.map((sub, i) => {
         return `${i + 1}\n${formatSrtTime(sub.startTime)} --> ${formatSrtTime(sub.endTime)}\n${sub.text}\n`;
     }).join('\n');
+}
+
+// Generate WebVTT file content
+export function generateWebVtt(subtitles: Subtitle[]): string {
+    return `WEBVTT\n\n` + subtitles.map((sub) => {
+        return `${formatVttTime(sub.startTime)} --> ${formatVttTime(sub.endTime)}\n${sub.text}\n`;
+    }).join('\n');
+}
+
+// Generate ASS file content
+export function generateAss(subtitles: Subtitle[]): string {
+    const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,50,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+    const events = subtitles.map((sub) => {
+        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${sub.text.replace(/\n/g, '\\N')}`;
+    }).join('\n');
+
+    return header + events;
 }

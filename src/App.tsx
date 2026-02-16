@@ -7,7 +7,7 @@ import { VideoPreview } from './components/VideoPreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
 import { createAudioChunks } from './services/audioProcessor';
-import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt } from './services/transcriber';
+import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss } from './services/transcriber';
 import { healSubtitles } from './services/healer';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState } from './types';
 
@@ -30,6 +30,7 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
   const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
 
   // Load settings on mount
   useEffect(() => {
@@ -164,19 +165,38 @@ function App() {
   }, [audioPath, settings]);
 
   // Download SRT
+  // Download subtitles
   const handleDownload = useCallback(async () => {
     if (subtitles.length === 0) return;
 
+    let ext = '.srt';
+    let content = '';
+
+    switch (exportFormat) {
+      case 'vtt':
+        ext = '.vtt';
+        content = generateWebVtt(subtitles);
+        break;
+      case 'ass':
+        ext = '.ass';
+        content = generateAss(subtitles);
+        break;
+      case 'srt':
+      default:
+        ext = '.srt';
+        content = generateSrt(subtitles);
+        break;
+    }
+
     const defaultName = mediaFile
-      ? mediaFile.name.replace(/\.[^.]+$/, '.srt')
-      : 'subtitles.srt';
+      ? mediaFile.name.replace(/\.[^.]+$/, ext)
+      : `subtitles${ext}`;
 
     const savePath = await window.electronAPI.saveFileDialog(defaultName);
     if (savePath) {
-      const srtContent = generateSrt(subtitles);
-      await window.electronAPI.writeFile(savePath, srtContent);
+      await window.electronAPI.writeFile(savePath, content);
     }
-  }, [subtitles, mediaFile]);
+  }, [subtitles, mediaFile, exportFormat]);
 
   // Seek audio
   const handleSeek = useCallback((time: number) => {
@@ -212,9 +232,21 @@ function App() {
         </div>
         <div className="header-actions">
           {subtitles.length > 0 && (
-            <button className="btn-secondary" onClick={handleDownload}>
-              <span className="icon icon-sm">download</span> Download SRT
-            </button>
+            <div className="flex gap-2">
+              <select
+                className="select-input"
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ass')}
+                style={{ width: 'auto', paddingRight: '2rem' }}
+              >
+                <option value="srt">SRT</option>
+                <option value="vtt">WebVTT</option>
+                <option value="ass">ASS</option>
+              </select>
+              <button className="btn-secondary" onClick={handleDownload}>
+                <span className="icon icon-sm">download</span> Download
+              </button>
+            </div>
           )}
           {mediaFile?.isVideo && subtitles.length > 0 && (
             <button className="btn-secondary" onClick={() => setShowVideoPreview(true)}>
@@ -269,13 +301,25 @@ function App() {
               )}
 
               {subtitles.length > 0 && (
-                <button
-                  className="btn-primary download-btn"
-                  onClick={handleDownload}
-                  style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}
-                >
-                  <span className="icon icon-sm">download</span> Download SRT
-                </button>
+                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                  <select
+                    className="select-input"
+                    value={exportFormat}
+                    onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ass')}
+                    style={{ width: '80px' }}
+                  >
+                    <option value="srt">SRT</option>
+                    <option value="vtt">VTT</option>
+                    <option value="ass">ASS</option>
+                  </select>
+                  <button
+                    className="btn-primary download-btn"
+                    onClick={handleDownload}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    <span className="icon icon-sm">download</span> Download
+                  </button>
+                </div>
               )}
 
               <ProgressIndicator state={processing} />

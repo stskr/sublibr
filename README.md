@@ -1,71 +1,78 @@
 # Subtitles Generator
 
-A desktop app that generates high-quality subtitles from audio/video files using Gemini AI.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## Features
+A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files using Google's Gemini AI.
 
-- Transcribe audio and video files into SRT subtitles
-- Powered by Google Gemini AI (Flash or Pro)
-- Automatic silence detection and smart audio chunking
-- Gap healing — re-transcribes missed speech segments
-- Subtitle quality enforcement (minimum display duration, reading speed)
-- Multi-language support with auto-detection
-- Built-in subtitle editor and timeline preview
-- Video preview with subtitle overlay
+## ✨ Features
 
-## Requirements
+- **🎙️ AI Transcription**: Powered by Google Gemini (Flash & Pro models) for industry-leading accuracy.
+- **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
+- **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware overlap.
+- **🩹 Gap Healing**: intelligently detects and fills in missing subtitles that AI might have skipped.
+- **⚡ Quality Control**: Enforces reading speeds, line limits, and minimum durations for professional-looking subtitles.
+- **🎬 Visual Editor**: Built-in timeline editor with real-time video preview.
+- **🔒 Private & Local**: Your files stay on your machine (except for the audio chunks sent securely to Gemini API).
 
-- A [Google Gemini API key](https://aistudio.google.com/apikey)
-- Node.js 18+
+## 🚀 Getting Started
 
-## Development
+### Prerequisites
 
-```bash
-npm install
-npm run dev
-```
+- **Node.js**: v18 or newer
+- **Google Gemini API Key**: You can get a free key from [Google AI Studio](https://aistudio.google.com/apikey).
 
-## Building Installers
+### Installation
 
-Build for the current platform:
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/yourusername/subtitles-gen.git
+    cd subtitles-gen
+    ```
 
-```bash
-npm run build:electron
-```
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
 
-Build for a specific platform:
+3.  **Run the app**
+    ```bash
+    npm run dev
+    ```
+
+### Building for Production
+
+To create an installer for your OS (`.dmg`, `.exe`, or `.AppImage`):
 
 ```bash
 # macOS
-npm run build && npx electron-builder --mac
+npm run build:electron
 
-# Windows (requires win32 ffmpeg/ffprobe binaries in node_modules)
-npm run build && npx electron-builder --win --x64
+# Windows
+npm run build && npx electron-builder --win
 
 # Linux
-npm run build && npx electron-builder --linux --x64
+npm run build && npx electron-builder --linux
 ```
 
-Installers are output to the `release/` directory.
+## 🛠️ How to Use
 
-### Windows cross-compilation from macOS
+1.  **Set API Key**: Click the **Settings** (gear icon) in the top right and paste your Google Gemini API Key.
+2.  **Load Media**: Drop a video or audio file into the main window.
+3.  **Generate**: Select your language (or leave as Auto-detect) and click **Generate Subtitles**.
+4.  **Edit & Export**: Review the generated subtitles in the timeline editor, make any fixes, and click **Download SRT** to save.
 
-The Windows ffmpeg/ffprobe binaries aren't installed by npm on macOS (they're platform-specific optional dependencies). To cross-compile, manually fetch them first:
+## ⚙️ Configuration
 
-```bash
-npm pack @ffmpeg-installer/win32-x64
-npm pack @ffprobe-installer/win32-x64
-mkdir -p node_modules/@ffmpeg-installer/win32-x64 node_modules/@ffprobe-installer/win32-x64
-tar xzf ffmpeg-installer-win32-x64-*.tgz -C node_modules/@ffmpeg-installer/win32-x64 --strip-components=1
-tar xzf ffprobe-installer-win32-x64-*.tgz -C node_modules/@ffprobe-installer/win32-x64 --strip-components=1
-rm *.tgz
-npm run build && npx electron-builder --win --x64
-```
+- **Model Selection**: Switch between `Gemini 2.5 Flash` (faster, cheaper) and `Gemini 2.5 Pro` (higher accuracy) in Settings.
+- **Theme**: The app defaults to a modern dark theme optimized for video editing.
 
-## Tech Stack
+## 🏗️ Tech Stack
 
-- Electron
-- React + TypeScript
-- Vite
-- Google Gemini API
-- FFmpeg (bundled)
+- **Core**: Electron, React 19, TypeScript, Vite
+- **AI**: Google Generative AI SDK
+- **Media**: FFmpeg (via `@ffmpeg-installer` for easy distribution)
+- **Styling**: Vanilla CSS with comprehensive design tokens
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
