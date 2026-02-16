@@ -153,22 +153,27 @@ a:hover {
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
+  height: 60px;
+  /* Explicit height to keep window controls happy */
 }
 
-.header-title {
+.header-brand {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   -webkit-app-region: no-drag;
 }
 
-.header-title h1 {
+.header-brand h1 {
   font-size: 18px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  margin: 0;
 }
+
+/* .header-title removed/refactored */
 
 .header-actions {
   display: flex;
@@ -200,7 +205,7 @@ a:hover {
   padding: var(--space-sm) var(--space-md);
   background: var(--color-accent);
   color: white;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
@@ -518,7 +523,7 @@ a:hover {
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-md);
   width: 100%;
 }
 
@@ -538,6 +543,7 @@ a:hover {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin: var(--space-xs) 0;
 }
 
 .sidebar-divider::before,
@@ -546,6 +552,13 @@ a:hover {
   flex: 1;
   height: 1px;
   background: var(--color-border);
+}
+
+.sidebar-hint {
+  text-align: center;
+  margin-top: var(--space-sm);
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 
@@ -738,14 +751,15 @@ a:hover {
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
 
 
-.generate-btn {
+.sidebar-action-btn {
   width: 100%;
   padding: var(--space-md);
   font-size: 15px;
+  justify-content: center;
 }
 
 .editor-main {
@@ -967,7 +981,10 @@ a:hover {
 }
 
 .add-subtitle-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
   width: calc(100% - var(--space-lg) * 2);
   margin: var(--space-md) var(--space-lg);
   padding: var(--space-sm);
@@ -1359,11 +1376,11 @@ a:hover {
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
-.provider-toggle-switch input:checked + .toggle-slider {
+.provider-toggle-switch input:checked+.toggle-slider {
   background: var(--color-accent);
 }
 
-.provider-toggle-switch input:checked + .toggle-slider::before {
+.provider-toggle-switch input:checked+.toggle-slider::before {
   transform: translateX(18px);
   background: white;
 }
@@ -1550,6 +1567,29 @@ a:hover {
   animation: spin 1s linear infinite;
 }
 
+/* Sidebar Back Button */
+.sidebar-back-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.sidebar-back-btn:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+}
+
 /* ============================================
    SCROLLBARS
    ============================================ */
@@ -1560,6 +1600,90 @@ a:hover {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Recent Files */
+.recent-files {
+  margin-top: var(--space-xl);
+  width: 100%;
+  max-width: 500px;
+}
+
+.recent-files-header {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recent-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.recent-file-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.recent-file-item:hover {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+}
+
+.recent-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+}
+
+.recent-file-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.recent-file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.recent-file-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.recent-file-arrow {
+  color: var(--color-text-muted);
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: all var(--transition-fast);
+}
+
+.recent-file-item:hover .recent-file-arrow {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 ::-webkit-scrollbar-thumb {

@@ -15,7 +15,7 @@ import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId } from './utils';
-import type { Subtitle, MediaFile, AppSettings, ProcessingState, AIProvider } from './types';
+import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile } from './types';
 import { PROVIDER_LABELS } from './services/providers';
 
 import './App.css';
@@ -45,6 +45,7 @@ function App() {
   const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
   const [showVideoPreview, setShowVideoPreview] = useState(false);
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
 
   // Load settings on mount
   useEffect(() => {
@@ -88,6 +89,55 @@ function App() {
       await window.electronAPI.setStoreValue('settings', newSettings);
     }
   }, []);
+
+  // Add to recent files
+  const addToRecents = useCallback(async (file: MediaFile, action: 'generated' | 'opened') => {
+    const newRecent: RecentFile = {
+      path: file.path,
+      name: file.name,
+      date: Date.now(),
+      lastAction: action
+    };
+
+    setRecentFiles(prev => {
+      // Remove existing if present (to move to top)
+      const filtered = prev.filter(f => f.path !== file.path);
+      const updated = [newRecent, ...filtered].slice(0, 10); // Keep max 10
+
+      if (window.electronAPI) {
+        window.electronAPI.setStoreValue('recent-files', updated);
+      }
+      return updated;
+    });
+  }, []);
+
+  // Load a recent file
+  const handleLoadRecent = useCallback(async (recent: RecentFile) => {
+    if (!window.electronAPI) return;
+
+    try {
+      // Get file info to verify it still exists
+      const info = await window.electronAPI.getFileInfo(recent.path);
+      const duration = await window.electronAPI.getDuration(recent.path);
+
+      const mediaFile: MediaFile = {
+        path: info.path,
+        name: info.name,
+        ext: info.ext,
+        size: info.size,
+        duration,
+        isVideo: info.ext.match(/\.(mp4|mkv|mov|avi|webm)$/i) !== null, // simple check, ideally reuse isVideoFile
+      };
+
+      setMediaFile(mediaFile);
+      setDuration(duration);
+      resetSubtitles([]);
+      setAudioPath(null); // Reset audio path so it gets extracted if needed
+    } catch (error) {
+      console.error('Failed to load recent file:', error);
+      // Optional: remove from recents if file not found?
+    }
+  }, [resetSubtitles]);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (file: MediaFile) => {
@@ -188,6 +238,9 @@ function App() {
 
       setSubtitles(merged);
       setProcessing({ status: 'done', progress: 100 });
+      if (mediaFile) {
+        addToRecents(mediaFile, 'generated');
+      }
 
       // Reset after brief delay
       setTimeout(() => {
@@ -226,6 +279,9 @@ function App() {
       }
 
       setSubtitles(loaded);
+      if (mediaFile) {
+        addToRecents(mediaFile, 'opened');
+      }
     } catch (err) {
       setProcessing({
         status: 'error',
@@ -358,24 +414,8 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div className="header-title">
-          {mediaFile && (
-            <button
-              className="btn-icon"
-              onClick={() => {
-                setMediaFile(null);
-                setAudioPath(null);
-                resetSubtitles([]);
-                setCurrentTime(0);
-                setDuration(0);
-                setProcessing({ status: 'idle', progress: 0 });
-              }}
-              title="Back to main screen"
-            >
-              <span className="icon">arrow_back</span>
-            </button>
-          )}
-          <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '32px' }} /> SUBLIBR</h1>
+        <div className="header-brand">
+          <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '18px' }} /> SUBLIBR</h1>
         </div>
         <div className="header-actions">
           {mediaFile?.isVideo && subtitles.length > 0 && (
@@ -398,13 +438,28 @@ function App() {
           <FileUpload
             settings={settings}
             onFileSelect={handleFileSelect}
-            onLanguageChange={(language, autoDetect) => {
-              setSettings(prev => ({ ...prev, language, autoDetectLanguage: autoDetect }));
-            }}
+            recentFiles={recentFiles}
+            onLoadRecent={handleLoadRecent}
           />
         ) : (
           <div className="editor-container">
             <div className="editor-sidebar">
+              <button
+                className="sidebar-back-btn"
+                onClick={() => {
+                  setMediaFile(null);
+                  setAudioPath(null);
+                  resetSubtitles([]);
+                  setCurrentTime(0);
+                  setDuration(0);
+                  setProcessing({ status: 'idle', progress: 0 });
+                }}
+                title="Back to main screen"
+              >
+                <span className="icon icon-sm">arrow_back</span>
+                Back to Home
+              </button>
+
               {!isProcessing && subtitles.length === 0 && (
                 <div className="sidebar-section">
                   <LanguageSelector
@@ -416,10 +471,9 @@ function App() {
                   />
 
                   <button
-                    className="btn-primary generate-btn"
+                    className="btn-primary sidebar-action-btn"
                     onClick={handleGenerate}
                     disabled={!canGenerate}
-                    style={{ marginTop: '1rem' }}
                   >
                     <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
                   </button>
@@ -429,12 +483,14 @@ function App() {
                   </div>
 
                   <button
-                    className="btn-secondary"
+                    className="btn-secondary sidebar-action-btn"
                     onClick={handleLoadSubtitles}
-                    style={{ width: '100%', justifyContent: 'center' }}
                   >
-                    <span className="icon icon-sm">upload_file</span> Load Subtitles
+                    <span className="icon icon-sm">upload_file</span> Import Subtitles
                   </button>
+                  <p className="sidebar-hint">
+                    Supported formats: .srt, .vtt, .ass, .json
+                  </p>
                 </div>
               )}
 

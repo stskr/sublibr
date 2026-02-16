@@ -77,7 +77,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
             {subtitles.length === 0 ? (
                 <div className="empty-state">
                     <p>No subtitles yet</p>
-                    <p className="hint">Upload a file and click "Generate Subtitles" to get started</p>
+                    <p className="hint">To get started, click "Generate Subtitles" or Import Subtitles</p>
                 </div>
             ) : (
                 <div className="subtitle-list">
@@ -136,7 +136,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, onSe
             )}
 
             <button className="add-subtitle-btn" onClick={handleAdd}>
-                <span className="icon icon-sm">add</span> Add Subtitle
+                <span className="icon icon-sm">add</span> Add New Line
             </button>
         </div>
     );

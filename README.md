@@ -11,6 +11,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware overlap.
 - **🩹 Gap Healing**: intelligently detects and fills in missing subtitles that AI might have skipped.
 - **📤 Multi-Format Export**: Support for SRT, WebVTT, and ASS formats.
+- **📝 Recent Files History**: Keep track of your last 10 generated or opened files for quick access.
 - **⚡ Quality Control**: Enforces reading speeds, line limits, and minimum durations for professional-looking subtitles.
 - **🛠️ Customizable**: Extensive language support and editor features.
 - **⌨️ Keyboard Shortcuts**: Control playback (Space, Arrows) and editing (Undo/Redo, Insert/Delete) with global shortcuts.

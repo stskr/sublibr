@@ -1,18 +1,20 @@
 import { useState, useCallback, useEffect } from 'react';
 import { formatFileSize, isVideoFile, estimateCost } from '../utils';
-import { LanguageSelector } from './LanguageSelector';
-import type { MediaFile, AppSettings } from '../types';
+import { RecentFiles } from './RecentFiles';
+import type { MediaFile, AppSettings, RecentFile } from '../types';
 
 interface FileUploadProps {
     settings: AppSettings;
     onFileSelect: (file: MediaFile) => void;
-    onLanguageChange: (language: string, autoDetect: boolean) => void;
+    recentFiles: RecentFile[];
+    onLoadRecent: (file: RecentFile) => void;
 }
+
 
 const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
 const MAX_DURATION = 2 * 60 * 60; // 2 hours
 
-export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUploadProps) {
+export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }: FileUploadProps) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -122,12 +124,6 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
                 </div>
             )}
 
-            <LanguageSelector
-                language={settings.language}
-                autoDetect={settings.autoDetectLanguage}
-                onLanguageChange={onLanguageChange}
-            />
-
             <div
                 className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${loading ? 'loading' : ''} ${!hasApiKey ? 'disabled' : ''}`}
                 onDrop={hasApiKey ? handleDrop : (e) => e.preventDefault()}
@@ -194,6 +190,8 @@ export function FileUpload({ settings, onFileSelect, onLanguageChange }: FileUpl
                     </div>
                 </div>
             )}
+
+            <RecentFiles files={recentFiles} onLoadRecent={onLoadRecent} />
         </div>
     );
 }

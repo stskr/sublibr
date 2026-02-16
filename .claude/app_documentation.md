@@ -28,6 +28,7 @@
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
 - **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
+- **Recent Files History**: Tracks the last 10 generated or opened files for quick access
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
 - **Video Overlay**: Real-time subtitle preview over video playback
@@ -369,6 +370,7 @@ All components are **functional React components** using hooks. No class compone
 | `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
 | `MarqueeText` | [MarqueeText.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/MarqueeText.tsx) | Smart scrolling text for long filenames |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
+| `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
 
 ---
 
@@ -381,6 +383,7 @@ All components are **functional React components** using hooks. No class compone
 const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
 const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
 const [processingState, setProcessingState] = useState<ProcessingState>({
   status: 'idle',
   progress: 0,
@@ -415,7 +418,7 @@ interface FileUploadProps {
 - File type validation (audio/video)
 - File info display (name, size, duration)
 - API cost estimation
-- Language selection (inline)
+- Recent Files list (last 10 items)
 - API key warning banner
 
 **UX Details**:
@@ -622,6 +625,24 @@ interface MarqueeTextProps {
 - Status text
 - Error display (if status === 'error')
 - Spinner animation
+
+---
+
+#### **RecentFiles**
+
+**Props**:
+```typescript
+interface RecentFilesProps {
+  files: RecentFile[];
+  onLoadRecent: (file: RecentFile) => void;
+}
+```
+
+**Features**:
+- Lists up to 10 recently accessed files
+- Shows filename, date (relative time), and last action (Generated/Opened)
+- Click to instantly reload file and state
+- Persistent storage via `electron-store`
 
 ---
 

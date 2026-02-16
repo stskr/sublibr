@@ -67,3 +67,10 @@ export interface SilenceSegment {
     start: number;
     end: number;
 }
+
+export interface RecentFile {
+    path: string;
+    name: string;
+    date: number; // timestamp
+    lastAction: 'generated' | 'opened';
+}

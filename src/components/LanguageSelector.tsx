@@ -24,6 +24,9 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
     return (
         <div className="language-selection-inline">
             <label>Language</label>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px', lineHeight: '1.4' }}>
+                Choose the source language or select Auto-Detect
+            </p>
             <div className="language-toggle">
                 <button
                     className={`toggle-btn ${!autoDetect ? 'active' : ''}`}
@@ -38,6 +41,19 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
                     Auto-detect
                 </button>
             </div>
+            {autoDetect && (
+                <div style={{
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    background: 'rgba(224, 235, 117, 0.1)',
+                    border: '1px solid var(--color-warning)',
+                    borderRadius: '6px',
+                    color: 'var(--color-warning)',
+                    fontSize: '12px'
+                }}>
+                    Auto-detect may be less accurate. Select a specific language for best results.
+                </div>
+            )}
             {!autoDetect && (
                 <div className="language-autocomplete">
                     <input
