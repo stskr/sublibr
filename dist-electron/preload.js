@@ -26,5 +26,22 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Progress events
   onProgress: (callback) => {
     import_electron.ipcRenderer.on("progress", (_event, progress) => callback(progress));
+  },
+  // App updates
+  getVersion: () => import_electron.ipcRenderer.invoke("app:getVersion"),
+  checkForUpdates: () => import_electron.ipcRenderer.invoke("app:checkForUpdates"),
+  downloadUpdate: () => import_electron.ipcRenderer.invoke("app:downloadUpdate"),
+  installUpdate: () => import_electron.ipcRenderer.invoke("app:installUpdate"),
+  onUpdateAvailable: (callback) => {
+    import_electron.ipcRenderer.on("update-available", (_event, info) => callback(info));
+  },
+  onUpdateProgress: (callback) => {
+    import_electron.ipcRenderer.on("update-download-progress", (_event, progress) => callback(progress));
+  },
+  onUpdateDownloaded: (callback) => {
+    import_electron.ipcRenderer.on("update-downloaded", (_event, info) => callback(info));
+  },
+  onUpdateError: (callback) => {
+    import_electron.ipcRenderer.on("update-error", (_event, message) => callback(message));
   }
 });
