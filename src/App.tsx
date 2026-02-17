@@ -129,7 +129,7 @@ function App() {
       const updated = [newRecent, ...filtered].slice(0, 10); // Keep max 10
 
       if (window.electronAPI) {
-        window.electronAPI.setStoreValue('recent-files', updated);
+        window.electronAPI.setStoreValue('recent-files', updated).catch(() => {});
       }
       return updated;
     });
@@ -193,7 +193,7 @@ function App() {
         return rest;
       });
       if (window.electronAPI) {
-        window.electronAPI.setStoreValue('recent-files', updated);
+        window.electronAPI.setStoreValue('recent-files', updated).catch(() => {});
       }
       return updated;
     });
@@ -303,7 +303,7 @@ function App() {
         // Cache subtitles for later restoration
         const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
         cache[mediaFile.path] = merged;
-        window.electronAPI.setStoreValue('subtitle-cache', cache);
+        window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => {});
       }
 
       // Reset after brief delay
