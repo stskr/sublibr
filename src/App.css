@@ -1092,14 +1092,6 @@ a:hover {
   border-radius: 1px;
 }
 
-.timeline-times {
-  display: flex;
-  justify-content: space-between;
-  margin-top: var(--space-xs);
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
 /* ============================================
    AUDIO PLAYER
    ============================================ */
@@ -1186,18 +1178,6 @@ a:hover {
 
 .control-btn:active {
   transform: scale(0.95);
-}
-
-.player-track-info {
-  padding: var(--space-sm) 0;
-  text-align: center;
-}
-
-.player-track-name {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  text-align: center;
 }
 
 .player-progress {
@@ -1582,75 +1562,6 @@ a:hover {
   font-size: 12px;
   color: var(--color-text-muted);
   margin-right: auto;
-}
-
-/* ============================================
-   VIDEO PREVIEW
-   ============================================ */
-.video-preview-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.video-preview-container {
-  position: relative;
-  width: 100%;
-  max-width: 900px;
-  padding: var(--space-lg);
-}
-
-.close-preview-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 40px;
-  height: 40px;
-  background: var(--color-bg-secondary);
-  border: none;
-  border-radius: var(--radius-full);
-  color: var(--color-text-primary);
-  font-size: 24px;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.video-wrapper {
-  position: relative;
-  background: black;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.video-wrapper video {
-  width: 100%;
-  display: block;
-  cursor: pointer;
-}
-
-.video-subtitle {
-  position: absolute;
-  bottom: var(--space-xl);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: var(--radius-sm);
-  color: white;
-  font-family: var(--font-subtitle);
-  font-size: 18px;
-  text-align: center;
-  max-width: 80%;
-}
-
-.preview-controls {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-md);
 }
 
 .spin {
