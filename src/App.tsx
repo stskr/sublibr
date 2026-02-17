@@ -35,6 +35,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoDetectLanguage: false,
 };
 
+const MAX_RECENT_FILES = 10;
+const DONE_STATUS_DELAY_MS = 2000;
+const DEFAULT_SUBTITLE_DURATION = 2; // seconds
+
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
@@ -126,7 +130,7 @@ function App() {
     setRecentFiles(prev => {
       // Remove existing if present (to move to top)
       const filtered = prev.filter(f => f.path !== file.path);
-      const updated = [newRecent, ...filtered].slice(0, 10); // Keep max 10
+      const updated = [newRecent, ...filtered].slice(0, MAX_RECENT_FILES);
 
       if (window.electronAPI) {
         window.electronAPI.setStoreValue('recent-files', updated).catch(() => {});
@@ -309,7 +313,7 @@ function App() {
       // Reset after brief delay
       setTimeout(() => {
         setProcessing({ status: 'idle', progress: 0 });
-      }, 2000);
+      }, DONE_STATUS_DELAY_MS);
 
     } catch (error) {
       setProcessing({
@@ -454,9 +458,9 @@ function App() {
 
     const newSub: Subtitle = {
       id: newId,
-      index: 0, // Will act as placeholder, re-indexing could happen on save/render if needed mostly visual
+      index: 0,
       startTime: startTime,
-      endTime: startTime + 2,
+      endTime: startTime + DEFAULT_SUBTITLE_DURATION,
       text: ''
     };
 
