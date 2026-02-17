@@ -104,13 +104,14 @@ export function AudioPlayer({
             return;
         }
 
-        if (isPlaying) {
+        const playing = !audioRef.current.paused;
+        if (playing) {
             audioRef.current.pause();
         } else {
             audioRef.current.play();
         }
-        setIsPlaying(!isPlaying);
-    }, [isPlaying, currentTime, mediaDuration]);
+        setIsPlaying(!playing);
+    }, [currentTime, mediaDuration]);
 
     const seek = useCallback((time: number) => {
         // Optimistic update
