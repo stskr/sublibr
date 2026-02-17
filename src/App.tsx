@@ -140,6 +140,9 @@ function App() {
     if (!window.electronAPI) return;
 
     try {
+      // Register the path so the main process allows access on fresh launches
+      await window.electronAPI.registerPath(recent.path);
+
       // Get file info to verify it still exists
       const info = await window.electronAPI.getFileInfo(recent.path);
       const duration = await window.electronAPI.getDuration(recent.path);
