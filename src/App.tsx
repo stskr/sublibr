@@ -240,12 +240,9 @@ function App() {
     const provider = settings.activeProvider;
 
     try {
-      // Step 1: Detect silences and create chunks
-      setProcessing({ status: 'detecting-silences', progress: 15 });
+      // Step 1: Detect silences and split into chunks
       const tempDir = await window.electronAPI.getTempPath();
-
-
-      setProcessing({ status: 'splitting', progress: 25 });
+      setProcessing({ status: 'detecting-silences', progress: 15 });
       const { chunks, silences } = await createAudioChunks(audioPath, tempDir);
 
       // Step 2: Transcribe each chunk
