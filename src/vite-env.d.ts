@@ -8,7 +8,7 @@ export interface ElectronAPI {
     openFileDialog: () => Promise<string | null>;
     openSubtitleFileDialog: () => Promise<string | null>;
     saveFileDialog: (defaultName: string, filterName?: string, filterExtensions?: string[]) => Promise<string | null>;
-    showMessageBox: (options: any) => Promise<Electron.MessageBoxReturnValue>;
+    showMessageBox: (options: Electron.MessageBoxOptions) => Promise<Electron.MessageBoxReturnValue>;
     getFilePath?: (file: File) => string;
 
     readFile: (path: string) => Promise<ArrayBuffer>;
