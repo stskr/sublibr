@@ -24,14 +24,6 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   getDuration: (filePath) => import_electron.ipcRenderer.invoke("ffmpeg:getDuration", filePath),
   detectSilences: (filePath, threshold, minDuration) => import_electron.ipcRenderer.invoke("ffmpeg:detectSilences", filePath, threshold, minDuration),
   splitAudio: (inputPath, chunks) => import_electron.ipcRenderer.invoke("ffmpeg:splitAudio", inputPath, chunks),
-  // Progress events
-  onProgress: (callback) => {
-    const listener = (_event, progress) => callback(progress);
-    import_electron.ipcRenderer.on("progress", listener);
-    return () => {
-      import_electron.ipcRenderer.removeListener("progress", listener);
-    };
-  },
   // App updates
   getVersion: () => import_electron.ipcRenderer.invoke("app:getVersion"),
   checkForUpdates: () => import_electron.ipcRenderer.invoke("app:checkForUpdates"),
