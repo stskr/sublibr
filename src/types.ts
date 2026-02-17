@@ -88,4 +88,5 @@ export interface RecentFile {
     name: string;
     date: number; // timestamp
     lastAction: 'generated' | 'opened';
+    subtitleCount?: number;
 }

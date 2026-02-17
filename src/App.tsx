@@ -62,14 +62,16 @@ function App() {
     }));
   }, []);
 
-  // Load settings on mount
+  // Load settings and recents on mount
   useEffect(() => {
-    async function loadSettings() {
+    async function loadFromStore() {
       // Guard: only load from electron store if running in Electron
       if (!window.electronAPI) {
         console.warn('Running in browser mode - Electron APIs not available');
         return;
       }
+
+      // Load settings
       const saved = await window.electronAPI.getStoreValue('settings') as Record<string, unknown> | null;
       if (saved) {
         // Migrate old flat format (apiKey/model) to new multi-provider format
@@ -93,8 +95,14 @@ function App() {
           setSettings(saved as unknown as AppSettings);
         }
       }
+
+      // Load recent files
+      const savedRecents = await window.electronAPI.getStoreValue('recent-files') as RecentFile[] | null;
+      if (savedRecents?.length) {
+        setRecentFiles(savedRecents);
+      }
     }
-    loadSettings();
+    loadFromStore();
   }, []);
 
   // Save settings
@@ -106,12 +114,13 @@ function App() {
   }, []);
 
   // Add to recent files
-  const addToRecents = useCallback(async (file: MediaFile, action: 'generated' | 'opened') => {
+  const addToRecents = useCallback(async (file: MediaFile, action: 'generated' | 'opened', subtitleCount?: number) => {
     const newRecent: RecentFile = {
       path: file.path,
       name: file.name,
       date: Date.now(),
-      lastAction: action
+      lastAction: action,
+      ...(subtitleCount != null && { subtitleCount }),
     };
 
     setRecentFiles(prev => {
@@ -146,13 +155,46 @@ function App() {
 
       setMediaFile(mediaFile);
       setDuration(duration);
-      resetSubtitles([]);
       setAudioPath(null); // Reset audio path so it gets extracted if needed
+
+      // Restore cached subtitles if available
+      const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
+      const cached = cache[recent.path];
+      if (cached?.length) {
+        resetSubtitles(cached);
+      } else {
+        resetSubtitles([]);
+      }
     } catch (error) {
       console.error('Failed to load recent file:', error);
-      // Optional: remove from recents if file not found?
     }
   }, [resetSubtitles]);
+
+  // Clear recents list
+  const handleClearRecents = useCallback(async () => {
+    setRecentFiles([]);
+    if (window.electronAPI) {
+      await window.electronAPI.setStoreValue('recent-files', []);
+    }
+  }, []);
+
+  // Clear subtitle cache
+  const handleClearCache = useCallback(async () => {
+    if (window.electronAPI) {
+      await window.electronAPI.deleteStoreValue('subtitle-cache');
+    }
+    // Update recents to remove subtitleCount indicators
+    setRecentFiles(prev => {
+      const updated = prev.map(f => {
+        const { subtitleCount: _, ...rest } = f;
+        return rest;
+      });
+      if (window.electronAPI) {
+        window.electronAPI.setStoreValue('recent-files', updated);
+      }
+      return updated;
+    });
+  }, []);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (file: MediaFile) => {
@@ -257,7 +299,11 @@ function App() {
       setSubtitles(merged);
       setProcessing({ status: 'done', progress: 100 });
       if (mediaFile) {
-        addToRecents(mediaFile, 'generated');
+        addToRecents(mediaFile, 'generated', merged.length);
+        // Cache subtitles for later restoration
+        const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
+        cache[mediaFile.path] = merged;
+        window.electronAPI.setStoreValue('subtitle-cache', cache);
       }
 
       // Reset after brief delay
@@ -475,6 +521,8 @@ function App() {
             onFileSelect={handleFileSelect}
             recentFiles={recentFiles}
             onLoadRecent={handleLoadRecent}
+            onClearRecents={handleClearRecents}
+            onClearCache={handleClearCache}
           />
         ) : (
           <div className="editor-container">
@@ -562,7 +610,7 @@ function App() {
             </div>
 
             <div className="editor-main">
-              {subtitles.length > 0 && (
+              {mediaFile?.isVideo && (
                 <div className="view-toggle-bar">
                   <button
                     className={`view-toggle-btn${editorView === 'subtitles' ? ' active' : ''}`}
@@ -579,7 +627,7 @@ function App() {
                 </div>
               )}
 
-              {editorView === 'subtitles' || subtitles.length === 0 ? (
+              {editorView === 'subtitles' ? (
                 <SubtitleEditor
                   subtitles={subtitles}
                   onSubtitlesChange={setSubtitles}

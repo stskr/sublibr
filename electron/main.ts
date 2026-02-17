@@ -44,7 +44,7 @@ function getAllowedDirs(): string[] {
 
 // ============== Security: Store Key Allowlist ==============
 
-const ALLOWED_STORE_KEYS = ['settings', 'recent-files'];
+const ALLOWED_STORE_KEYS = ['settings', 'recent-files', 'subtitle-cache'];
 
 // Set ffmpeg and ffprobe paths
 // In packaged builds, binaries live in extraResources; in dev, use npm installer packages
@@ -191,6 +191,13 @@ ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
     throw new Error(`Invalid store key: ${key}`);
   }
   store.set(key, value);
+});
+
+ipcMain.handle('store:delete', (_event, key: string) => {
+  if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  store.delete(key);
 });
 
 // File dialogs

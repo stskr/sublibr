@@ -8,12 +8,14 @@ interface FileUploadProps {
     onFileSelect: (file: MediaFile) => void;
     recentFiles: RecentFile[];
     onLoadRecent: (file: RecentFile) => void;
+    onClearRecents: () => void;
+    onClearCache: () => void;
 }
 
 
 const MAX_SIZE = 3 * 1024 * 1024 * 1024; // 3GB
 
-export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }: FileUploadProps) {
+export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent, onClearRecents, onClearCache }: FileUploadProps) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -254,7 +256,7 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
                 </div>
             )}
 
-            <RecentFiles files={recentFiles} onLoadRecent={onLoadRecent} />
+            <RecentFiles files={recentFiles} onLoadRecent={onLoadRecent} onClearRecents={onClearRecents} onClearCache={onClearCache} />
         </div>
     );
 }

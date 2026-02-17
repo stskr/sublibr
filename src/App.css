@@ -196,13 +196,15 @@ a:hover {
 
 .footer-bottom-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-md);
+  flex-direction: column;
 }
 
 .footer-bottom-row .audio-player-wrapper {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
+}
+
+.footer-bottom-row > .token-usage-wrapper {
+  align-self: flex-end;
 }
 
 /* ============================================
@@ -1807,13 +1809,45 @@ a:hover {
   max-width: 500px;
 }
 
+.recent-files-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
 .recent-files-header {
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-sm);
+  margin-bottom: 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.recent-files-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.recent-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.recent-clear-btn:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+}
+
+.recent-file-cached {
+  color: var(--color-accent);
 }
 
 .recent-files-list {

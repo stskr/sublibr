@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Settings
     getStoreValue: (key: string) => ipcRenderer.invoke('store:get', key),
     setStoreValue: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
+    deleteStoreValue: (key: string) => ipcRenderer.invoke('store:delete', key),
 
     // File dialogs
     openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
