@@ -633,6 +633,7 @@ function App() {
                   onSubtitlesChange={setSubtitles}
                   currentTime={currentTime}
                   onSeek={handleSeek}
+                  mediaDuration={mediaFile?.duration}
                 />
               ) : (
                 mediaFile && (
@@ -663,6 +664,7 @@ function App() {
                 duration={duration}
                 currentTime={currentTime}
                 onSeek={handleSeek}
+                mediaDuration={mediaFile?.duration}
               />
             )}
             <div className="footer-bottom-row">
@@ -672,6 +674,7 @@ function App() {
                 duration={duration}
                 onTimeUpdate={setCurrentTime}
                 onDurationChange={setDuration}
+                mediaDuration={mediaFile?.duration}
               />
               <TokenUsageDisplay stats={tokenStats} />
             </div>
