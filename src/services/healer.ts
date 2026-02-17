@@ -79,8 +79,6 @@ export async function healSubtitles(
         return { subtitles, tokenUsages: [] };
     }
 
-    console.log(`Healing: Found ${actionableGaps.length} gaps to process.`);
-
     // 3. Heal gaps
     const newSubtitles: Subtitle[] = [];
     const tokenUsages: TokenUsage[] = [];
