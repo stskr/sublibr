@@ -610,7 +610,7 @@ function App() {
             </div>
 
             <div className="editor-main">
-              {mediaFile?.isVideo && (
+              {subtitles.length > 0 && (
                 <div className="view-toggle-bar">
                   <button
                     className={`view-toggle-btn${editorView === 'subtitles' ? ' active' : ''}`}
