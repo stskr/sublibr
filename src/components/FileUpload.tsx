@@ -110,26 +110,14 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent, 
             }
 
             if (filePath) {
-                // Register dropped file to allow access
+                // Register dropped file to allow access, then process
                 if (window.electronAPI?.registerPath) {
-                    // Start registration but don't strictly await if we want to be optimistic, 
-                    // but awaiting ensures validation passes in processFile
-                    try {
-                        // We must wait for registration or getFileInfo will fail
-                        // Note: Using a self-invoking async function or just calling it if we don't want to block UI?
-                        // processFile is async, so better to just call processFile and let it handle...
-                        // But processFile doesn't register.
-                        // We can't await here directly easily because handleDrop isn't async? 
-                        // It is a callback. We can make it async.
-                        window.electronAPI.registerPath(filePath).then(() => {
-                            processFile(filePath);
-                        }).catch(err => {
-                            console.error('Failed to register file path:', err);
-                            setError('Failed to access file. Please try again.');
-                        });
-                    } catch (e) {
-                        processFile(filePath); // Fallback try
-                    }
+                    window.electronAPI.registerPath(filePath).then(() => {
+                        processFile(filePath);
+                    }).catch(err => {
+                        console.error('Failed to register file path:', err);
+                        setError('Failed to access file. Please try again.');
+                    });
                 } else {
                     processFile(filePath);
                 }
