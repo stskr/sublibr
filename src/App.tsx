@@ -576,7 +576,7 @@ function App() {
                     <span className="icon icon-sm">upload_file</span> Import Subtitles
                   </button>
                   <p className="sidebar-hint">
-                    Supported formats: .srt, .vtt, .ass, .json
+                    Supported formats: .srt, .vtt, .ass
                   </p>
                 </div>
               )}
