@@ -12,6 +12,7 @@ const STATUS_ICONS: Record<string, string> = {
     'splitting': 'content_cut',
     'transcribing': 'translate',
     'merging': 'merge',
+    'healing': 'healing',
     'done': 'check_circle',
     'error': 'error',
 };
@@ -23,6 +24,7 @@ const STATUS_MESSAGES: Record<string, string> = {
     'splitting': 'Splitting audio into chunks...',
     'transcribing': 'Transcribing...',
     'merging': 'Merging subtitles...',
+    'healing': 'Healing gaps...',
     'done': 'Complete!',
     'error': 'Error occurred',
 };
