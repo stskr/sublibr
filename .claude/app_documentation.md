@@ -28,7 +28,8 @@
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
 - **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
-- **Recent Files History**: Tracks the last 10 generated or opened files for quick access
+- **Recent Files History**: Tracks the last 10 generated or opened files for quick access, with automatic subtitle caching
+- **Subtitle Caching**: Generated subtitles are persisted to `electron-store` and restored when loading a recent file
 - **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
@@ -61,13 +62,17 @@ subtitles-gen/
 ├── src/                        # React application source
 │   ├── components/             # React components
 │   │   ├── AudioPlayer.tsx
+│   │   ├── CustomSelect.tsx
 │   │   ├── FileUpload.tsx
 │   │   ├── LanguageSelector.tsx
 │   │   ├── ProgressIndicator.tsx
+│   │   ├── RecentFiles.tsx
 │   │   ├── Settings.tsx
+│   │   ├── ShortcutsModal.tsx
 │   │   ├── SubtitleEditor.tsx
 │   │   ├── SubtitlePreview.tsx
-│   │   └── VideoPreview.tsx
+│   │   ├── TokenUsageDisplay.tsx
+│   │   └── UpdateNotification.tsx
 │   │
 │   ├── services/               # Core business logic
 │   │   ├── audioProcessor.ts   # Audio chunking & silence detection
@@ -99,7 +104,7 @@ subtitles-gen/
 
 ### File Counts & Organization
 
-- **React Components**: 8 files
+- **React Components**: 12 files
 - **Services**: 4 core modules
 - **Electron Process Files**: 2 (main + preload)
 - **Total Source Files**: ~15 TypeScript/TSX files
@@ -147,9 +152,10 @@ The app uses Electron's IPC (Inter-Process Communication) to bridge the renderer
 
 ```typescript
 window.electronAPI = {
-  // Settings
+  // Settings & Store
   getStoreValue: (key: string) => ipcRenderer.invoke('store:get', key),
   setStoreValue: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
+  deleteStoreValue: (key: string) => ipcRenderer.invoke('store:delete', key),
   
   // File dialogs
   openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
@@ -199,10 +205,11 @@ Responsibilities:
 - File system access (with security validation)
 - FFmpeg execution
 - Settings persistence via `electron-store`
+- Subtitle cache persistence (`subtitle-cache` store key)
 
 **Security Features**:
 - Path validation against allowed directories
-- Store key allowlist
+- Store key allowlist (`settings`, `recent-files`, `subtitle-cache`)
 - Content Security Policy (CSP)
 - Sandboxed renderer process
 
@@ -378,12 +385,11 @@ All components are **functional React components** using hooks. No class compone
 | `FileUpload` | [FileUpload.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/FileUpload.tsx) | Drag-and-drop + file selection |
 | `SubtitleEditor` | [SubtitleEditor.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitleEditor.tsx) | Timeline-based subtitle editor |
 | `SubtitlePreview` | [SubtitlePreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitlePreview.tsx) | Inline preview (video or cinema screen with subtitles) |
-| `VideoPreview` | [VideoPreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/VideoPreview.tsx) | Video player with subtitle overlay (full-screen modal) |
 | `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
+| `CustomSelect` | [CustomSelect.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/CustomSelect.tsx) | Reusable custom dropdown select |
 | `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (multi-provider, API key testing, active model) |
 | `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
-| `MarqueeText` | [MarqueeText.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/MarqueeText.tsx) | Smart scrolling text for long filenames |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 | `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
 | `TokenUsageDisplay` | [TokenUsageDisplay.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/TokenUsageDisplay.tsx) | Session token usage badge + detailed popup |
@@ -409,9 +415,11 @@ const [processingState, setProcessingState] = useState<ProcessingState>({
 ```
 
 **Responsibilities**:
-- Load/save settings from electron-store
+- Load/save settings and recent files from electron-store on mount
 - Manage file selection
 - Orchestrate subtitle generation pipeline
+- Cache subtitles on generation, restore from cache when loading recents
+- Handle clearing recents list and subtitle cache
 - Handle errors and processing state
 - Toggle between subtitle editor and inline preview
 
@@ -430,7 +438,10 @@ const [processingState, setProcessingState] = useState<ProcessingState>({
 interface FileUploadProps {
   settings: AppSettings;
   onFileSelect: (file: MediaFile) => void;
-  onLanguageChange: (language: string, autoDetect: boolean) => void;
+  recentFiles: RecentFile[];
+  onLoadRecent: (file: RecentFile) => void;
+  onClearRecents: () => void;
+  onClearCache: () => void;
 }
 ```
 
@@ -512,33 +523,6 @@ interface SubtitlePreviewProps {
 
 ---
 
-#### **VideoPreview**
-
-**Props**:
-```typescript
-interface VideoPreviewProps {
-  videoPath: string;
-  subtitles: Subtitle[];
-  onClose: () => void;
-}
-```
-
-**Features**:
-- HTML5 video player
-- Subtitle overlay (centered, bottom-aligned)
-- Direction detection (RTL support for Arabic/Hebrew)
-- Time synchronization
-- Native browser controls
-
-**Subtitle Styling**:
-- White text with black shadow/outline
-- Centered horizontally
-- Positioned 10% from bottom
-- Max 80% width
-- Font: `var(--font-subtitle)` (Arial)
-
----
-
 #### **AudioPlayer**
 
 **Props**:
@@ -547,9 +531,9 @@ interface AudioPlayerProps {
   audioPath: string;
   currentTime: number;
   duration: number;
+  mediaDuration?: number;
   onTimeUpdate: (time: number) => void;
   onDurationChange: (duration: number) => void;
-  fileName?: string;
 }
 ```
 
@@ -650,27 +634,6 @@ type ProcessingStatus =
 
 ---
 
-#### **MarqueeText**
-
-**Props**:
-```typescript
-interface MarqueeTextProps {
-  text: string;
-  className?: string;
-}
-```
-
-**Features**:
-- Detects overflow automatically
-- Scrolls text back and forth on hover (marquee effect)
-- Stays static if text fits container
-- Smooth CSS animations
-
----
-
-> [!NOTE]
-> The `'healing'` status exists in TypeScript types but has no corresponding UI message in `ProgressIndicator`. If used, it will display with a default sync icon and no status message.
-
 **UI**:
 - Progress bar (0-100%)
 - Status text
@@ -686,13 +649,18 @@ interface MarqueeTextProps {
 interface RecentFilesProps {
   files: RecentFile[];
   onLoadRecent: (file: RecentFile) => void;
+  onClearRecents: () => void;
+  onClearCache: () => void;
 }
 ```
 
 **Features**:
 - Lists up to 10 recently accessed files
 - Shows filename, date (relative time), and last action (Generated/Opened)
-- Click to instantly reload file and state
+- Shows cached subtitle count indicator when subtitles are cached
+- Click to instantly reload file and restore cached subtitles
+- **Clear List**: Removes all items from recents list
+- **Clear Cache**: Deletes cached subtitles (does not affect exported files on disk)
 - Persistent storage via `electron-store`
 
 ---
@@ -1388,6 +1356,14 @@ export interface SilenceSegment {
   start: number;
   end: number;
 }
+
+export interface RecentFile {
+  path: string;
+  name: string;
+  date: number;       // timestamp
+  lastAction: 'generated' | 'opened';
+  subtitleCount?: number;  // indicates cached subtitles exist
+}
 ```
 
 ---
@@ -1434,6 +1410,7 @@ npm run build:electron
 - [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
 - [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
 - [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
+- [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List / Clear Cache actions in recents UI
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*
