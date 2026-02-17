@@ -506,6 +506,38 @@ a:hover {
   margin-top: var(--space-md);
 }
 
+.upload-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 500px;
+  margin-top: var(--space-md);
+}
+
+.upload-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.upload-note .icon-sm {
+  flex-shrink: 0;
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+.upload-note a {
+  color: var(--color-accent);
+}
+
+.upload-note a:hover {
+  color: var(--color-accent-hover);
+}
+
 .loading-content {
   text-align: center;
 }

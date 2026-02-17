@@ -11,8 +11,7 @@ interface FileUploadProps {
 }
 
 
-const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
-const MAX_DURATION = 2 * 60 * 60; // 2 hours
+const MAX_SIZE = 3 * 1024 * 1024 * 1024; // 3GB
 
 export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }: FileUploadProps) {
     const [isDragOver, setIsDragOver] = useState(false);
@@ -52,16 +51,11 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
 
             // Validate size
             if (info.size > MAX_SIZE) {
-                throw new Error(`File too large. Maximum size is 1GB. Your file: ${formatFileSize(info.size)}`);
+                throw new Error(`File too large. Maximum size is 3GB. Your file: ${formatFileSize(info.size)}`);
             }
 
             // Get duration
             const duration = await window.electronAPI.getDuration(filePath);
-
-            // Validate duration
-            if (duration > MAX_DURATION) {
-                throw new Error(`File too long. Maximum duration is 2 hours. Your file: ${Math.floor(duration / 60)} minutes`);
-            }
 
             const mediaFile: MediaFile = {
                 path: info.path,
@@ -212,10 +206,25 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent }
                         </button>
                         <p className="upload-hint">
                             Supports MP4, MKV, MOV, MP3, WAV, and more<br />
-                            Max 1GB, up to 2 hours
+                            Max 3GB
                         </p>
                     </div>
                 )}
+            </div>
+
+            <div className="upload-notes">
+                <div className="upload-note">
+                    <span className="icon icon-sm">info</span>
+                    <span>For best results, use smaller files. Larger files take longer and cost more.</span>
+                </div>
+                <div className="upload-note">
+                    <span className="icon icon-sm">auto_awesome</span>
+                    <span>Best quality: Gemini 2.5 Pro or Claude Sonnet. Lower cost: Gemini 2.5 Flash or GPT-4o Mini.</span>
+                </div>
+                <div className="upload-note">
+                    <span className="icon icon-sm">redeem</span>
+                    <span>Google AI Studio offers a free tier with no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
+                </div>
             </div>
 
             {error && (
