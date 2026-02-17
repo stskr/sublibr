@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -117,7 +118,7 @@ app.on('before-quit', () => {
     const tempDir = app.getPath('temp');
     const entries = fs.readdirSync(tempDir);
     for (const entry of entries) {
-      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.mp3)$/.test(entry)) {
+      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(entry)) {
         fs.unlinkSync(path.join(tempDir, entry));
       }
     }
@@ -217,10 +218,10 @@ ipcMain.handle('dialog:openSubtitleFile', async () => {
   return filePath;
 });
 
-ipcMain.handle('dialog:saveFile', async (_event, defaultName: string) => {
+ipcMain.handle('dialog:saveFile', async (_event, defaultName: string, filterName?: string, filterExtensions?: string[]) => {
   const result = await dialog.showSaveDialog(mainWindow!, {
     defaultPath: defaultName,
-    filters: [{ name: 'SRT Subtitle', extensions: ['srt'] }],
+    filters: [{ name: filterName || 'Subtitle File', extensions: filterExtensions || [defaultName.split('.').pop() || 'srt'] }],
   });
   const filePath = result.filePath || null;
   if (filePath) allowedPaths.add(path.resolve(filePath));
@@ -278,10 +279,20 @@ ipcMain.handle('file:getTempPath', () => {
   return app.getPath('temp');
 });
 
+// Only allow registering paths to supported media files (for drag-and-drop)
+const ALLOWED_MEDIA_EXTENSIONS = new Set([
+  '.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts', '.mts', '.m2ts',
+  '.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.alac', '.aiff',
+]);
+
 ipcMain.handle('file:registerPath', (_event, filePath: string) => {
-  if (typeof filePath === 'string') {
-    allowedPaths.add(path.resolve(filePath));
+  if (typeof filePath !== 'string') return;
+  const resolved = path.resolve(filePath);
+  const ext = path.extname(resolved).toLowerCase();
+  if (!ALLOWED_MEDIA_EXTENSIONS.has(ext)) {
+    throw new Error('Only media files can be registered');
   }
+  allowedPaths.add(resolved);
 });
 
 // FFmpeg: Extract audio to FLAC

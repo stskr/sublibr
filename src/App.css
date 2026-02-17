@@ -1134,7 +1134,8 @@ a:hover {
 }
 
 .control-btn:hover {
-  background: var(--color-bg-hover);
+  background: var(--color-bg-tertiary);
+  transform: scale(1.05);
 }
 
 .control-btn.play {
@@ -1143,15 +1144,6 @@ a:hover {
   background: var(--color-accent);
   color: white;
   font-size: 18px;
-}
-
-.control-btn.play:hover {
-  background: var(--color-accent-hover);
-}
-
-.control-btn:hover {
-  background: var(--color-bg-tertiary);
-  transform: scale(1.05);
 }
 
 .control-btn.play:hover {
@@ -1760,7 +1752,7 @@ a:hover {
 
 .sidebar-back-btn:hover {
   background: var(--color-bg-tertiary);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
 

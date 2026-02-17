@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File dialogs
     openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
     openSubtitleFileDialog: () => ipcRenderer.invoke('dialog:openSubtitleFile'),
-    saveFileDialog: (defaultName: string) => ipcRenderer.invoke('dialog:saveFile', defaultName),
+    saveFileDialog: (defaultName: string, filterName?: string, filterExtensions?: string[]) => ipcRenderer.invoke('dialog:saveFile', defaultName, filterName, filterExtensions),
     showMessageBox: (options: Electron.MessageBoxOptions) => ipcRenderer.invoke('dialog:showMessageBox', options),
 
     // File operations
@@ -35,7 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Progress events
     onProgress: (callback: (progress: number) => void) => {
-        ipcRenderer.on('progress', (_event, progress) => callback(progress));
+        const listener = (_event: Electron.IpcRendererEvent, progress: number) => callback(progress);
+        ipcRenderer.on('progress', listener);
+        return () => { ipcRenderer.removeListener('progress', listener); };
     },
 
     // App updates
@@ -44,15 +46,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
     installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
     onUpdateAvailable: (callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void) => {
-        ipcRenderer.on('update-available', (_event, info) => callback(info));
+        const listener = (_event: Electron.IpcRendererEvent, info: { version: string; releaseNotes?: string; releaseDate?: string }) => callback(info);
+        ipcRenderer.on('update-available', listener);
+        return () => { ipcRenderer.removeListener('update-available', listener); };
     },
     onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => {
-        ipcRenderer.on('update-download-progress', (_event, progress) => callback(progress));
+        const listener = (_event: Electron.IpcRendererEvent, progress: { percent: number; transferred: number; total: number }) => callback(progress);
+        ipcRenderer.on('update-download-progress', listener);
+        return () => { ipcRenderer.removeListener('update-download-progress', listener); };
     },
     onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
-        ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+        const listener = (_event: Electron.IpcRendererEvent, info: { version: string }) => callback(info);
+        ipcRenderer.on('update-downloaded', listener);
+        return () => { ipcRenderer.removeListener('update-downloaded', listener); };
     },
     onUpdateError: (callback: (message: string) => void) => {
-        ipcRenderer.on('update-error', (_event, message) => callback(message));
+        const listener = (_event: Electron.IpcRendererEvent, message: string) => callback(message);
+        ipcRenderer.on('update-error', listener);
+        return () => { ipcRenderer.removeListener('update-error', listener); };
     },
 });

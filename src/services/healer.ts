@@ -101,7 +101,7 @@ export async function healSubtitles(
         try {
             // Extract this specific audio segment to a temp file
             const tempDir = await window.electronAPI.getTempPath();
-            const chunkPath = `${tempDir}/gap_heal_${Date.now()}_${i}.mp3`;
+            const chunkPath = `${tempDir}/gap_heal_${Date.now()}_${i}.flac`;
 
             // Use splitAudio to extract a single chunk
             await window.electronAPI.splitAudio(audioPath, [{

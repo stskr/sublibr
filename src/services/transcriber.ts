@@ -8,15 +8,17 @@ export interface TranscriptionResult {
     tokenUsage: TokenUsage;
 }
 
-// Convert audio file to base64
+// Convert audio file to base64 (chunked to avoid O(n^2) string concatenation)
 async function audioToBase64(filePath: string): Promise<string> {
     const buffer = await window.electronAPI.readFile(filePath);
     const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
+    const CHUNK_SIZE = 8192;
+    const parts: string[] = [];
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+        parts.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
     }
-    return btoa(binary);
+    return btoa(parts.join(''));
 }
 
 // Parse transcription response into subtitles

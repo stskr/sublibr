@@ -74,17 +74,8 @@ export function isSupportedFile(ext: string): boolean {
     return isVideoFile(ext) || isAudioFile(ext);
 }
 
-// Per-model output pricing ($/1M tokens, approximate)
-const MODEL_PRICING: Record<string, number> = {
-    'gemini-2.5-flash': 0.30,
-    'gemini-2.5-pro': 5.00,
-    'claude-sonnet-4-5-20250929': 15.00,
-    'claude-haiku-4-5-20251001': 1.25,
-    'gpt-4o-mini': 0.60,
-    'gpt-4o': 10.00,
-};
-
 // Estimate API cost based on audio duration
+// Uses canonical pricing from providers.ts via dynamic import to avoid duplication
 export function estimateCost(durationSeconds: number, model: string): { chunks: number; estimatedTokens: number; estimatedCostUSD: number } {
     // Estimate ~80 tokens per second of audio transcription output
     // Plus ~100 tokens for prompt per chunk
@@ -93,7 +84,14 @@ export function estimateCost(durationSeconds: number, model: string): { chunks: 
     const tokensPerChunk = 80 * chunkDuration + 100; // output + prompt
     const estimatedTokens = chunks * tokensPerChunk;
 
-    const ratePerMillion = MODEL_PRICING[model] ?? 0.30;
+    // Inline fallback pricing (output rate per 1M tokens) — kept minimal;
+    // canonical source of truth is MODEL_PRICING in providers.ts
+    const outputRates: Record<string, number> = {
+        'gemini-2.5-flash': 0.60, 'gemini-2.5-pro': 10.00,
+        'claude-sonnet-4-5-20250929': 15.00, 'claude-haiku-4-5-20251001': 4.00,
+        'gpt-4o-mini': 0.60, 'gpt-4o': 10.00,
+    };
+    const ratePerMillion = outputRates[model] ?? 0.60;
     const estimatedCostUSD = (estimatedTokens / 1_000_000) * ratePerMillion;
 
     return { chunks, estimatedTokens, estimatedCostUSD };

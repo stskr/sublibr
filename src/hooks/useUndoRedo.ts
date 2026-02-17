@@ -51,10 +51,10 @@ export function useUndoRedo<T>(initialState: T) {
     const set = useCallback((newPresent: T) => {
         setState((currentState) => {
             const { past, present } = currentState;
-
-            // Optional: limit history size here if needed
+            const newPast = [...past, present];
+            if (newPast.length > 50) newPast.splice(0, newPast.length - 50);
             return {
-                past: [...past, present],
+                past: newPast,
                 present: newPresent,
                 future: [],
             };

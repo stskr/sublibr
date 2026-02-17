@@ -17,25 +17,26 @@ export function UpdateNotification() {
     useEffect(() => {
         if (!window.electronAPI) return;
 
-        window.electronAPI.onUpdateAvailable((info) => {
-            setUpdateInfo(info);
-            setStatus('available');
-            setDismissed(false);
-        });
+        const cleanups = [
+            window.electronAPI.onUpdateAvailable((info) => {
+                setUpdateInfo(info);
+                setStatus('available');
+                setDismissed(false);
+            }),
+            window.electronAPI.onUpdateProgress((progress) => {
+                setDownloadPercent(progress.percent);
+                setStatus('downloading');
+            }),
+            window.electronAPI.onUpdateDownloaded((info) => {
+                setUpdateInfo(prev => prev ? { ...prev, ...info } : info);
+                setStatus('ready');
+            }),
+            window.electronAPI.onUpdateError(() => {
+                setStatus('error');
+            }),
+        ];
 
-        window.electronAPI.onUpdateProgress((progress) => {
-            setDownloadPercent(progress.percent);
-            setStatus('downloading');
-        });
-
-        window.electronAPI.onUpdateDownloaded((info) => {
-            setUpdateInfo(prev => prev ? { ...prev, ...info } : info);
-            setStatus('ready');
-        });
-
-        window.electronAPI.onUpdateError(() => {
-            setStatus('error');
-        });
+        return () => { cleanups.forEach(fn => fn()); };
     }, []);
 
     if (status === 'idle' || dismissed) return null;

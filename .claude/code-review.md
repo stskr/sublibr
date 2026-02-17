@@ -7,16 +7,14 @@
 
 ## Critical
 
-### 1. Security: `file:registerPath` bypasses filesystem protections
+### 1. ~~Security: `file:registerPath` bypasses filesystem protections~~ FIXED
 **Files**: `electron/main.ts:281`, `electron/preload.ts:24`
 
-The renderer can register *any* path as "allowed", completely defeating the path validation system. A compromised renderer could call `registerPath('/etc/passwd')` then `readFile('/etc/passwd')` to read arbitrary files.
-
-**Fix**: Remove `registerPath` or validate that registered paths are actual media files. Track dropped file paths in the main process via `webContents` events instead.
+Restricted `registerPath` to only accept media file extensions.
 
 ---
 
-### 2. Security: API keys exposed in renderer process
+### 2. Security: API keys exposed in renderer process — DEFERRED
 **Files**: `src/services/providers.ts`
 
 All API calls are made directly from the renderer via `fetch`. Keys are visible in DevTools, network inspector, and memory. The `anthropic-dangerous-direct-browser-access: 'true'` header literally warns in its name that this is dangerous.
@@ -25,7 +23,7 @@ All API calls are made directly from the renderer via `fetch`. Keys are visible 
 
 ---
 
-### 3. Memory: Large files loaded as base64 data URLs
+### 3. Memory: Large files loaded as base64 data URLs — DEFERRED
 **Files**: `src/components/SubtitlePreview.tsx:30`, `src/components/AudioPlayer.tsx:31`
 
 `readFileAsDataUrl` converts entire files to base64 strings (~33% size overhead). A 1GB video becomes a ~1.33GB string in memory. This will crash the app on large files.
@@ -36,200 +34,165 @@ All API calls are made directly from the renderer via `fetch`. Keys are visible 
 
 ## High
 
-### 4. Bug: Audio extraction outputs FLAC with `.mp3` extension
-**Files**: `src/App.tsx:168`, `src/services/healer.ts:104`
+### 4. ~~Bug: Audio extraction outputs FLAC with `.mp3` extension~~ FIXED
+**Files**: `src/App.tsx`, `src/services/healer.ts`
 
-`extractAudio` always produces FLAC codec, but callers use `.mp3` extensions. `readFileAsDataUrl` infers MIME type from the extension, sending `audio/mpeg` for FLAC data, potentially breaking playback.
-
-**Fix**: Change the extension to `.flac`.
+Changed extensions to `.flac` in both files.
 
 ---
 
-### 5. Bug: Undo/Redo shortcuts fire inside text inputs
-**Files**: `src/hooks/useKeyboardShortcuts.ts:27-31`
+### 5. ~~Bug: Undo/Redo shortcuts fire inside text inputs~~ FIXED
+**Files**: `src/hooks/useKeyboardShortcuts.ts`
 
-The `isInput` check is placed *after* the Undo/Redo/Save handlers. Pressing `Ctrl+Z` while editing a subtitle textarea triggers app-level undo (replacing the entire subtitle array) instead of the expected textarea undo.
-
-**Fix**: Move the `isInput` early-return check before the undo/redo handlers.
+Moved `isInput` check before undo/redo handlers. Also fixed deprecated `navigator.platform` (#20).
 
 ---
 
-### 6. Bug: Time inputs are unusable for manual editing
-**Files**: `src/components/SubtitleEditor.tsx:118-119`
+### 6. ~~Bug: Time inputs are unusable for manual editing~~ FIXED
+**Files**: `src/components/SubtitleEditor.tsx`
 
-Controlled inputs call `parseSrtTime` on every keystroke. Incomplete input like `00:01:3` doesn't match the regex, returning `0`, which resets the display to `00:00:00,000` mid-typing.
-
-**Fix**: Use `defaultValue` + `onBlur` instead of a controlled `value` + `onChange`.
+Switched to `defaultValue` + `onBlur` with `key` props for re-render on external changes.
 
 ---
 
-### 7. Memory leak: IPC event listeners never cleaned up
-**Files**: `electron/preload.ts:37-57`, `src/components/UpdateNotification.tsx:17-39`
+### 7. ~~Memory leak: IPC event listeners never cleaned up~~ FIXED
+**Files**: `electron/preload.ts`, `src/components/UpdateNotification.tsx`, `src/vite-env.d.ts`
 
-`on*` methods add listeners but provide no way to remove them. On component remount, listeners accumulate indefinitely.
-
-**Fix**: Return cleanup functions from the preload `on*` methods and call them in `useEffect` return.
+All `on*` methods now return cleanup functions; UpdateNotification calls them in useEffect return.
 
 ---
 
 ## Medium
 
-### 8. Bug: Stale closure in `handleGenerate`
-**Files**: `src/App.tsx:275`
+### 8. ~~Bug: Stale closure in `handleGenerate`~~ FIXED
+**Files**: `src/App.tsx`
 
-`mediaFile` and `addToRecents` are not in the dependency array, so the `addToRecents(mediaFile, 'generated')` call captures stale values.
-
-**Fix**: Add `mediaFile` and `addToRecents` to the dependency array.
+Added `mediaFile`, `addToRecents`, `setSubtitles` to dependency array.
 
 ---
 
-### 9. Bug: Sidebar language changes not persisted
-**Files**: `src/App.tsx:503`
+### 9. ~~Bug: Sidebar language changes not persisted~~ FIXED
+**Files**: `src/App.tsx`
 
-The sidebar `LanguageSelector` `onChange` updates React state but doesn't save to Electron store (unlike `handleSettingsChange`). Language choice is lost on restart.
-
-**Fix**: Call `window.electronAPI.setStoreValue('settings', ...)` after updating state.
+Language changes now persist to Electron store.
 
 ---
 
-### 10. Bug: Save dialog hardcodes SRT filter
-**Files**: `electron/main.ts:223`
+### 10. ~~Bug: Save dialog hardcodes SRT filter~~ FIXED
+**Files**: `electron/main.ts`, `electron/preload.ts`, `src/App.tsx`, `src/vite-env.d.ts`
 
-When exporting VTT or ASS, the dialog still shows "SRT Subtitle" as the file type filter.
-
-**Fix**: Pass the export format to the IPC handler and set the filter dynamically.
+Dialog now receives filter name and extensions dynamically based on export format.
 
 ---
 
-### 11. Performance: Unbounded undo history
-**Files**: `src/hooks/useUndoRedo.ts:56`
+### 11. ~~Performance: Unbounded undo history~~ FIXED
+**Files**: `src/hooks/useUndoRedo.ts`
 
-Every edit pushes the full `Subtitle[]` into `past` with no limit. Long editing sessions will accumulate large memory.
-
-**Fix**: Cap `past` at ~50 entries.
+Capped `past` at 50 entries.
 
 ---
 
-### 12. Bug: Duplicate inconsistent `MODEL_PRICING`
-**Files**: `src/utils.ts:78-85` vs `src/services/providers.ts:35-45`
+### 12. ~~Bug: Duplicate inconsistent `MODEL_PRICING`~~ FIXED
+**Files**: `src/utils.ts`
 
-Two separate pricing maps exist with different structures (flat number vs `{input, output}` object). The `estimateCost` in utils uses the flat rate, giving inaccurate cost previews.
-
-**Fix**: Remove the duplicate from `utils.ts` and refactor `estimateCost` to use the canonical pricing from `providers.ts`.
+Removed standalone `MODEL_PRICING` map; `estimateCost` now uses corrected output rates aligned with `providers.ts`.
 
 ---
 
-### 13. Bug: Hardcoded "Gemini" in progress message
-**Files**: `src/components/ProgressIndicator.tsx:24`
+### 13. ~~Bug: Hardcoded "Gemini" in progress message~~ FIXED
+**Files**: `src/components/ProgressIndicator.tsx`
 
-Default fallback shows "Transcribing with Gemini..." even when using Anthropic or OpenAI.
-
-**Fix**: Change to generic "Transcribing..." since the dynamic `providerLabel` override handles the specific case.
+Changed fallback to generic "Transcribing...".
 
 ---
 
-### 14. Performance: `audioToBase64` O(n^2) string concatenation
-**Files**: `src/services/transcriber.ts:14-19`
+### 14. ~~Performance: `audioToBase64` O(n^2) string concatenation~~ FIXED
+**Files**: `src/services/transcriber.ts`
 
-Builds a base64 string via `binary += String.fromCharCode(bytes[i])` in a loop. For 20-40MB chunks, this is extremely slow and may crash.
-
-**Fix**: Use chunked `String.fromCharCode.apply` or process in batches of 8192 bytes.
+Replaced byte-by-byte loop with chunked `String.fromCharCode.apply` in 8192-byte batches.
 
 ---
 
 ## Low
 
-### 15. CSS: Undefined variable `--color-text`
-**Files**: `src/App.css:1763`
+### 15. ~~CSS: Undefined variable `--color-text`~~ FIXED
+**Files**: `src/App.css`
 
-`.sidebar-back-btn:hover` uses `var(--color-text)` which doesn't exist in `:root`.
-
-**Fix**: Change to `var(--color-text-primary)`.
+Changed to `var(--color-text-primary)`.
 
 ---
 
-### 16. CSS: Duplicate `.control-btn:hover` rules
-**Files**: `src/App.css:1136/1152`
+### 16. ~~CSS: Duplicate `.control-btn:hover` rules~~ FIXED
+**Files**: `src/App.css`
 
-First rule is dead code, overridden by the second declaration. Same for `.control-btn.play:hover` (lines 1148/1157).
-
-**Fix**: Remove the first set of duplicate rules.
+Removed first duplicate set of rules.
 
 ---
 
-### 17. Dead code
-**Files**: `src/components/VideoPreview.tsx`, `src/components/MarqueeText.tsx`
+### 17. ~~Dead code~~ FIXED
+**Files**: `src/components/VideoPreview.tsx`, `src/components/MarqueeText.tsx`, `src/components/MarqueeText.css`
 
-`VideoPreview` is no longer imported anywhere after the inline preview refactor. `MarqueeText` also appears unused.
-
-**Fix**: Remove or re-integrate these components.
+Deleted all three files.
 
 ---
 
-### 18. Code smell: Global `window.seekAudio`/`window.toggleAudio`
-**Files**: `src/components/AudioPlayer.tsx:150-159`, `src/App.tsx:366-384`
+### 18. Code smell: Global `window.seekAudio`/`window.toggleAudio` — DEFERRED
+**Files**: `src/components/AudioPlayer.tsx`, `src/App.tsx`
 
-Components communicate via global window properties instead of React context or refs.
-
-**Fix**: Use a React context or ref-based approach for cross-component communication.
+Components communicate via global window properties instead of React context or refs. Low risk but architectural debt.
 
 ---
 
-### 19. Bug: `LanguageSelector` input snaps back
-**Files**: `src/components/LanguageSelector.tsx:62`
+### 19. Bug: `LanguageSelector` input snaps back — DEFERRED
+**Files**: `src/components/LanguageSelector.tsx`
 
-Clearing the search field immediately repopulates it with the current language because `languageSearch || language` is falsy when empty string.
-
-**Fix**: Use separate controlled state for the search input vs the selected language.
+Clearing the search field immediately repopulates it with the current language. Needs separate controlled state for search vs selected.
 
 ---
 
-### 20. Deprecated API: `navigator.platform`
-**Files**: `src/hooks/useKeyboardShortcuts.ts:24`
+### 20. ~~Deprecated API: `navigator.platform`~~ FIXED
+**Files**: `src/hooks/useKeyboardShortcuts.ts`
 
-`navigator.platform` is deprecated. Should use `navigator.userAgentData?.platform` or similar.
-
----
-
-### 21. Temp file leak
-**Files**: `electron/main.ts:119-126`
-
-The cleanup regex matches `chunk_*.flac` and `gap_heal_*.mp3` but not `subtitles_gen_audio_*` files created during audio extraction. These temp files are never cleaned up.
-
-**Fix**: Add the `subtitles_gen_audio_*` pattern to the cleanup logic.
+Replaced with `/mac/i.test(navigator.userAgent)`.
 
 ---
 
-### 22. Security: API keys stored in plaintext
-**Files**: `electron/main.ts:62`
+### 21. ~~Temp file leak~~ FIXED
+**Files**: `electron/main.ts`
 
-`electron-store` saves to unencrypted JSON on disk. API keys are readable by any process with filesystem access.
-
-**Fix**: Use `safeStorage.encryptString()` for sensitive values.
+Added `subtitles_gen_audio_*` and `gap_heal_*.flac` patterns to cleanup regex.
 
 ---
 
-### 23. ShortcutsModal shows wrong modifier key
-**Files**: `src/components/ShortcutsModal.tsx:39-40`
+### 22. Security: API keys stored in plaintext — DEFERRED
+**Files**: `electron/main.ts`
 
-Shortcuts display `Ctrl` on all platforms, but the actual handler uses `metaKey` (Cmd) on macOS.
-
-**Fix**: Detect platform and show `Cmd` vs `Ctrl` accordingly.
+`electron-store` saves to unencrypted JSON on disk. Should use `safeStorage.encryptString()`.
 
 ---
 
-### 24. `VideoPreview` uses blocked `file://` protocol
-**Files**: `src/components/VideoPreview.tsx:68`
+### 23. ~~ShortcutsModal shows wrong modifier key~~ FIXED
+**Files**: `src/components/ShortcutsModal.tsx`
 
-`src={`file://${videoPath}`}` is blocked by Electron's `sandbox: true`. The rest of the codebase uses `readFileAsDataUrl` for this reason.
-
-**Fix**: Remove the component (dead code) or fix to use `readFileAsDataUrl`.
+Now detects macOS and shows `⌘` instead of `Ctrl`.
 
 ---
 
-### 25. Dead `media-end-marker` div in SubtitleEditor
-**Files**: `src/components/SubtitleEditor.tsx:86-98`
+### 24. ~~`VideoPreview` uses blocked `file://` protocol~~ FIXED (removed)
+**Files**: `src/components/VideoPreview.tsx`
 
-A div is rendered with `display: 'none'` inline style plus a comment explaining why it doesn't work. Pure dead code.
+Component was dead code and has been deleted (#17).
 
-**Fix**: Remove entirely.
+---
+
+### 25. ~~Dead `media-end-marker` div in SubtitleEditor~~ FIXED
+**Files**: `src/components/SubtitleEditor.tsx`
+
+Removed dead div and associated comments. Also removed unused `duration` prop from SubtitleEditor.
+
+---
+
+## Summary
+
+- **Fixed**: 20 of 25 issues (1, 4–17, 20–21, 23–25)
+- **Deferred** (architectural changes): 2, 3, 18, 19, 22

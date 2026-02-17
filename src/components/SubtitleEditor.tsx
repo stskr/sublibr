@@ -1,17 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { formatSrtTime, parseSrtTime, generateId, formatDisplayTime, detectDirection } from '../utils';
+import { formatSrtTime, parseSrtTime, generateId, detectDirection } from '../utils';
 import type { Subtitle } from '../types';
 
 interface SubtitleEditorProps {
     subtitles: Subtitle[];
     onSubtitlesChange: (subtitles: Subtitle[]) => void;
     currentTime: number;
-    duration?: number; // Total content duration (max of media and subtitles)
     mediaDuration?: number; // Actual media file duration
     onSeek: (time: number) => void;
 }
 
-export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, duration = 0, mediaDuration, onSeek }: SubtitleEditorProps) {
+export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, mediaDuration, onSeek }: SubtitleEditorProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
@@ -28,7 +27,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, dura
         );
     }, [subtitles, onSubtitlesChange]);
 
-    const handleTimeChange = useCallback((id: string, field: 'startTime' | 'endTime', value: string) => {
+    const handleTimeBlur = useCallback((id: string, field: 'startTime' | 'endTime', value: string) => {
         const seconds = parseSrtTime(value);
         onSubtitlesChange(
             subtitles.map(sub => sub.id === id ? { ...sub, [field]: seconds } : sub)
@@ -83,21 +82,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, dura
                 </div>
             ) : (
                 <div className="subtitle-list">
-                    {mediaDuration && duration > mediaDuration && (
-                        <div className="media-end-marker" style={{
-                            top: `${(mediaDuration / duration) * 100}%`,
-                            display: 'none' // We are in a list, this absolute positioning strategy won't work well for a list. 
-                            // Instead, we should probably mark the specific subtitle that crosses the boundary or show a global indicator.
-                        }}>
-                            {/* Retracting the inline style approach for list. 
-                                 Better approach for list: Highlight subtitles that are out of bounds? 
-                                 Or just show a warning banner? 
-                                 The user asked for "indicate in and out for each". 
-                                 In the list view, we can mark subtitles that are beyond media duration.
-                             */}
-                        </div>
-                    )}
-
                     {subtitles.map((sub) => {
                         const isBeyondMedia = mediaDuration ? sub.startTime > mediaDuration : false;
 
@@ -113,18 +97,20 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, dura
 
                                 <div className="subtitle-times">
                                     <input
+                                        key={`start-${sub.id}-${sub.startTime}`}
                                         type="text"
                                         className="time-input"
-                                        value={formatSrtTime(sub.startTime)}
-                                        onChange={(e) => handleTimeChange(sub.id, 'startTime', e.target.value)}
+                                        defaultValue={formatSrtTime(sub.startTime)}
+                                        onBlur={(e) => handleTimeBlur(sub.id, 'startTime', e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
                                     />
                                     <span className="time-separator">→</span>
                                     <input
+                                        key={`end-${sub.id}-${sub.endTime}`}
                                         type="text"
                                         className="time-input"
-                                        value={formatSrtTime(sub.endTime)}
-                                        onChange={(e) => handleTimeChange(sub.id, 'endTime', e.target.value)}
+                                        defaultValue={formatSrtTime(sub.endTime)}
+                                        onBlur={(e) => handleTimeBlur(sub.id, 'endTime', e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
                                     />
                                 </div>

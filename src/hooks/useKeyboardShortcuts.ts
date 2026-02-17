@@ -21,8 +21,18 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
                 target.tagName === 'TEXTAREA' ||
                 target.isContentEditable;
 
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const isMac = /mac/i.test(navigator.userAgent);
             const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+            // Save: Cmd+S / Ctrl+S (always intercept to prevent browser save)
+            if (cmdOrCtrl && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                shortcuts.onSave();
+                return;
+            }
+
+            // Don't trigger undo/redo or navigation shortcuts while typing in inputs
+            if (isInput) return;
 
             // Undo: Cmd+Z / Ctrl+Z
             if (cmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -37,18 +47,6 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
                 shortcuts.onRedo();
                 return;
             }
-
-            // Save: Cmd+S / Ctrl+S (Prevent browser save)
-            if (cmdOrCtrl && e.key.toLowerCase() === 's') {
-                e.preventDefault();
-                shortcuts.onSave();
-                return;
-            }
-
-            // GLOBAL NAVIGATION SHORTCUTS
-            // (Should work unless user is typing in a text field)
-
-            if (isInput) return; // Don't trigger navigation shortcuts while typing
 
             // Play/Pause: Space
             if (e.code === 'Space') {

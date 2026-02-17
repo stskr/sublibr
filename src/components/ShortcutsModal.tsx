@@ -6,6 +6,8 @@ interface ShortcutsModalProps {
 }
 
 export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
+    const mod = /mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+
     return (
         <div className="modal-backdrop" onClick={onClose}>
             <div className="modal-content shortcuts-modal" onClick={e => e.stopPropagation()}>
@@ -37,13 +39,13 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
                         <div className="shortcut-row">
                             <span className="shortcut-label">Undo</span>
                             <div className="keys">
-                                <kbd>Ctrl</kbd> + <kbd>Z</kbd>
+                                <kbd>{mod}</kbd> + <kbd>Z</kbd>
                             </div>
                         </div>
                         <div className="shortcut-row">
                             <span className="shortcut-label">Redo</span>
                             <div className="keys">
-                                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>
+                                <kbd>{mod}</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>
                             </div>
                         </div>
                         <div className="shortcut-row">
@@ -61,7 +63,7 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
                         <div className="shortcut-row">
                             <span className="shortcut-label">Save / Download</span>
                             <div className="keys">
-                                <kbd>Ctrl</kbd> + <kbd>S</kbd>
+                                <kbd>{mod}</kbd> + <kbd>S</kbd>
                             </div>
                         </div>
                     </div>

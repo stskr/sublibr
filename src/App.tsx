@@ -165,7 +165,7 @@ function App() {
       setProcessing({ status: 'extracting', progress: 10 });
       try {
         const tempDir = await window.electronAPI.getTempPath();
-        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.mp3`;
+        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
         await window.electronAPI.extractAudio(file.path, audioOutput);
         setAudioPath(audioOutput);
         setProcessing({ status: 'idle', progress: 0 });
@@ -272,7 +272,7 @@ function App() {
         error: error instanceof Error ? error.message : 'Transcription failed',
       });
     }
-  }, [audioPath, settings, addTokenUsage]);
+  }, [audioPath, settings, addTokenUsage, mediaFile, addToRecents, setSubtitles]);
 
   // Load subtitles from file
   const handleLoadSubtitles = useCallback(async () => {
@@ -356,7 +356,8 @@ function App() {
       ? mediaFile.name.replace(/\.[^.]+$/, ext)
       : `subtitles${ext}`;
 
-    const savePath = await window.electronAPI.saveFileDialog(defaultName);
+    const formatNames: Record<string, string> = { srt: 'SRT Subtitle', vtt: 'WebVTT Subtitle', ass: 'ASS Subtitle' };
+    const savePath = await window.electronAPI.saveFileDialog(defaultName, formatNames[exportFormat], [exportFormat]);
     if (savePath) {
       await window.electronAPI.writeFile(savePath, content);
     }
@@ -500,7 +501,11 @@ function App() {
                     language={settings.language}
                     autoDetect={settings.autoDetectLanguage}
                     onLanguageChange={(language, autoDetect) => {
-                      setSettings(s => ({ ...s, language, autoDetectLanguage: autoDetect }));
+                      const updated = { ...settings, language, autoDetectLanguage: autoDetect };
+                      setSettings(updated);
+                      if (window.electronAPI) {
+                        window.electronAPI.setStoreValue('settings', updated);
+                      }
                     }}
                   />
 

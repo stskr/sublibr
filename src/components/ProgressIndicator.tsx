@@ -21,7 +21,7 @@ const STATUS_MESSAGES: Record<string, string> = {
     'extracting': 'Extracting audio...',
     'detecting-silences': 'Detecting silences...',
     'splitting': 'Splitting audio into chunks...',
-    'transcribing': 'Transcribing with Gemini...',
+    'transcribing': 'Transcribing...',
     'merging': 'Merging subtitles...',
     'done': 'Complete!',
     'error': 'Error occurred',
