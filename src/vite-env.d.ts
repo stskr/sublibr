@@ -21,8 +21,6 @@ export interface ElectronAPI {
     getDuration: (filePath: string) => Promise<number>;
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
     splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => Promise<string[]>;
-    onProgress: (callback: (progress: number) => void) => () => void;
-
     // App updates
     getVersion: () => Promise<string>;
     checkForUpdates: () => Promise<{ updateAvailable: boolean }>;

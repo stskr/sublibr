@@ -56,7 +56,7 @@ export function UpdateNotification() {
 
     const handleCheckAgain = () => {
         setStatus('idle');
-        window.electronAPI?.checkForUpdates();
+        window.electronAPI?.checkForUpdates().catch(() => {});
     };
 
     return (

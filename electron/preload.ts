@@ -34,13 +34,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) =>
         ipcRenderer.invoke('ffmpeg:splitAudio', inputPath, chunks),
 
-    // Progress events
-    onProgress: (callback: (progress: number) => void) => {
-        const listener = (_event: Electron.IpcRendererEvent, progress: number) => callback(progress);
-        ipcRenderer.on('progress', listener);
-        return () => { ipcRenderer.removeListener('progress', listener); };
-    },
-
     // App updates
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
