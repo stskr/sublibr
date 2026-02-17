@@ -92,7 +92,7 @@ function App() {
           setSettings(migrated);
           await window.electronAPI.setStoreValue('settings', migrated);
         } else {
-          setSettings(saved as unknown as AppSettings);
+          setSettings({ ...DEFAULT_SETTINGS, ...(saved as Partial<AppSettings>) });
         }
       }
 
