@@ -4,7 +4,6 @@ import { callProvider } from './providers';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
-    rawText: string;
     tokenUsage: TokenUsage;
 }
 
@@ -178,7 +177,6 @@ Transcribe the audio now:`;
 
     return {
         subtitles,
-        rawText: text,
         tokenUsage: providerResponse.tokenUsage,
     };
 }

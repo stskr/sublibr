@@ -26,7 +26,6 @@ export async function healSubtitles(
     model: string,
     language: string,
     autoDetect: boolean,
-    onProgress?: (progress: number) => void
 ): Promise<HealResult> {
     if (subtitles.length === 0) return { subtitles, tokenUsages: [] };
 
@@ -85,11 +84,6 @@ export async function healSubtitles(
 
     for (let i = 0; i < actionableGaps.length; i++) {
         const gap = actionableGaps[i];
-
-        // Update progress/log
-        if (onProgress) {
-            onProgress(Math.round((i / actionableGaps.length) * 100));
-        }
 
         // Create a temporary "chunk" for this gap
         // We add a bit of buffer to context
