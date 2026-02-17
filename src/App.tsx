@@ -14,7 +14,7 @@ import { healSubtitles } from './services/healer';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { generateId, formatDisplayTime } from './utils';
+import { generateId, formatDisplayTime, isVideoFile } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats } from './types';
 import { PROVIDER_LABELS } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
@@ -150,7 +150,7 @@ function App() {
         ext: info.ext,
         size: info.size,
         duration,
-        isVideo: info.ext.match(/\.(mp4|mkv|mov|avi|webm)$/i) !== null, // simple check, ideally reuse isVideoFile
+        isVideo: isVideoFile(info.ext),
       };
 
       setMediaFile(mediaFile);
