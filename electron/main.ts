@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -178,19 +178,69 @@ if (app.isPackaged) {
 
 // ============== IPC Handlers ==============
 
+// ============== API Key Encryption Helpers ==============
+// Encrypt/decrypt apiKey fields within the settings object using OS keychain.
+
+const ENC_PREFIX = 'enc:';
+
+function encryptApiKeys(settings: Record<string, unknown>): Record<string, unknown> {
+  if (!safeStorage.isEncryptionAvailable()) return settings;
+  const providers = settings.providers as Record<string, Record<string, unknown>> | undefined;
+  if (!providers) return settings;
+
+  const encrypted = { ...settings, providers: { ...providers } };
+  for (const name of Object.keys(encrypted.providers as Record<string, Record<string, unknown>>)) {
+    const provider = { ...(encrypted.providers as Record<string, Record<string, unknown>>)[name] };
+    if (typeof provider.apiKey === 'string' && provider.apiKey && !provider.apiKey.startsWith(ENC_PREFIX)) {
+      provider.apiKey = ENC_PREFIX + safeStorage.encryptString(provider.apiKey).toString('base64');
+    }
+    (encrypted.providers as Record<string, Record<string, unknown>>)[name] = provider;
+  }
+  return encrypted;
+}
+
+function decryptApiKeys(settings: Record<string, unknown>): Record<string, unknown> {
+  if (!safeStorage.isEncryptionAvailable()) return settings;
+  const providers = settings.providers as Record<string, Record<string, unknown>> | undefined;
+  if (!providers) return settings;
+
+  const decrypted = { ...settings, providers: { ...providers } };
+  for (const name of Object.keys(decrypted.providers as Record<string, Record<string, unknown>>)) {
+    const provider = { ...(decrypted.providers as Record<string, Record<string, unknown>>)[name] };
+    if (typeof provider.apiKey === 'string' && provider.apiKey.startsWith(ENC_PREFIX)) {
+      try {
+        const buf = Buffer.from(provider.apiKey.slice(ENC_PREFIX.length), 'base64');
+        provider.apiKey = safeStorage.decryptString(buf);
+      } catch {
+        // If decryption fails, leave as-is (key may have been corrupted)
+      }
+    }
+    (decrypted.providers as Record<string, Record<string, unknown>>)[name] = provider;
+  }
+  return decrypted;
+}
+
 // Settings
 ipcMain.handle('store:get', (_event, key: string) => {
   if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
     throw new Error(`Invalid store key: ${key}`);
   }
-  return store.get(key);
+  const value = store.get(key);
+  if (key === 'settings' && value && typeof value === 'object') {
+    return decryptApiKeys(value as Record<string, unknown>);
+  }
+  return value;
 });
 
 ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
   if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
     throw new Error(`Invalid store key: ${key}`);
   }
-  store.set(key, value);
+  if (key === 'settings' && value && typeof value === 'object') {
+    store.set(key, encryptApiKeys(value as Record<string, unknown>));
+  } else {
+    store.set(key, value);
+  }
 });
 
 ipcMain.handle('store:delete', (_event, key: string) => {

@@ -162,10 +162,10 @@ Added `subtitles_gen_audio_*` and `gap_heal_*.flac` patterns to cleanup regex.
 
 ---
 
-### 22. Security: API keys stored in plaintext — DEFERRED
+### 22. ~~Security: API keys stored in plaintext~~ FIXED
 **Files**: `electron/main.ts`
 
-`electron-store` saves to unencrypted JSON on disk. Should use `safeStorage.encryptString()`.
+API keys are now encrypted at rest using Electron's `safeStorage` API (OS keychain). Encryption/decryption is transparent — applied in `store:get`/`store:set` handlers. Existing plaintext keys auto-migrate on next save. Falls back to plaintext if OS encryption is unavailable.
 
 ---
 
@@ -192,5 +192,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 21 of 25 issues (1–2, 4–17, 20–21, 23–25)
-- **Deferred** (architectural changes): 3, 18, 19, 22
+- **Fixed**: 22 of 25 issues (1–2, 4–17, 20–25)
+- **Deferred** (architectural changes): 3, 18, 19
