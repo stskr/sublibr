@@ -14,12 +14,10 @@ Restricted `registerPath` to only accept media file extensions.
 
 ---
 
-### 2. Security: API keys exposed in renderer process — DEFERRED
-**Files**: `src/services/providers.ts`
+### 2. ~~Security: API keys exposed in renderer process~~ FIXED
+**Files**: `src/services/providers.ts`, `electron/main.ts`, `electron/preload.ts`, `src/vite-env.d.ts`
 
-All API calls are made directly from the renderer via `fetch`. Keys are visible in DevTools, network inspector, and memory. The `anthropic-dangerous-direct-browser-access: 'true'` header literally warns in its name that this is dangerous.
-
-**Fix**: Proxy all API calls through the main process via IPC handlers. Store keys using Electron's `safeStorage` API.
+All API calls (testApiKey + callProvider) proxied through the main process via IPC handlers. Renderer never makes direct HTTP requests; `net.fetch` in main process is invisible in DevTools. Removed `anthropic-dangerous-direct-browser-access` header and `@google/generative-ai` SDK from renderer.
 
 ---
 
@@ -194,5 +192,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 20 of 25 issues (1, 4–17, 20–21, 23–25)
-- **Deferred** (architectural changes): 2, 3, 18, 19, 22
+- **Fixed**: 21 of 25 issues (1–2, 4–17, 20–21, 23–25)
+- **Deferred** (architectural changes): 3, 18, 19, 22

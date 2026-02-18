@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
     registerPath: (path: string) => ipcRenderer.invoke('file:registerPath', path),
 
+    // AI API proxy (calls go through main process — keys never exposed in renderer)
+    testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string) =>
+        ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64),
+
     // FFmpeg operations
     extractAudio: (inputPath: string, outputPath: string) =>
         ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath),

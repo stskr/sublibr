@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, net } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -414,4 +414,208 @@ ipcMain.handle('app:downloadUpdate', async () => {
 
 ipcMain.handle('app:installUpdate', () => {
   autoUpdater.quitAndInstall(false, true);
+});
+
+// ============== AI API Proxy ==============
+// All AI calls go through the main process so API keys are never exposed in the renderer.
+
+type AIProvider = 'gemini' | 'anthropic' | 'openai';
+
+ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: string) => {
+  try {
+    switch (provider) {
+      case 'gemini': {
+        const res = await net.fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models',
+          { headers: { 'x-goog-api-key': apiKey } },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
+      }
+      case 'anthropic': {
+        const res = await net.fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1,
+            messages: [{ role: 'user', content: 'ping' }],
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
+      }
+      case 'openai': {
+        const res = await net.fetch('https://api.openai.com/v1/models', {
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' };
+  }
+});
+
+ipcMain.handle('ai:callProvider', async (
+  _event,
+  provider: AIProvider,
+  apiKey: string,
+  model: string,
+  prompt: string,
+  audioBase64: string,
+) => {
+  switch (provider) {
+    case 'gemini': {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiModel = genAI.getGenerativeModel({ model });
+
+      const result = await geminiModel.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: 'audio/flac',
+            data: audioBase64,
+          },
+        },
+      ]);
+
+      const response = await result.response;
+      const usage = response.usageMetadata;
+
+      return {
+        text: response.text(),
+        tokenUsage: {
+          inputTokens: usage?.promptTokenCount ?? 0,
+          outputTokens: usage?.candidatesTokenCount ?? 0,
+          provider: 'gemini',
+          model,
+          timestamp: Date.now(),
+        },
+      };
+    }
+
+    case 'anthropic': {
+      const res = await net.fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 8192,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'document',
+                  source: {
+                    type: 'base64',
+                    media_type: 'audio/flac',
+                    data: audioBase64,
+                  },
+                },
+                {
+                  type: 'text',
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
+        throw new Error(`Anthropic API error: ${err.error?.message || res.statusText}`);
+      }
+
+      const data = await res.json() as {
+        content?: { type: string; text?: string }[];
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
+      const textBlock = data.content?.find((b) => b.type === 'text');
+
+      return {
+        text: textBlock?.text ?? '',
+        tokenUsage: {
+          inputTokens: data.usage?.input_tokens ?? 0,
+          outputTokens: data.usage?.output_tokens ?? 0,
+          provider: 'anthropic',
+          model,
+          timestamp: Date.now(),
+        },
+      };
+    }
+
+    case 'openai': {
+      const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_audio',
+                  input_audio: {
+                    data: audioBase64,
+                    format: 'flac',
+                  },
+                },
+                {
+                  type: 'text',
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
+        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
+      }
+
+      const data = await res.json() as {
+        choices?: { message?: { content?: string } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+
+      return {
+        text: data.choices?.[0]?.message?.content ?? '',
+        tokenUsage: {
+          inputTokens: data.usage?.prompt_tokens ?? 0,
+          outputTokens: data.usage?.completion_tokens ?? 0,
+          provider: 'openai',
+          model,
+          timestamp: Date.now(),
+        },
+      };
+    }
+  }
 });

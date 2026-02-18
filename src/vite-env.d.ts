@@ -17,6 +17,19 @@ export interface ElectronAPI {
     getFileInfo: (path: string) => Promise<{ size: number; path: string; name: string; ext: string }>;
     getTempPath: () => Promise<string>;
     registerPath: (path: string) => Promise<void>;
+
+    // AI API proxy
+    testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>;
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string) => Promise<{
+        text: string;
+        tokenUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            provider: string;
+            model: string;
+            timestamp: number;
+        };
+    }>;
     extractAudio: (inputPath: string, outputPath: string) => Promise<string>;
     getDuration: (filePath: string) => Promise<number>;
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
