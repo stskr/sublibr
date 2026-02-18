@@ -203,8 +203,24 @@ a:hover {
   width: 100%;
 }
 
-.footer-bottom-row>.token-usage-wrapper {
-  align-self: flex-end;
+.footer-bottom-row>.footer-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-md);
+}
+
+.active-model-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.active-model-name {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
 }
 
 /* ============================================

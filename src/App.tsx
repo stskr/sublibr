@@ -16,7 +16,7 @@ import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId, formatDisplayTime, isVideoFile } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats } from './types';
-import { PROVIDER_LABELS } from './services/providers';
+import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { UpdateNotification } from './components/UpdateNotification';
 
@@ -675,7 +675,16 @@ function App() {
                 onDurationChange={setDuration}
                 mediaDuration={mediaFile?.duration}
               />
-              <TokenUsageDisplay stats={tokenStats} />
+              <div className="footer-info-row">
+                <div className="active-model-badge">
+                  <span className="icon icon-sm">smart_toy</span>
+                  <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
+                  <span className="active-model-name">
+                    {MODEL_OPTIONS[settings.activeProvider]?.find(m => m.value === activeConfig.model)?.label ?? activeConfig.model}
+                  </span>
+                </div>
+                <TokenUsageDisplay stats={tokenStats} />
+              </div>
             </div>
           </footer>
         )
