@@ -162,7 +162,27 @@ function App() {
 
       setMediaFile(mediaFile);
       setDuration(duration);
-      setAudioPath(null); // Reset audio path so it gets extracted if needed
+
+      // Set up audio path (extract for video, use directly for audio)
+      if (mediaFile.isVideo) {
+        setAudioPath(null);
+        setProcessing({ status: 'extracting', progress: 10 });
+        try {
+          const tempDir = await window.electronAPI.getTempPath();
+          const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
+          await window.electronAPI.extractAudio(mediaFile.path, audioOutput);
+          setAudioPath(audioOutput);
+          setProcessing({ status: 'idle', progress: 0 });
+        } catch (error) {
+          setProcessing({
+            status: 'error',
+            progress: 0,
+            error: error instanceof Error ? error.message : 'Failed to extract audio',
+          });
+        }
+      } else {
+        setAudioPath(mediaFile.path);
+      }
 
       // Restore cached subtitles if available
       const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
