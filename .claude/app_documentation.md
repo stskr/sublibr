@@ -910,6 +910,21 @@ The application supports global keyboard shortcuts for efficient workflow. A ref
 | **Delete Subtitle** | `Alt` + `Delete` / `Backspace` | Editor (active subtitle) |
 | **Save / Download** | `Ctrl` + `S` / `Cmd` + `S` | Global |
 
+### Accessibility
+
+The application implements comprehensive ARIA accessibility support:
+
+- **Modals** (`Settings`, `ShortcutsModal`): `role="dialog"`, `aria-modal`, `aria-labelledby`, focus trap (Tab cycles within modal), Escape to close, focus restoration on close
+- **Custom Select**: `role="combobox"` trigger with `aria-expanded`/`aria-haspopup`, `role="listbox"` dropdown, `role="option"` items with `aria-selected`, keyboard navigation (Up/Down/Enter/Escape)
+- **Audio Player**: Progress bar as `role="slider"` with `aria-valuenow/min/max`, keyboard seekable (Arrow keys), `aria-label` on all icon-only buttons (Play/Pause, Skip)
+- **File Upload**: Drop zone as `role="button"` with `tabIndex` and Enter/Space keyboard activation, `role="alert"` on warnings/errors
+- **Progress Indicator**: `role="progressbar"` with `aria-valuenow/min/max`, `aria-live="polite"` for status announcements, `role="alert"` on errors
+- **Subtitle Editor**: `role="list"` container, `aria-label` on all time inputs, text areas, and delete buttons with subtitle index context
+- **Subtitle Preview**: `aria-live="polite"` on subtitle text for screen reader announcements
+- **Token Usage**: `aria-expanded` on toggle button, `role="dialog"` on popup
+- **Update Notification**: `role="alert"` with `aria-live="polite"`
+- **All icon-only buttons**: `aria-label` attributes matching their `title` text
+
 ### User Workflow
 
 ```mermaid
@@ -1411,6 +1426,7 @@ npm run build:electron
 - [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
 - [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
 - [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List / Clear Cache actions in recents UI
+- [x] **Accessibility** — Comprehensive ARIA support: dialog roles with focus traps, combobox/listbox on custom selects, slider on progress bar, keyboard navigation, live regions, alert roles
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

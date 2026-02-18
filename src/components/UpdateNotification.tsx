@@ -56,11 +56,11 @@ export function UpdateNotification() {
 
     const handleCheckAgain = () => {
         setStatus('idle');
-        window.electronAPI?.checkForUpdates().catch(() => {});
+        window.electronAPI?.checkForUpdates().catch(() => { });
     };
 
     return (
-        <div className={`update-notification update-${status}`}>
+        <div className={`update-notification update-${status}`} role="alert" aria-live="polite">
             <div className="update-content">
                 {status === 'available' && (
                     <>

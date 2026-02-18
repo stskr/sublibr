@@ -35,11 +35,25 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
     useEffect(() => {
         if (!open) return;
         const handleKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Escape') { setOpen(false); return; }
+            const enabledOptions = options.filter(o => !o.disabled);
+            const currentIndex = enabledOptions.findIndex(o => o.value === value);
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = enabledOptions[(currentIndex + 1) % enabledOptions.length];
+                if (next) { onChange(next.value); }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prev = enabledOptions[(currentIndex - 1 + enabledOptions.length) % enabledOptions.length];
+                if (prev) { onChange(prev.value); }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                setOpen(false);
+            }
         };
         document.addEventListener('keydown', handleKey);
         return () => document.removeEventListener('keydown', handleKey);
-    }, [open]);
+    }, [open, options, value, onChange]);
 
     return (
         <div
@@ -53,16 +67,21 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
                 className="custom-select-trigger"
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
+                role="combobox"
+                aria-expanded={open}
+                aria-haspopup="listbox"
             >
                 <span className="custom-select-value">{selected?.label || ''}</span>
                 <span className={`custom-select-arrow ${open ? 'open' : ''}`} />
             </button>
             {open && (
-                <ul className="custom-select-dropdown">
+                <ul className="custom-select-dropdown" role="listbox">
                     {options.map(opt => (
                         <li
                             key={opt.value}
                             className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
+                            role="option"
+                            aria-selected={opt.value === value}
                             onClick={() => {
                                 if (opt.disabled) return;
                                 onChange(opt.value);

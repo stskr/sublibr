@@ -156,7 +156,7 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent, 
         <div className="file-upload-container">
             {/* API Key Warning */}
             {!hasApiKey && (
-                <div className="api-key-warning">
+                <div className="api-key-warning" role="alert">
                     <span className="icon icon-sm warning-icon">warning</span>
                     <span>Please add your API key in Settings before uploading files</span>
                 </div>
@@ -167,6 +167,12 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent, 
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
+                role="button"
+                tabIndex={0}
+                aria-label="Drop audio or video file, or press to browse"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBrowse(); }
+                }}
             >
                 {loading ? (
                     <div className="loading-content">
@@ -218,7 +224,7 @@ export function FileUpload({ settings, onFileSelect, recentFiles, onLoadRecent, 
             </div>
 
             {error && (
-                <div className="error-message">
+                <div className="error-message" role="alert">
                     <span className="icon icon-sm error-icon">error</span>
                     {error}
                 </div>

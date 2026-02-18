@@ -1,4 +1,4 @@
-
+import { useEffect, useRef } from 'react';
 import './ShortcutsModal.css';
 
 interface ShortcutsModalProps {
@@ -8,12 +8,42 @@ interface ShortcutsModalProps {
 export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
     const mod = /mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const prev = document.activeElement as HTMLElement;
+        modalRef.current?.focus();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { onClose(); return; }
+            if (e.key !== 'Tab') return;
+            const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (!focusable || focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => { document.removeEventListener('keydown', handleKeyDown); prev?.focus(); };
+    }, [onClose]);
+
     return (
         <div className="modal-backdrop" onClick={onClose}>
-            <div className="modal-content shortcuts-modal" onClick={e => e.stopPropagation()}>
+            <div
+                className="modal-content shortcuts-modal"
+                onClick={e => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="shortcuts-title"
+                ref={modalRef}
+                tabIndex={-1}
+            >
                 <div className="modal-header">
-                    <h2>Keyboard Shortcuts</h2>
-                    <button className="btn-icon" onClick={onClose}>
+                    <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
+                    <button className="btn-icon" onClick={onClose} aria-label="Close shortcuts">
                         <span className="icon">close</span>
                     </button>
                 </div>

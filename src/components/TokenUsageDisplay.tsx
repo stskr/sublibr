@@ -66,6 +66,8 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
                 className="token-usage-badge"
                 onClick={() => setShowPopup(!showPopup)}
                 title="Session token usage (click for details)"
+                aria-expanded={showPopup}
+                aria-label="Session token usage"
             >
                 <span className="icon icon-sm">toll</span>
                 <span className="token-usage-text">
@@ -75,7 +77,7 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
             </button>
 
             {showPopup && (
-                <div className="token-usage-popup">
+                <div className="token-usage-popup" role="dialog" aria-label="Token usage details">
                     <div className="token-popup-header">
                         <h3>Session Token Usage</h3>
                         <span className="token-popup-calls">{stats.calls.length} API call{stats.calls.length !== 1 ? 's' : ''}</span>

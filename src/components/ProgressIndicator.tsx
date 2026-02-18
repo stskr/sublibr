@@ -41,7 +41,7 @@ export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorPro
         : STATUS_MESSAGES[status];
 
     return (
-        <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`}>
+        <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`} aria-live="polite">
             <div className="progress-header">
                 <span className="progress-status">
                     <span className={`icon icon-sm ${status === 'transcribing' ? 'spin' : ''}`}>
@@ -56,7 +56,14 @@ export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorPro
                 )}
             </div>
 
-            <div className="progress-bar-container">
+            <div
+                className="progress-bar-container"
+                role="progressbar"
+                aria-valuenow={Math.round(progress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Processing progress"
+            >
                 <div
                     className="progress-bar-fill"
                     style={{ width: `${progress}%` }}
@@ -66,7 +73,7 @@ export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorPro
             <div className="progress-percent">{Math.round(progress)}%</div>
 
             {error && (
-                <div className="progress-error">
+                <div className="progress-error" role="alert">
                     <span className="icon icon-sm">error_outline</span>
                     {error}
                 </div>

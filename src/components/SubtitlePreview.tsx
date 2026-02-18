@@ -63,7 +63,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, audioPath }
         if (audioEl.paused && !video.paused) {
             video.pause();
         } else if (!audioEl.paused && video.paused) {
-            video.play().catch(() => {/* ignore autoplay issues */});
+            video.play().catch(() => {/* ignore autoplay issues */ });
         }
     }, [videoReady]);
 
@@ -96,7 +96,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, audioPath }
                         playsInline
                     />
                     {subtitleText && (
-                        <div className="preview-subtitle" dir={direction} style={{ direction }}>
+                        <div className="preview-subtitle" dir={direction} style={{ direction }} aria-live="polite">
                             {subtitleText}
                         </div>
                     )}
@@ -110,7 +110,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, audioPath }
         <div className="subtitle-preview">
             <div className="preview-cinema">
                 {subtitleText ? (
-                    <div className="preview-subtitle cinema-subtitle" dir={direction} style={{ direction }}>
+                    <div className="preview-subtitle cinema-subtitle" dir={direction} style={{ direction }} aria-live="polite">
                         {subtitleText}
                     </div>
                 ) : (

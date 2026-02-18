@@ -17,15 +17,15 @@ export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache 
             <div className="recent-files-header-row">
                 <h3 className="recent-files-header">Recently Generated</h3>
                 <div className="recent-files-actions">
-                    <button className="recent-clear-btn" onClick={onClearRecents} title="Remove all items from the recents list">
+                    <button className="recent-clear-btn" onClick={onClearRecents} title="Remove all items from the recents list" aria-label="Clear recent files list">
                         Clear List
                     </button>
-                    <button className="recent-clear-btn" onClick={onClearCache} title="Delete cached subtitles (does not affect exported files)">
+                    <button className="recent-clear-btn" onClick={onClearCache} title="Delete cached subtitles (does not affect exported files)" aria-label="Clear subtitle cache">
                         Clear Cache
                     </button>
                 </div>
             </div>
-            <div className="recent-files-list">
+            <div className="recent-files-list" role="list" aria-label="Recent files">
                 {files.map((file) => (
                     <button
                         key={`${file.path}-${file.date}`}

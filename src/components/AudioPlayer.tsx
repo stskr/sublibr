@@ -163,7 +163,20 @@ export function AudioPlayer({
         <div className="audio-player-wrapper">
             {/* Audio Timeline Layer */}
             <div className="audio-timeline-layer">
-                <div className="player-progress" onClick={handleProgressClick}>
+                <div
+                    className="player-progress"
+                    onClick={handleProgressClick}
+                    role="slider"
+                    aria-label="Playback progress"
+                    aria-valuenow={Math.round(currentTime)}
+                    aria-valuemin={0}
+                    aria-valuemax={Math.round(duration)}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === 'ArrowLeft') { e.preventDefault(); skipBackward(); }
+                        else if (e.key === 'ArrowRight') { e.preventDefault(); skipForward(); }
+                    }}
+                >
                     {/* Media Duration Marker */}
                     {mediaDuration && duration > mediaDuration && (
                         <div
@@ -200,15 +213,15 @@ export function AudioPlayer({
                 <div className="controls-spacer"></div>
 
                 <div className="player-controls">
-                    <button className="control-btn skip" onClick={skipBackward} title="Back 5s">
+                    <button className="control-btn skip" onClick={skipBackward} title="Back 5s" aria-label="Skip backward 5 seconds">
                         <span className="icon">fast_rewind</span>
                     </button>
 
-                    <button className="control-btn play" onClick={togglePlay}>
+                    <button className="control-btn play" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
                         <span className="icon">{isPlaying ? 'pause' : 'play_arrow'}</span>
                     </button>
 
-                    <button className="control-btn skip" onClick={skipForward} title="Forward 5s">
+                    <button className="control-btn skip" onClick={skipForward} title="Forward 5s" aria-label="Skip forward 5 seconds">
                         <span className="icon">fast_forward</span>
                     </button>
                 </div>
@@ -223,6 +236,7 @@ export function AudioPlayer({
                         value={volume}
                         onChange={handleVolumeChange}
                         className="volume-slider"
+                        aria-label="Volume"
                     />
                 </div>
             </div>

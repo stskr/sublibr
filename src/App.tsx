@@ -133,7 +133,7 @@ function App() {
       const updated = [newRecent, ...filtered].slice(0, MAX_RECENT_FILES);
 
       if (window.electronAPI) {
-        window.electronAPI.setStoreValue('recent-files', updated).catch(() => {});
+        window.electronAPI.setStoreValue('recent-files', updated).catch(() => { });
       }
       return updated;
     });
@@ -197,7 +197,7 @@ function App() {
         return rest;
       });
       if (window.electronAPI) {
-        window.electronAPI.setStoreValue('recent-files', updated).catch(() => {});
+        window.electronAPI.setStoreValue('recent-files', updated).catch(() => { });
       }
       return updated;
     });
@@ -307,7 +307,7 @@ function App() {
         // Cache subtitles for later restoration
         const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
         cache[mediaFile.path] = merged;
-        window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => {});
+        window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => { });
       }
 
       // Reset after brief delay
@@ -507,10 +507,10 @@ function App() {
           <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '18px' }} /> SUBLIBR</h1>
         </div>
         <div className="header-actions">
-          <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts">
+          <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts" aria-label="Keyboard Shortcuts">
             <span className="icon">keyboard</span>
           </button>
-          <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings">
+          <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
             <span className="icon">settings</span>
           </button>
         </div>
@@ -542,6 +542,7 @@ function App() {
                   setProcessing({ status: 'idle', progress: 0 });
                 }}
                 title="Back to main screen"
+                aria-label="Back to Home"
               >
                 <span className="icon icon-sm">arrow_back</span>
                 Back to Home

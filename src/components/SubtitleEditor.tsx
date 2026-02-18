@@ -81,7 +81,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                     <p className="hint">To get started, click "Generate Subtitles" or Import Subtitles</p>
                 </div>
             ) : (
-                <div className="subtitle-list">
+                <div className="subtitle-list" role="list">
                     {subtitles.map((sub) => {
                         const isBeyondMedia = mediaDuration ? sub.startTime > mediaDuration : false;
 
@@ -103,6 +103,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         defaultValue={formatSrtTime(sub.startTime)}
                                         onBlur={(e) => handleTimeBlur(sub.id, 'startTime', e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
+                                        aria-label={`Subtitle ${sub.index} start time`}
                                     />
                                     <span className="time-separator">→</span>
                                     <input
@@ -112,6 +113,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         defaultValue={formatSrtTime(sub.endTime)}
                                         onBlur={(e) => handleTimeBlur(sub.id, 'endTime', e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
+                                        aria-label={`Subtitle ${sub.index} end time`}
                                     />
                                 </div>
 
@@ -125,6 +127,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     onBlur={() => setEditingId(null)}
                                     rows={2}
                                     placeholder="Enter subtitle text..."
+                                    aria-label={`Subtitle ${sub.index} text`}
                                 />
 
                                 <button
@@ -134,6 +137,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         handleDelete(sub.id);
                                     }}
                                     title="Delete subtitle"
+                                    aria-label={`Delete subtitle ${sub.index}`}
                                 >
                                     <span className="icon icon-sm">close</span>
                                 </button>

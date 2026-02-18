@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppSettings, AIProvider } from '../types';
 import { PROVIDER_LABELS, MODEL_OPTIONS, PROVIDER_KEY_URLS, testApiKey } from '../services/providers';
 import { CustomSelect } from './CustomSelect';
@@ -95,12 +95,42 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
         enabledProviders.length > 0 &&
         keyStatus[draft.activeProvider] === 'valid';
 
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    // Focus trap + Escape key
+    useEffect(() => {
+        const prev = document.activeElement as HTMLElement;
+        modalRef.current?.focus();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { onClose(); return; }
+            if (e.key !== 'Tab') return;
+            const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (!focusable || focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => { document.removeEventListener('keydown', handleKeyDown); prev?.focus(); };
+    }, [onClose]);
+
     return (
         <div className="settings-overlay">
-            <div className="settings-modal">
+            <div
+                className="settings-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="settings-title"
+                ref={modalRef}
+                tabIndex={-1}
+            >
                 <div className="settings-header">
-                    <h2>Settings</h2>
-                    <button className="close-btn" onClick={onClose}>
+                    <h2 id="settings-title">Settings</h2>
+                    <button className="close-btn" onClick={onClose} aria-label="Close settings">
                         <span className="icon">close</span>
                     </button>
                 </div>
@@ -159,6 +189,7 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                             type="checkbox"
                                             checked={config.enabled}
                                             onChange={() => handleToggle(provider)}
+                                            aria-label={`Enable ${PROVIDER_LABELS[provider]}`}
                                         />
                                         <span className="toggle-slider" />
                                     </label>
@@ -178,11 +209,11 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                                     className="input-field"
                                                 />
                                                 {status === 'valid' ? (
-                                                    <span className="key-status-valid">
+                                                    <span className="key-status-valid" aria-label="API key valid">
                                                         <span className="icon icon-sm">check_circle</span>
                                                     </span>
                                                 ) : status === 'invalid' ? (
-                                                    <span className="key-status-invalid">
+                                                    <span className="key-status-invalid" aria-label="API key invalid">
                                                         <span className="icon icon-sm">cancel</span>
                                                     </span>
                                                 ) : null}
