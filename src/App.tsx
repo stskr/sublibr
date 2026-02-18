@@ -162,27 +162,7 @@ function App() {
 
       setMediaFile(mediaFile);
       setDuration(duration);
-
-      // Set up audio path (extract for video, use directly for audio)
-      if (mediaFile.isVideo) {
-        setAudioPath(null);
-        setProcessing({ status: 'extracting', progress: 10 });
-        try {
-          const tempDir = await window.electronAPI.getTempPath();
-          const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
-          await window.electronAPI.extractAudio(mediaFile.path, audioOutput);
-          setAudioPath(audioOutput);
-          setProcessing({ status: 'idle', progress: 0 });
-        } catch (error) {
-          setProcessing({
-            status: 'error',
-            progress: 0,
-            error: error instanceof Error ? error.message : 'Failed to extract audio',
-          });
-        }
-      } else {
-        setAudioPath(mediaFile.path);
-      }
+      setAudioPath(mediaFile.path); // Play original file directly
 
       // Restore cached subtitles if available
       const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
@@ -228,32 +208,13 @@ function App() {
     setMediaFile(file);
     resetSubtitles([]);
     setDuration(file.duration);
-
-    // If it's a video, extract audio; otherwise use directly
-    if (file.isVideo) {
-      setProcessing({ status: 'extracting', progress: 10 });
-      try {
-        const tempDir = await window.electronAPI.getTempPath();
-        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
-        await window.electronAPI.extractAudio(file.path, audioOutput);
-        setAudioPath(audioOutput);
-        setProcessing({ status: 'idle', progress: 0 });
-      } catch (error) {
-        setProcessing({
-          status: 'error',
-          progress: 0,
-          error: error instanceof Error ? error.message : 'Failed to extract audio'
-        });
-      }
-    } else {
-      setAudioPath(file.path);
-    }
+    setAudioPath(file.path); // Play original file directly; extraction deferred to generate
   }, []);
 
   // Generate subtitles
   const handleGenerate = useCallback(async () => {
     const activeConfig = settings.providers[settings.activeProvider];
-    if (!audioPath || !activeConfig.apiKey) {
+    if (!mediaFile || !activeConfig.apiKey) {
       if (!activeConfig.apiKey) {
         setShowSettings(true);
       }
@@ -264,10 +225,20 @@ function App() {
     const provider = settings.activeProvider;
 
     try {
-      // Step 1: Detect silences and split into chunks
       const tempDir = await window.electronAPI.getTempPath();
+
+      // Step 0: Extract audio from video if needed
+      let processAudioPath = mediaFile.path;
+      if (mediaFile.isVideo) {
+        setProcessing({ status: 'extracting', progress: 5 });
+        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
+        await window.electronAPI.extractAudio(mediaFile.path, audioOutput);
+        processAudioPath = audioOutput;
+      }
+
+      // Step 1: Detect silences and split into chunks
       setProcessing({ status: 'detecting-silences', progress: 15 });
-      const { chunks, silences } = await createAudioChunks(audioPath, tempDir);
+      const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir);
 
       // Step 2: Transcribe each chunk
       const allSubtitles: Subtitle[][] = [];
@@ -302,7 +273,7 @@ function App() {
       try {
         const healResult = await healSubtitles(
           merged,
-          audioPath,
+          processAudioPath,
           silences,
           provider,
           apiKey,
@@ -342,7 +313,7 @@ function App() {
         error: error instanceof Error ? error.message : 'Transcription failed',
       });
     }
-  }, [audioPath, settings, addTokenUsage, mediaFile, addToRecents, setSubtitles]);
+  }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles]);
 
   // Load subtitles from file
   const handleLoadSubtitles = useCallback(async () => {
@@ -517,7 +488,7 @@ function App() {
   });
 
   const activeConfig = settings.providers[settings.activeProvider];
-  const canGenerate = audioPath && activeConfig.enabled && activeConfig.apiKey && processing.status === 'idle';
+  const canGenerate = mediaFile && activeConfig.enabled && activeConfig.apiKey && processing.status === 'idle';
   const isProcessing = processing.status !== 'idle' && processing.status !== 'done' && processing.status !== 'error';
 
   return (
