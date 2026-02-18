@@ -1184,7 +1184,7 @@ a:hover {
 .player-progress {
   flex: 1;
   height: 6px;
-  background: var(--color-bg-active);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
   cursor: pointer;
   overflow: hidden;
