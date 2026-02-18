@@ -1,5 +1,10 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { formatDisplayTime } from '../utils';
+
+export interface AudioPlayerHandle {
+    seek: (time: number) => void;
+    togglePlay: () => void;
+}
 
 interface AudioPlayerProps {
     audioPath: string;
@@ -10,14 +15,14 @@ interface AudioPlayerProps {
     onDurationChange: (duration: number) => void;
 }
 
-export function AudioPlayer({
+export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
     audioPath,
     currentTime,
     duration,
     mediaDuration,
     onTimeUpdate,
     onDurationChange
-}: AudioPlayerProps) {
+}, ref) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [volume, setVolume] = useState(1);
@@ -114,9 +119,17 @@ export function AudioPlayer({
                 setIsPlaying(false);
             } else {
                 audioRef.current.currentTime = time;
+                if (!audioRef.current.paused) {
+                    setIsPlaying(true);
+                }
             }
         }
     }, [onTimeUpdate, mediaDuration]);
+
+    useImperativeHandle(ref, () => ({
+        seek,
+        togglePlay
+    }));
 
     const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -135,18 +148,6 @@ export function AudioPlayer({
 
     const skipBackward = () => seek(Math.max(0, currentTime - 5));
     const skipForward = () => seek(Math.min(duration, currentTime + 5));
-
-    // Expose seek and toggle for external use
-    useEffect(() => {
-        const win = window as { seekAudio?: (time: number) => void; toggleAudio?: () => void };
-        win.seekAudio = seek;
-        win.toggleAudio = togglePlay;
-
-        return () => {
-            win.seekAudio = undefined;
-            win.toggleAudio = undefined;
-        };
-    }, [seek, togglePlay]);
 
     return (
         <div className="audio-player-wrapper">
@@ -231,4 +232,4 @@ export function AudioPlayer({
             </div>
         </div>
     );
-}
+});

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from './components/Settings';
 import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor, TimelinePreview } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AudioPlayer } from './components/AudioPlayer';
+import type { AudioPlayerHandle } from './components/AudioPlayer';
 import { SubtitlePreview } from './components/SubtitlePreview';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
@@ -56,6 +57,8 @@ function App() {
   const [versions, setVersions] = useState<SubtitleVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [showGenerator, setShowGenerator] = useState(false);
+
+  const audioPlayerRef = useRef<AudioPlayerHandle>(null);
 
   const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
     totalInputTokens: 0,
@@ -457,8 +460,7 @@ function App() {
   // Seek audio
   const handleSeek = useCallback((time: number) => {
     setCurrentTime(time);
-    const seekFn = (window as { seekAudio?: (time: number) => void }).seekAudio;
-    if (seekFn) seekFn(time);
+    audioPlayerRef.current?.seek(time);
   }, []);
 
   // Keyboard Shortcuts Handlers
@@ -471,8 +473,7 @@ function App() {
   }, [canRedo, redoSubtitles]);
 
   const handlePlayPause = useCallback(() => {
-    const toggleFn = (window as { toggleAudio?: () => void }).toggleAudio;
-    if (toggleFn) toggleFn();
+    audioPlayerRef.current?.togglePlay();
   }, []);
 
   const handleSeekBackward = useCallback(() => {
@@ -756,6 +757,7 @@ function App() {
             />
             <div className="footer-bottom-row">
               <AudioPlayer
+                ref={audioPlayerRef}
                 audioPath={audioPath}
                 currentTime={currentTime}
                 duration={duration}

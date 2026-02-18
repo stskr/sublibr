@@ -134,10 +134,10 @@ Deleted all three files.
 
 ---
 
-### 18. Code smell: Global `window.seekAudio`/`window.toggleAudio` — DEFERRED
+### 18. ~~Code smell: Global `window.seekAudio`/`window.toggleAudio`~~ FIXED
 **Files**: `src/components/AudioPlayer.tsx`, `src/App.tsx`
 
-Components communicate via global window properties instead of React context or refs. Low risk but architectural debt.
+**Fix**: Refactored `AudioPlayer` to expose `seek` and `togglePlay` methods via `forwardRef`/`useImperativeHandle`. `App.tsx` now uses a React `ref` to control the player instead of global window properties.
 
 ---
 
@@ -201,5 +201,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 24 of 26 issues
-- **Deferred** (architectural changes): 18, 20
+- **Fixed**: 25 of 26 issues
+- **Deferred** (architectural changes): 20
