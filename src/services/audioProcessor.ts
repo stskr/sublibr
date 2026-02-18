@@ -7,7 +7,8 @@ const OVERLAP_DURATION = 20; // 20s overlap
 
 export async function createAudioChunks(
     audioPath: string,
-    tempDir: string
+    tempDir: string,
+    format: 'flac' | 'mp3' = 'flac'
 ): Promise<{ chunks: AudioChunk[], silences: SilenceSegment[] }> {
     // Get total duration
     const duration = await window.electronAPI.getDuration(audioPath);
@@ -91,11 +92,11 @@ export async function createAudioChunks(
     const chunkConfigs = chunks.map((chunk, i) => ({
         start: chunk.start,
         end: chunk.end,
-        outputPath: `${tempDir}/chunk_${i.toString().padStart(3, '0')}.flac`,
+        outputPath: `${tempDir}/chunk_${i.toString().padStart(3, '0')}.${format}`,
     }));
 
     // Split audio using FFmpeg
-    await window.electronAPI.splitAudio(audioPath, chunkConfigs);
+    await window.electronAPI.splitAudio(audioPath, chunkConfigs, format);
 
     // Return AudioChunk objects AND silences
     return {

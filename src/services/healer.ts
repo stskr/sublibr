@@ -91,16 +91,19 @@ export async function healSubtitles(
         const chunkEnd = gap.end + 0.5;
 
         try {
+            // Determine format based on provider
+            const audioFormat = provider === 'openai' ? 'mp3' : 'flac';
+
             // Extract this specific audio segment to a temp file
             const tempDir = await window.electronAPI.getTempPath();
-            const chunkPath = `${tempDir}/gap_heal_${Date.now()}_${i}.flac`;
+            const chunkPath = `${tempDir}/gap_heal_${Date.now()}_${i}.${audioFormat}`;
 
             // Use splitAudio to extract a single chunk
             await window.electronAPI.splitAudio(audioPath, [{
                 start: chunkStart,
                 end: chunkEnd,
                 outputPath: chunkPath
-            }]);
+            }], audioFormat);
 
             // Transcribe it with HIGH sensitivity mode?
             // We just use standard transcribe but maybe prompt could be tweaked?

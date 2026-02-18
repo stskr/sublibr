@@ -13,6 +13,7 @@ interface AudioPlayerProps {
     mediaDuration?: number; // Actual media duration
     onTimeUpdate: (time: number) => void;
     onDurationChange: (duration: number) => void;
+    filename?: string;
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
@@ -21,7 +22,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
     duration,
     mediaDuration,
     onTimeUpdate,
-    onDurationChange
+    onDurationChange,
+    filename
 }, ref) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -192,6 +194,21 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
                 </div>
                 <div className="player-times">
                     <div className="player-time left">{formatDisplayTime(currentTime)}</div>
+                    {/* Filename centered between times */}
+                    {filename && (
+                        <div className="player-track-name" style={{
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            color: 'var(--color-text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '300px',
+                            textAlign: 'center'
+                        }}>
+                            {filename}
+                        </div>
+                    )}
                     <div className="player-time right">{formatDisplayTime(duration)}</div>
                 </div>
             </div>

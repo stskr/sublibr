@@ -88,7 +88,6 @@ export function estimateCost(durationSeconds: number, model: string): { chunks: 
     // canonical source of truth is MODEL_PRICING in providers.ts
     const outputRates: Record<string, number> = {
         'gemini-2.5-flash': 0.60, 'gemini-2.5-pro': 10.00,
-        'claude-sonnet-4-5-20250929': 15.00, 'claude-haiku-4-5-20251001': 4.00,
         'gpt-4o-mini': 0.60, 'gpt-4o': 10.00,
     };
     const ratePerMillion = outputRates[model] ?? 0.60;

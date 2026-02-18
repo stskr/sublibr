@@ -20,20 +20,20 @@ export interface ElectronAPI {
 
     // AI API proxy
     testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>;
-    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string) => Promise<{
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string) => Promise<{
         text: string;
         tokenUsage: {
             inputTokens: number;
             outputTokens: number;
-            provider: string;
+            provider: 'gemini' | 'openai';
             model: string;
             timestamp: number;
         };
     }>;
-    extractAudio: (inputPath: string, outputPath: string) => Promise<string>;
+    extractAudio: (inputPath: string, outputPath: string, format?: string) => Promise<string>;
     getDuration: (filePath: string) => Promise<number>;
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
-    splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => Promise<string[]>;
+    splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[], format?: string) => Promise<string[]>;
     // App updates
     getVersion: () => Promise<string>;
     checkForUpdates: () => Promise<{ updateAvailable: boolean }>;

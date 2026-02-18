@@ -20,11 +20,11 @@
 
 ## Overview
 
-**SUBLIBR** is a desktop application that generates high-quality subtitles from audio and video files using multiple AI providers (Google Gemini, Anthropic Claude, OpenAI). The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
+**SUBLIBR** is a desktop application that generates high-quality subtitles from audio and video files using multiple AI providers (Google Gemini and OpenAI). The app runs as an Electron desktop application, providing a native experience across macOS, Windows, and Linux platforms.
 
 ### Key Features
 
-- **Multi-Provider AI Transcription**: Supports Google Gemini, Anthropic Claude, and OpenAI with per-provider API key validation and a unified "Active Model" selector
+- **Multi-Provider AI Transcription**: Supports Google Gemini and OpenAI with per-provider API key validation and a unified "Active Model" selector
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
 - **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
@@ -46,7 +46,7 @@
 | **React 19** | UI framework with hooks |
 | **TypeScript** | Type-safe development |
 | **Vite** | Build tool and dev server |
-| **Google Gemini / Anthropic Claude / OpenAI** | Speech-to-text transcription (multi-provider) |
+| **Google Gemini / OpenAI** | Speech-to-text transcription (multi-provider) |
 | **FFmpeg** | Audio/video processing (extract audio, detect silences, split chunks) |
 | **electron-store** | Persistent settings storage |
 | **fluent-ffmpeg** | Node.js wrapper for FFmpeg |
@@ -252,7 +252,6 @@ Four core services handle subtitle processing:
 | API/Tool | Purpose | Configuration |
 |----------|---------|---------------|
 | **Google Gemini API** | Transcription | API key stored in settings, tested via `GET /v1beta/models` |
-| **Anthropic Claude API** | Transcription | API key stored in settings, tested via 1-token message |
 | **OpenAI API** | Transcription | API key stored in settings, tested via `GET /v1/models` |
 | **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
 | **ffprobe** | Media metadata | Bundled with FFmpeg |
@@ -542,6 +541,7 @@ interface AudioPlayerProps {
   mediaDuration?: number;
   onTimeUpdate: (time: number) => void;
   onDurationChange: (duration: number) => void;
+  filename?: string; // Displayed centered between start/end times
 }
 ```
 
@@ -551,9 +551,8 @@ interface AudioPlayerProps {
 - Skip forward/backward (5s)
 - Clickable progress bar
 - Volume slider
-- Time display (current / total)
-- **Integrated Filename**: Displays current file name with smart scrolling (marquee) for long names
-- Loads audio via data URL (IPC) to avoid file protocol restrictions
+- Time display: `[00:00]  [Filename]  [05:35]` — start time left-aligned, filename centered, end time right-aligned
+- Loads audio via custom `media://` protocol for efficient streaming
 
 **UX Details**:
 - Material Icons for controls (play_arrow, pause, fast_forward, fast_rewind)
@@ -597,7 +596,7 @@ interface SettingsProps {
 
 **Layout**:
 1. **Active Model Hero** — Always-visible accent-bordered dropdown listing all models from enabled providers (e.g. "Google Gemini — Gemini 2.5 Flash (Fast)"). When no API keys exist, shows an info banner instead: "Toggle the providers you'd like to use below and paste an API key for each one." Disabled when no providers are toggled.
-2. **Provider Sections** — One card per provider (Gemini, Claude, OpenAI) with:
+2. **Provider Sections** — One card per provider (Gemini, OpenAI) with:
    - Toggle switch to enable/disable
    - API Key input + **Test** button (validates key via lightweight API call)
    - Key status indicator: green checkmark (valid), red X + error (invalid), spinner (testing)
@@ -607,7 +606,7 @@ interface SettingsProps {
 **Key Testing**:
 - Keys matching previously saved values initialize as `valid` (skip re-testing)
 - Changing a key resets status to `idle` and disables Save
-- Test calls are the cheapest possible per provider (free model-list endpoints for Gemini/OpenAI, 1-token message for Anthropic)
+- Test calls are the cheapest possible per provider (free model-list endpoints for Gemini/OpenAI)
 
 **UX**:
 - Modal overlay (backdrop)
@@ -712,7 +711,7 @@ interface TokenUsageDisplayProps {
   - Total tokens and cost
   - Per-provider/model breakdown with pricing info
 - Session-scoped: resets when the app is restarted (in-memory state)
-- Supports all three providers (Gemini, Anthropic, OpenAI)
+- Supports Gemini and OpenAI providers
 - Cost calculated using per-model pricing rates
 
 **UX Details**:
@@ -731,13 +730,12 @@ interface TokenUsageDisplayProps {
 
 **Exported Functions**:
 
-##### `callProvider(provider, apiKey, model, prompt, audioBase64)`
-Dispatches transcription requests to the selected AI provider (Gemini, Anthropic, or OpenAI). Returns a `ProviderResponse` containing both the text response and `TokenUsage` data (input/output token counts, provider, model, timestamp).
+##### `callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat)`
+Dispatches transcription requests to the selected AI provider (Gemini or OpenAI). Returns a `ProviderResponse` containing both the text response and `TokenUsage` data (input/output token counts, provider, model, timestamp).
 
 ##### `testApiKey(provider, apiKey)`
 Validates an API key with the cheapest possible call per provider:
 - **Gemini**: `GET /v1beta/models` (free, lists models)
-- **Anthropic**: `POST /v1/messages` with 1 max token (minimal cost)
 - **OpenAI**: `GET /v1/models` (free, lists models)
 
 Returns `{ ok: true }` or `{ ok: false, error: "..." }`.

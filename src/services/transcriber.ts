@@ -110,7 +110,11 @@ Rules:
 
 Transcribe the audio now:`;
 
-    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64);
+    // Infer format from extension
+    const ext = chunk.filePath.split('.').pop()?.toLowerCase() || 'flac';
+    const audioFormat = ext === 'mp3' ? 'mp3' : 'flac';
+
+    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat);
     const text = providerResponse.text;
 
     let subtitles = parseTranscription(text, chunk.startTime);

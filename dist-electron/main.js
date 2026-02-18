@@ -1,7 +1,7 @@
 import { protocol, app, net, BrowserWindow, ipcMain, dialog, shell, safeStorage } from "electron";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import Store from "electron-store";
 import ffmpeg from "fluent-ffmpeg";
 import { createRequire } from "module";
@@ -38,7 +38,7 @@ function getAllowedDirs() {
     app.getPath("userData")
   ];
 }
-const ALLOWED_STORE_KEYS = ["settings", "recent-files", "subtitle-cache"];
+const ALLOWED_STORE_KEYS = ["settings", "recent-files", "subtitle-cache", "subtitle-versions"];
 if (app.isPackaged) {
   const ext = process.platform === "win32" ? ".exe" : "";
   ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
@@ -91,7 +91,7 @@ app.whenReady().then(() => {
     try {
       const decodedPath = decodeURIComponent(url);
       const safePath = validatePath(decodedPath, ...getAllowedDirs());
-      return net.fetch(`file://${safePath}`);
+      return net.fetch(pathToFileURL(safePath).toString());
     } catch (error) {
       console.error("Media protocol error:", error);
       return new Response("Access denied or file not found", { status: 403 });
@@ -295,11 +295,12 @@ ipcMain.handle("file:registerPath", (_event, filePath) => {
   }
   allowedPaths.add(resolved);
 });
-ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath) => {
+ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath, format = "flac") => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+  const codec = format === "mp3" ? "libmp3lame" : "flac";
   return new Promise((resolve, reject) => {
-    ffmpeg(safeInput).audioCodec("flac").toFormat("flac").on("end", () => resolve(safeOutput)).on("error", (err) => reject(err.message)).save(safeOutput);
+    ffmpeg(safeInput).audioCodec(codec).toFormat(format).on("end", () => resolve(safeOutput)).on("error", (err) => reject(err.message)).save(safeOutput);
   });
 });
 ipcMain.handle("ffmpeg:getDuration", async (_event, filePath) => {
@@ -336,13 +337,14 @@ ipcMain.handle("ffmpeg:detectSilences", async (_event, filePath, threshold, minD
     }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
-ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks) => {
+ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks, format = "flac") => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const results = [];
+  const codec = format === "mp3" ? "libmp3lame" : "flac";
   for (const chunk of chunks) {
     const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
     await new Promise((resolve, reject) => {
-      ffmpeg(safeInput).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec("flac").toFormat("flac").on("end", () => {
+      ffmpeg(safeInput).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec(codec).toFormat(format).on("end", () => {
         results.push(safeOutput);
         resolve();
       }).on("error", (err) => reject(err.message)).save(safeOutput);
@@ -418,7 +420,8 @@ ipcMain.handle("ai:testApiKey", async (_event, provider, apiKey) => {
     return { ok: false, error: e instanceof Error ? e.message : "Network error" };
   }
 });
-ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt, audioBase64) => {
+ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt, audioBase64, audioFormat = "flac") => {
+  const mimeType = `audio/${audioFormat}`;
   switch (provider) {
     case "gemini": {
       const { GoogleGenerativeAI } = await import("./index-B6HwN2S4.js");
@@ -428,7 +431,7 @@ ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt
         prompt,
         {
           inlineData: {
-            mimeType: "audio/flac",
+            mimeType,
             data: audioBase64
           }
         }
@@ -446,96 +449,43 @@ ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt
         }
       };
     }
-    case "anthropic": {
-      const res = await net.fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 8192,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "document",
-                  source: {
-                    type: "base64",
-                    media_type: "audio/flac",
-                    data: audioBase64
-                  }
-                },
-                {
-                  type: "text",
-                  text: prompt
-                }
-              ]
-            }
-          ]
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-        throw new Error(`Anthropic API error: ${err.error?.message || res.statusText}`);
-      }
-      const data = await res.json();
-      const textBlock = data.content?.find((b) => b.type === "text");
-      return {
-        text: textBlock?.text ?? "",
-        tokenUsage: {
-          inputTokens: data.usage?.input_tokens ?? 0,
-          outputTokens: data.usage?.output_tokens ?? 0,
-          provider: "anthropic",
-          model,
-          timestamp: Date.now()
-        }
-      };
-    }
     case "openai": {
-      const res = await net.fetch("https://api.openai.com/v1/chat/completions", {
+      const buffer = Buffer.from(audioBase64, "base64");
+      const blob = new Blob([buffer], { type: mimeType });
+      const formData = new FormData();
+      formData.append("file", blob, `audio.${audioFormat}`);
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "verbose_json");
+      const res = await net.fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "input_audio",
-                  input_audio: {
-                    data: audioBase64,
-                    format: "flac"
-                  }
-                },
-                {
-                  type: "text",
-                  text: prompt
-                }
-              ]
-            }
-          ]
-        })
+        body: formData
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
         throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
       }
       const data = await res.json();
+      let formattedText = "";
+      if (data.segments) {
+        formattedText = data.segments.map((seg) => {
+          const minutes = Math.floor(seg.start / 60).toString().padStart(2, "0");
+          const seconds = Math.floor(seg.start % 60).toString().padStart(2, "0");
+          return `[${minutes}:${seconds}] ${seg.text.trim()}`;
+        }).join("\n\n");
+      } else {
+        formattedText = `[00:00] ${data.text}`;
+      }
       return {
-        text: data.choices?.[0]?.message?.content ?? "",
+        text: formattedText,
         tokenUsage: {
-          inputTokens: data.usage?.prompt_tokens ?? 0,
-          outputTokens: data.usage?.completion_tokens ?? 0,
+          inputTokens: 0,
+          // Whisper doesn't report traditional token usage in the same way
+          outputTokens: 0,
           provider: "openai",
-          model,
+          model: "whisper-1",
           timestamp: Date.now()
         }
       };

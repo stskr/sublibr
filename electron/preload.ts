@@ -26,18 +26,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // AI API proxy (calls go through main process — keys never exposed in renderer)
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
-    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string) =>
-        ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64),
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string) =>
+        ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat),
 
     // FFmpeg operations
-    extractAudio: (inputPath: string, outputPath: string) =>
-        ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath),
-    getDuration: (filePath: string) =>
-        ipcRenderer.invoke('ffmpeg:getDuration', filePath),
-    detectSilences: (filePath: string, threshold: number, minDuration: number) =>
-        ipcRenderer.invoke('ffmpeg:detectSilences', filePath, threshold, minDuration),
-    splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) =>
-        ipcRenderer.invoke('ffmpeg:splitAudio', inputPath, chunks),
+    extractAudio: (inputPath: string, outputPath: string, format?: string) => ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath, format),
+    getDuration: (filePath: string) => ipcRenderer.invoke('ffmpeg:getDuration', filePath),
+    detectSilences: (filePath: string, threshold: number, minDuration: number) => ipcRenderer.invoke('ffmpeg:detectSilences', filePath, threshold, minDuration),
+    splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[], format?: string) => ipcRenderer.invoke('ffmpeg:splitAudio', inputPath, chunks, format),
 
     // App updates
     getVersion: () => ipcRenderer.invoke('app:getVersion'),

@@ -29,7 +29,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   activeProvider: 'gemini',
   providers: {
     gemini: { enabled: true, apiKey: '', model: 'gemini-2.5-flash' },
-    anthropic: { enabled: false, apiKey: '', model: 'claude-sonnet-4-5-20250929' },
     openai: { enabled: false, apiKey: '', model: 'gpt-4o-mini' },
   },
   language: 'English',
@@ -189,16 +188,15 @@ function App() {
       setMediaFile(mediaFile);
       setDuration(duration);
       setAudioPath(mediaFile.path); // Play original file directly
-      // Reset versions on load recent
-      setVersions([]);
-      setActiveVersionId(null);
-      setShowGenerator(true);
 
       // Restore cached subtitles if available
       const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
       const cached = cache[recent.path];
+
+      let hasSubtitles = false;
       if (cached?.length) {
         resetSubtitles(cached);
+        hasSubtitles = true;
       } else {
         resetSubtitles([]);
       }
@@ -206,16 +204,12 @@ function App() {
       // Restore versions
       const versionCache = (await window.electronAPI.getStoreValue('subtitle-versions') || {}) as Record<string, SubtitleVersion[]>;
       const cachedVersions = versionCache[recent.path];
-      if (cachedVersions?.length) {
-        setVersions(cachedVersions);
-        // If we have versions but no active ID, maybe set the last one? 
-        // Or just leave it null (fresh state).
-        // Actually, if we loaded cached subtitles, we might want to know which version they belong to.
-        // But the simple cache just stores current "work in progress".
-        // So we leave activeVersionId null unless we can infer it.
-      } else {
-        setVersions([]);
-      }
+
+      setVersions(cachedVersions || []);
+
+      // If we have subtitles, show the editor/download view. Otherwise show generator.
+      setShowGenerator(!hasSubtitles);
+      setActiveVersionId(null);
     } catch (error) {
       console.error('Failed to load recent file:', error);
     }
@@ -254,10 +248,37 @@ function App() {
     resetSubtitles([]);
     setDuration(file.duration);
     setAudioPath(file.path); // Play original file directly; extraction deferred to generate
-    setVersions([]);
-    setActiveVersionId(null);
-    setShowGenerator(true);
-  }, []);
+
+    // Try to load existing versions
+    if (window.electronAPI) {
+      try {
+        const store = await window.electronAPI.getStoreValue('subtitle-versions') as Record<string, SubtitleVersion[]>;
+        const existing = store?.[file.path];
+
+        if (existing && existing.length > 0) {
+          setVersions(existing);
+          // Auto-select the latest version
+          const latestVersion = existing[existing.length - 1];
+          setActiveVersionId(latestVersion.id);
+          setSubtitles(latestVersion.subtitles);
+          setShowGenerator(false);
+        } else {
+          setVersions([]);
+          setActiveVersionId(null);
+          setShowGenerator(true);
+        }
+      } catch (e) {
+        console.error('Failed to load versions', e);
+        setVersions([]);
+        setActiveVersionId(null);
+        setShowGenerator(true);
+      }
+    } else {
+      setVersions([]);
+      setActiveVersionId(null);
+      setShowGenerator(true);
+    }
+  }, [resetSubtitles, setSubtitles]);
 
   // Generate subtitles
   const handleGenerate = useCallback(async () => {
@@ -276,17 +297,20 @@ function App() {
       const tempDir = await window.electronAPI.getTempPath();
 
       // Step 0: Extract audio from video if needed
+      // Determine format based on provider
+      const audioFormat = provider === 'openai' ? 'mp3' : 'flac';
+
       let processAudioPath = mediaFile.path;
       if (mediaFile.isVideo) {
         setProcessing({ status: 'extracting', progress: 5 });
-        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.flac`;
-        await window.electronAPI.extractAudio(mediaFile.path, audioOutput);
+        const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.${audioFormat}`;
+        await window.electronAPI.extractAudio(mediaFile.path, audioOutput, audioFormat);
         processAudioPath = audioOutput;
       }
 
       // Step 1: Detect silences and split into chunks
       setProcessing({ status: 'detecting-silences', progress: 15 });
-      const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir);
+      const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat);
 
       // Step 2: Transcribe each chunk
       const allSubtitles: Subtitle[][] = [];
@@ -349,7 +373,18 @@ function App() {
         subtitles: merged,
       };
 
-      setVersions(prev => [...prev, newVersion]);
+      setVersions(prev => {
+        const updated = [...prev, newVersion];
+        // Persist versions
+        if (window.electronAPI) {
+          window.electronAPI.getStoreValue('subtitle-versions').then((store: any) => {
+            const versionCache = (store || {}) as Record<string, SubtitleVersion[]>;
+            versionCache[mediaFile.path] = updated;
+            window.electronAPI.setStoreValue('subtitle-versions', versionCache);
+          });
+        }
+        return updated;
+      });
       setActiveVersionId(versionId);
       setSubtitles(merged);
       setProcessing({ status: 'done', progress: 100 });
@@ -377,29 +412,63 @@ function App() {
     }
   }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles]);
 
+  // Helper to persist versions
+  const persistVersions = useCallback((newVersions: SubtitleVersion[]) => {
+    if (mediaFile && window.electronAPI) {
+      window.electronAPI.getStoreValue('subtitle-versions').then((store: any) => {
+        const versionCache = (store || {}) as Record<string, SubtitleVersion[]>;
+        versionCache[mediaFile.path] = newVersions;
+        window.electronAPI.setStoreValue('subtitle-versions', versionCache);
+      });
+    }
+  }, [mediaFile]);
+
   // Handle Regenerate Click
   const handleRegenerate = useCallback(() => {
-    // Save current work to active version before switching mode
-    if (activeVersionId) {
-      setVersions(prev => prev.map(v => v.id === activeVersionId ? { ...v, subtitles } : v));
+    let updatedVersions = versions;
+
+    // If we have subtitles but no version history (e.g. restored from cache or legacy),
+    // create a snapshot version so we don't lose the current state.
+    if (versions.length === 0 && subtitles.length > 0) {
+      const restoredVersion: SubtitleVersion = {
+        id: generateId(),
+        timestamp: Date.now(),
+        provider: settings.activeProvider,
+        model: settings.providers[settings.activeProvider].model,
+        language: settings.language,
+        subtitles: subtitles,
+        label: 'Restored Version',
+      };
+      updatedVersions = [restoredVersion];
+      setVersions(updatedVersions);
+      persistVersions(updatedVersions);
+    } else if (activeVersionId) {
+      // Save current work to active version before switching mode
+      updatedVersions = versions.map(v => v.id === activeVersionId ? { ...v, subtitles } : v);
+      setVersions(updatedVersions);
+      persistVersions(updatedVersions);
     }
     setShowGenerator(true);
-  }, [activeVersionId, subtitles]);
+  }, [activeVersionId, subtitles, versions, settings, persistVersions]);
 
   // Handle Version Switching
   const handleVersionSelect = useCallback((versionId: string) => {
+    let updatedVersions = versions;
+
     // Save current work to active version
     if (activeVersionId) {
-      setVersions(prev => prev.map(v => v.id === activeVersionId ? { ...v, subtitles } : v));
+      updatedVersions = versions.map(v => v.id === activeVersionId ? { ...v, subtitles } : v);
+      setVersions(updatedVersions);
+      persistVersions(updatedVersions);
     }
 
-    const targetVersion = versions.find(v => v.id === versionId);
+    const targetVersion = updatedVersions.find(v => v.id === versionId);
     if (targetVersion) {
       setActiveVersionId(versionId);
       resetSubtitles(targetVersion.subtitles);
       setShowGenerator(false);
     }
-  }, [activeVersionId, subtitles, versions, resetSubtitles]);
+  }, [activeVersionId, subtitles, versions, resetSubtitles, persistVersions]);
 
   // Load subtitles from file
   const handleLoadSubtitles = useCallback(async () => {
@@ -776,11 +845,6 @@ function App() {
       {
         audioPath && (
           <footer className="app-footer">
-            {mediaFile?.name && (
-              <div className="player-track-info">
-                <div className="player-track-name">{mediaFile.name}</div>
-              </div>
-            )}
             <TimelinePreview
               subtitles={subtitles}
               duration={duration}
@@ -788,14 +852,21 @@ function App() {
               onSeek={handleSeek}
               mediaDuration={mediaFile?.duration}
             />
+
             <div className="footer-bottom-row">
               <AudioPlayer
                 ref={audioPlayerRef}
                 audioPath={audioPath}
+                filename={mediaFile?.name}
                 currentTime={currentTime}
                 duration={duration}
                 onTimeUpdate={setCurrentTime}
-                onDurationChange={setDuration}
+                onDurationChange={(d) => {
+                  // Only update duration if we don't have a valid one from ffprobe
+                  if (!mediaFile?.duration && d > 0 && d !== Infinity) {
+                    setDuration(d);
+                  }
+                }}
                 mediaDuration={mediaFile?.duration}
               />
               <div className="footer-info-row">

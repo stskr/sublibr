@@ -3,13 +3,13 @@ import type { AppSettings, AIProvider } from '../types';
 import { PROVIDER_LABELS, MODEL_OPTIONS, PROVIDER_KEY_URLS, testApiKey } from '../services/providers';
 import { CustomSelect } from './CustomSelect';
 
+const ALL_PROVIDERS: AIProvider[] = ['gemini', 'openai'];
+
 interface SettingsProps {
     settings: AppSettings;
     onSettingsChange: (settings: AppSettings) => void;
     onClose: () => void;
 }
-
-const ALL_PROVIDERS: AIProvider[] = ['gemini', 'anthropic', 'openai'];
 
 type KeyStatus = 'idle' | 'testing' | 'valid' | 'invalid';
 
@@ -26,7 +26,7 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
         return init;
     });
     const [keyError, setKeyError] = useState<Record<AIProvider, string>>(
-        () => ({ gemini: '', anthropic: '', openai: '' }),
+        () => ({ gemini: '', openai: '' }),
     );
 
     const enabledProviders = ALL_PROVIDERS.filter(p => draft.providers[p].enabled);

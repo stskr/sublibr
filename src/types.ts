@@ -47,7 +47,7 @@ export interface ProcessingState {
 }
 
 // AI Providers
-export type AIProvider = 'gemini' | 'anthropic' | 'openai';
+export type AIProvider = 'gemini' | 'openai';
 
 export interface ProviderConfig {
     enabled: boolean;

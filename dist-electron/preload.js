@@ -20,12 +20,12 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   registerPath: (path) => import_electron.ipcRenderer.invoke("file:registerPath", path),
   // AI API proxy (calls go through main process — keys never exposed in renderer)
   testApiKey: (provider, apiKey) => import_electron.ipcRenderer.invoke("ai:testApiKey", provider, apiKey),
-  callProvider: (provider, apiKey, model, prompt, audioBase64) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64),
+  callProvider: (provider, apiKey, model, prompt, audioBase64, audioFormat) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64, audioFormat),
   // FFmpeg operations
-  extractAudio: (inputPath, outputPath) => import_electron.ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath),
+  extractAudio: (inputPath, outputPath, format) => import_electron.ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath, format),
   getDuration: (filePath) => import_electron.ipcRenderer.invoke("ffmpeg:getDuration", filePath),
   detectSilences: (filePath, threshold, minDuration) => import_electron.ipcRenderer.invoke("ffmpeg:detectSilences", filePath, threshold, minDuration),
-  splitAudio: (inputPath, chunks) => import_electron.ipcRenderer.invoke("ffmpeg:splitAudio", inputPath, chunks),
+  splitAudio: (inputPath, chunks, format) => import_electron.ipcRenderer.invoke("ffmpeg:splitAudio", inputPath, chunks, format),
   // App updates
   getVersion: () => import_electron.ipcRenderer.invoke("app:getVersion"),
   checkForUpdates: () => import_electron.ipcRenderer.invoke("app:checkForUpdates"),

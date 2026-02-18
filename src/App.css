@@ -207,12 +207,13 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-md);
+  padding: 0;
 }
 
 .active-model-badge {
   display: inline-flex;
   align-items: center;
+  margin-left: -8px;
   gap: var(--space-xs);
   font-size: 11px;
   color: var(--color-text-secondary);
@@ -1032,8 +1033,12 @@ a:hover {
   color: var(--color-text-primary);
   font-family: var(--font-subtitle);
   font-size: 13px;
+  line-height: 1.5;
   resize: none;
   overflow: hidden;
+  field-sizing: content;
+  min-height: 52px;
+  /* Approx 2 lines + padding */
 }
 
 .subtitle-text:focus {
@@ -1138,16 +1143,7 @@ a:hover {
 }
 
 /* Track Info Above Timelines */
-.app-footer .player-track-info {
-  padding: var(--space-xs) 0;
-  text-align: center;
-}
 
-.app-footer .player-track-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
 
 /* Audio Timeline Layer - matches subtitle timeline width */
 .audio-timeline-layer {
@@ -1240,8 +1236,17 @@ a:hover {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-text-secondary);
-  min-width: 90px;
-  text-align: center;
+  font-variant-numeric: tabular-nums;
+  width: 60px;
+  /* Fixed width to ensure center alignment of filename */
+}
+
+.player-time.left {
+  text-align: left;
+}
+
+.player-time.right {
+  text-align: right;
 }
 
 .player-volume {

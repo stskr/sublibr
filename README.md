@@ -2,11 +2,11 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini, Anthropic Claude, and OpenAI.
+A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini and OpenAI.
 
 ## ✨ Features
 
-- **🎙️ AI Transcription**: Multi-provider support — Google Gemini, Anthropic Claude, and OpenAI — with per-provider API key validation.
+- **🎙️ AI Transcription**: Multi-provider support — Google Gemini and OpenAI — with per-provider API key validation.
 - **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
 - **🔄 Versions & Regenerate**: Create multiple subtitle versions with different settings and switch between them instantly.
 - **⚡ Efficient Streaming**: Handles large video files smoothly using a custom streaming protocol.
@@ -29,7 +29,6 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **Node.js**: v18 or newer
 - **AI Provider API Key** (at least one):
   - [Google AI Studio](https://aistudio.google.com/apikey) (Gemini)
-  - [Anthropic Console](https://console.anthropic.com/settings/keys) (Claude)
   - [OpenAI Platform](https://platform.openai.com/api-keys) (GPT)
 
 ### Installation
@@ -74,13 +73,13 @@ npm run build && npx electron-builder --linux
 
 ## ⚙️ Configuration
 
-- **Model Selection**: Choose from models across all enabled providers in the "Active Model" dropdown (e.g. Gemini 2.5 Flash, Claude Sonnet 4.5, GPT-4o).
+- **Model Selection**: Choose from models across all enabled providers in the "Active Model" dropdown (e.g. Gemini 2.5 Flash, GPT-4o).
 - **Theme**: The app defaults to a modern dark theme optimized for video editing.
 
 ## 🏗️ Tech Stack
 
 - **Core**: Electron, React 19, TypeScript, Vite
-- **AI**: Google Gemini, Anthropic Claude, OpenAI (multi-provider)
+- **AI**: Google Gemini, OpenAI (multi-provider)
 - **Media**: FFmpeg (via `@ffmpeg-installer` for easy distribution)
 - **Styling**: Vanilla CSS with comprehensive design tokens
 

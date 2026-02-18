@@ -125,7 +125,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     onClick={(e) => e.stopPropagation()}
                                     onFocus={() => setEditingId(sub.id)}
                                     onBlur={() => setEditingId(null)}
-                                    rows={2}
                                     placeholder="Enter subtitle text..."
                                     aria-label={`Subtitle ${sub.index} text`}
                                 />

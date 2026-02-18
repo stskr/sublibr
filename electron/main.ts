@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
@@ -124,7 +124,7 @@ app.whenReady().then(() => {
     try {
       const decodedPath = decodeURIComponent(url);
       const safePath = validatePath(decodedPath, ...getAllowedDirs());
-      return net.fetch(`file://${safePath}`);
+      return net.fetch(pathToFileURL(safePath).toString());
     } catch (error) {
       console.error('Media protocol error:', error);
       return new Response('Access denied or file not found', { status: 403 });
@@ -361,14 +361,17 @@ ipcMain.handle('file:registerPath', (_event, filePath: string) => {
   allowedPaths.add(resolved);
 });
 
-// FFmpeg: Extract audio to FLAC
-ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPath: string) => {
+// FFmpeg: Extract audio
+ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPath: string, format: string = 'flac') => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+
+  const codec = format === 'mp3' ? 'libmp3lame' : 'flac';
+
   return new Promise((resolve, reject) => {
     ffmpeg(safeInput)
-      .audioCodec('flac')
-      .toFormat('flac')
+      .audioCodec(codec)
+      .toFormat(format)
       .on('end', () => resolve(safeOutput))
       .on('error', (err) => reject(err.message))
       .save(safeOutput);
@@ -426,9 +429,10 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
 });
 
 // FFmpeg: Split audio at specific times
-ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => {
+ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { start: number; end: number; outputPath: string }[], format: string = 'flac') => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const results: string[] = [];
+  const codec = format === 'mp3' ? 'libmp3lame' : 'flac';
 
   for (const chunk of chunks) {
     const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
@@ -436,8 +440,8 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
       ffmpeg(safeInput)
         .setStartTime(chunk.start)
         .setDuration(chunk.end - chunk.start)
-        .audioCodec('flac')
-        .toFormat('flac')
+        .audioCodec(codec)
+        .toFormat(format)
         .on('end', () => {
           results.push(safeOutput);
           resolve();
@@ -537,7 +541,10 @@ ipcMain.handle('ai:callProvider', async (
   model: string,
   prompt: string,
   audioBase64: string,
+  audioFormat: string = 'flac', // Default to flac
 ) => {
+  const mimeType = `audio/${audioFormat}`;
+
   switch (provider) {
     case 'gemini': {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
@@ -548,7 +555,7 @@ ipcMain.handle('ai:callProvider', async (
         prompt,
         {
           inlineData: {
-            mimeType: 'audio/flac',
+            mimeType: mimeType,
             data: audioBase64,
           },
         },
@@ -569,90 +576,28 @@ ipcMain.handle('ai:callProvider', async (
       };
     }
 
-    case 'anthropic': {
-      const res = await net.fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 8192,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'document',
-                  source: {
-                    type: 'base64',
-                    media_type: 'audio/flac',
-                    data: audioBase64,
-                  },
-                },
-                {
-                  type: 'text',
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
-      });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
-        throw new Error(`Anthropic API error: ${err.error?.message || res.statusText}`);
-      }
-
-      const data = await res.json() as {
-        content?: { type: string; text?: string }[];
-        usage?: { input_tokens?: number; output_tokens?: number };
-      };
-      const textBlock = data.content?.find((b) => b.type === 'text');
-
-      return {
-        text: textBlock?.text ?? '',
-        tokenUsage: {
-          inputTokens: data.usage?.input_tokens ?? 0,
-          outputTokens: data.usage?.output_tokens ?? 0,
-          provider: 'anthropic',
-          model,
-          timestamp: Date.now(),
-        },
-      };
-    }
 
     case 'openai': {
-      const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
+      // Use Whisper API for transcription
+      const buffer = Buffer.from(audioBase64, 'base64');
+      const blob = new Blob([buffer], { type: mimeType });
+
+      const formData = new FormData();
+      formData.append('file', blob, `audio.${audioFormat}`);
+      formData.append('model', 'whisper-1');
+      formData.append('response_format', 'verbose_json');
+      // We can't pass the full complex prompt to Whisper in the same way, 
+      // but we can pass a "prompt" for context/style. 
+      // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
+      // and format it ourselves to match what the app expects ([MM:SS] Text).
+
+      const res = await net.fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'input_audio',
-                  input_audio: {
-                    data: audioBase64,
-                    format: 'flac',
-                  },
-                },
-                {
-                  type: 'text',
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -661,17 +606,30 @@ ipcMain.handle('ai:callProvider', async (
       }
 
       const data = await res.json() as {
-        choices?: { message?: { content?: string } }[];
-        usage?: { prompt_tokens?: number; completion_tokens?: number };
+        text: string;
+        segments?: { start: number; end: number; text: string }[];
       };
 
+      // Format Whisper segments into the expected [MM:SS] Text format
+      let formattedText = '';
+      if (data.segments) {
+        formattedText = data.segments.map(seg => {
+          const minutes = Math.floor(seg.start / 60).toString().padStart(2, '0');
+          const seconds = Math.floor(seg.start % 60).toString().padStart(2, '0');
+          return `[${minutes}:${seconds}] ${seg.text.trim()}`;
+        }).join('\n\n');
+      } else {
+        // Fallback if no segments (shouldn't happen with verbose_json)
+        formattedText = `[00:00] ${data.text}`;
+      }
+
       return {
-        text: data.choices?.[0]?.message?.content ?? '',
+        text: formattedText,
         tokenUsage: {
-          inputTokens: data.usage?.prompt_tokens ?? 0,
-          outputTokens: data.usage?.completion_tokens ?? 0,
+          inputTokens: 0, // Whisper doesn't report traditional token usage in the same way
+          outputTokens: 0,
           provider: 'openai',
-          model,
+          model: 'whisper-1',
           timestamp: Date.now(),
         },
       };
