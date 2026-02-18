@@ -138,27 +138,35 @@ export function FileUpload({
                         <button className="btn-primary" onClick={handleBrowse} disabled={!hasApiKey}>
                             Browse Files
                         </button>
-                        <p className="upload-hint">
-                            Supports MP4, MKV, MOV, MP3, WAV, and more<br />
-                            Max 3GB
-                        </p>
+
+                        <div className="upload-notes">
+                            <div className="upload-note">
+                                <span className="icon icon-sm">check_circle</span>
+                                <span>Supports MP4, MKV, MOV, MP3, WAV, and more (Max 3GB)</span>
+                            </div>
+                            <div className="upload-note">
+                                <span className="icon icon-sm">info</span>
+                                <span>For best results, use smaller files. Larger files take longer and cost more.</span>
+                            </div>
+                            <div className="upload-note">
+                                <span className="icon icon-sm">auto_awesome</span>
+                                <span>Best quality: Gemini 2.5 Pro or Claude Sonnet. Lower cost: Gemini 2.5 Flash or GPT-4o Mini.</span>
+                            </div>
+                            <div className="upload-note">
+                                <span className="icon icon-sm">redeem</span>
+                                <span>Google AI Studio offers a free tier with no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
+                            </div>
+                            <div className="upload-note disclaimer-note">
+                                <span className="icon icon-sm">gavel</span>
+                                <span>
+                                    By using this service, you acknowledge that AI-generated results may vary in accuracy. Data is processed via your selected provider (OpenAI or Google Gemini).
+                                    We value your privacy: no tracking is used, and data collection is limited to optional usability surveys or marketing updates you explicitly approve.
+                                    This software is provided "as is"—the developer assumes no liability for outcomes, and use is at the user's sole responsibility.
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 )}
-            </div>
-
-            <div className="upload-notes">
-                <div className="upload-note">
-                    <span className="icon icon-sm">info</span>
-                    <span>For best results, use smaller files. Larger files take longer and cost more.</span>
-                </div>
-                <div className="upload-note">
-                    <span className="icon icon-sm">auto_awesome</span>
-                    <span>Best quality: Gemini 2.5 Pro or Claude Sonnet. Lower cost: Gemini 2.5 Flash or GPT-4o Mini.</span>
-                </div>
-                <div className="upload-note">
-                    <span className="icon icon-sm">redeem</span>
-                    <span>Google AI Studio offers a free tier with no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
-                </div>
             </div>
 
             {propsError && (

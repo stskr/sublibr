@@ -549,33 +549,44 @@ a:hover {
 .upload-notes {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   width: 100%;
-  max-width: 500px;
-  margin-top: var(--space-md);
+  margin-top: var(--space-xl);
+  text-align: left;
 }
 
 .upload-note {
   display: flex;
   align-items: flex-start;
   gap: var(--space-sm);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-muted);
-  line-height: 1.4;
+  line-height: 1.5;
+  padding: var(--space-xs) var(--space-sm);
 }
 
 .upload-note .icon-sm {
   flex-shrink: 0;
-  font-size: 16px;
-  margin-top: 1px;
+  font-size: 18px;
+  color: var(--color-text-tertiary);
 }
 
 .upload-note a {
   color: var(--color-accent);
+  text-decoration: underline;
 }
 
 .upload-note a:hover {
   color: var(--color-accent-hover);
+}
+
+.disclaimer-note {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  margin-top: var(--space-xs);
+  border-top: 1px solid var(--color-border-soft);
+  padding-top: var(--space-sm);
 }
 
 .loading-content {
