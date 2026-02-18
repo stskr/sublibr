@@ -19,6 +19,8 @@ Restricted `registerPath` to only accept media file extensions.
 
 All API calls (testApiKey + callProvider) proxied through the main process via IPC handlers. Renderer never makes direct HTTP requests; `net.fetch` in main process is invisible in DevTools. Removed `anthropic-dangerous-direct-browser-access` header and `@google/generative-ai` SDK from renderer.
 
+**Update**: API keys are now also encrypted at rest using Electron `safeStorage`.
+
 ---
 
 ### 3. Memory: Large files loaded as base64 data URLs — DEFERRED
