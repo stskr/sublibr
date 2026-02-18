@@ -57,7 +57,7 @@ function getAllowedDirs(): string[] {
 
 // ============== Security: Store Key Allowlist ==============
 
-const ALLOWED_STORE_KEYS = ['settings', 'recent-files', 'subtitle-cache'];
+const ALLOWED_STORE_KEYS = ['settings', 'recent-files', 'subtitle-cache', 'subtitle-versions'];
 
 // Set ffmpeg and ffprobe paths
 // In packaged builds, binaries live in extraResources; in dev, use npm installer packages
