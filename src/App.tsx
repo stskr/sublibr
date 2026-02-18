@@ -676,13 +676,14 @@ function App() {
                 mediaDuration={mediaFile?.duration}
               />
               <div className="footer-info-row">
-                <div className="active-model-badge">
+                <button className="active-model-badge" onClick={() => setShowSettings(true)} title="Click to change model">
                   <span className="icon icon-sm">smart_toy</span>
+                  <span className="active-model-label">Model in use:</span>
                   <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
                   <span className="active-model-name">
                     {MODEL_OPTIONS[settings.activeProvider]?.find(m => m.value === activeConfig.model)?.label ?? activeConfig.model}
                   </span>
-                </div>
+                </button>
                 <TokenUsageDisplay stats={tokenStats} />
               </div>
             </div>

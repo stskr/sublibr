@@ -216,11 +216,29 @@ a:hover {
   gap: var(--space-xs);
   font-size: 11px;
   color: var(--color-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.active-model-badge:hover {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.active-model-label {
+  color: var(--color-text-tertiary);
+  margin-right: 2px;
 }
 
 .active-model-name {
   color: var(--color-text-tertiary);
   font-size: 10px;
+  margin-left: 4px;
 }
 
 /* ============================================
