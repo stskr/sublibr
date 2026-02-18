@@ -659,15 +659,13 @@ function App() {
                 <div className="player-track-name">{mediaFile.name}</div>
               </div>
             )}
-            {subtitles.length > 0 && (
-              <TimelinePreview
-                subtitles={subtitles}
-                duration={duration}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-                mediaDuration={mediaFile?.duration}
-              />
-            )}
+            <TimelinePreview
+              subtitles={subtitles}
+              duration={duration}
+              currentTime={currentTime}
+              onSeek={handleSeek}
+              mediaDuration={mediaFile?.duration}
+            />
             <div className="footer-bottom-row">
               <AudioPlayer
                 audioPath={audioPath}
