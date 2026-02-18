@@ -9,6 +9,11 @@ interface Shortcuts {
     onSeekForward: () => void;
     onInsertSubtitle: () => void;
     onDeleteSubtitle: () => void;
+    // Homepage shortcuts
+    onOpenFile?: () => void;
+    onNavigateRecentUp?: () => void;
+    onNavigateRecentDown?: () => void;
+    onSelectRecent?: () => void;
 }
 
 export function useKeyboardShortcuts(shortcuts: Shortcuts) {
@@ -29,6 +34,15 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
                 e.preventDefault();
                 shortcuts.onSave();
                 return;
+            }
+
+            // Open: Cmd+O / Ctrl+O
+            if (cmdOrCtrl && e.key.toLowerCase() === 'o') {
+                if (shortcuts.onOpenFile) {
+                    e.preventDefault();
+                    shortcuts.onOpenFile();
+                    return;
+                }
             }
 
             // Don't trigger undo/redo or navigation shortcuts while typing in inputs
@@ -62,6 +76,22 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
             if (e.code === 'ArrowRight') {
                 e.preventDefault();
                 shortcuts.onSeekForward();
+            }
+
+            // Homepage Navigation: Up/Down Arrows
+            if (e.code === 'ArrowUp' && shortcuts.onNavigateRecentUp) {
+                e.preventDefault();
+                shortcuts.onNavigateRecentUp();
+            }
+            if (e.code === 'ArrowDown' && shortcuts.onNavigateRecentDown) {
+                e.preventDefault();
+                shortcuts.onNavigateRecentDown();
+            }
+
+            // Select Recent: Enter
+            if (e.key === 'Enter' && shortcuts.onSelectRecent) {
+                // Only if NOT in an input (already checked by isInput)
+                shortcuts.onSelectRecent();
             }
 
             // Insert New: Alt+N

@@ -905,16 +905,18 @@ Today we're talking about subtitles.
 
 The application supports global keyboard shortcuts for efficient workflow. A reference modal can be opened by clicking the keyboard icon in the header.
 
-| Action | Shortcut | Context |
-|--------|----------|---------|
-| **Play / Pause** | `Space` | Global (unless in text input) |
-| **Seek Backward 5s** | `←` (Left Arrow) | Global (unless in text input) |
-| **Seek Forward 5s** | `→` (Right Arrow) | Global (unless in text input) |
-| **Undo** | `Ctrl` + `Z` / `Cmd` + `Z` | Editor |
-| **Redo** | `Ctrl` + `Shift` + `Z` / `Cmd` + `Shift` + `Z` | Editor |
-| **Insert Subtitle** | `Alt` + `N` | Editor (at current time) |
-| **Delete Subtitle** | `Alt` + `Delete` / `Backspace` | Editor (active subtitle) |
-| **Save / Download** | `Ctrl` + `S` / `Cmd` + `S` | Global |
+### Shortcuts
+- `Cmd+S` / `Ctrl+S`: Save/Download subtitles.
+- `Cmd+Z` / `Ctrl+Z`: Undo.
+- `Cmd+Shift+Z` / `Ctrl+Shift+Z`: Redo.
+- `Space`: Play/Pause media.
+- `Left`/`Right` Arrows: Seek 5s.
+- `Alt+N`: Insert new subtitle at current time.
+- `Alt+Backspace`: Delete selected subtitle.
+- **Homepage:**
+  - `Cmd+O` / `Ctrl+O`: Open file.
+  - `↑`/`↓` Arrows: Navigate recent files.
+  - `Enter`: Select recent file.
 
 ### Accessibility
 
@@ -976,8 +978,8 @@ graph TD
 
 #### 1. **Initial State (No File)**
 
-- **Header**: App title + Settings button
-- **Main Area**: File upload drop zone
+- **Header**: Home button (left, if media open) + Keyboard & Settings buttons (right)
+- **Sidebar (Editor)**: Logo and App Title (`SUBLIBR`) at top
   - Large upload icon
   - "Drop a file or click to select"
   - Supported formats hint

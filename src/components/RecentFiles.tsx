@@ -7,9 +7,10 @@ interface RecentFilesProps {
     onLoadRecent: (file: RecentFile) => void;
     onClearRecents: () => void;
     onClearCache: () => void;
+    highlightedIndex: number | null;
 }
 
-export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache }: RecentFilesProps) {
+export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache, highlightedIndex }: RecentFilesProps) {
     if (files.length === 0) return null;
 
     return (
@@ -26,10 +27,10 @@ export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache 
                 </div>
             </div>
             <div className="recent-files-list" role="list" aria-label="Recent files">
-                {files.map((file) => (
+                {files.map((file, index) => (
                     <button
                         key={`${file.path}-${file.date}`}
-                        className="recent-file-item"
+                        className={`recent-file-item ${highlightedIndex === index ? 'highlighted' : ''}`}
                         onClick={() => onLoadRecent(file)}
                         title={file.path}
                     >

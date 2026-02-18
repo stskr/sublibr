@@ -15,7 +15,7 @@ import { healSubtitles } from './services/healer';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { generateId, formatDisplayTime, isVideoFile } from './utils';
+import { generateId, formatDisplayTime, isVideoFile, isSupportedFile, formatFileSize } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats, SubtitleVersion } from './types';
 import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
@@ -56,6 +56,7 @@ function App() {
   const [versions, setVersions] = useState<SubtitleVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [showGenerator, setShowGenerator] = useState(false);
+  const [highlightedRecentIndex, setHighlightedRecentIndex] = useState<number | null>(null);
 
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
 
@@ -255,11 +256,83 @@ function App() {
   }, []);
 
   // Handle file selection
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const processFile = useCallback(async (filePath: string) => {
+    setIsAnalyzing(true);
+    setProcessingError(null);
+
+    try {
+      if (!window.electronAPI) {
+        throw new Error('File upload requires Electron. Please run the app in Electron.');
+      }
+
+      // Quick extension check before calling API
+      const ext = filePath.split('.').pop();
+      if (ext && !isSupportedFile(`.${ext}`)) {
+        throw new Error(`Unsupported file type: .${ext}. Please use a supported audio or video file.`);
+      }
+
+      const info = await window.electronAPI.getFileInfo(filePath);
+
+      // Validate size (3GB)
+      if (info.size > 3 * 1024 * 1024 * 1024) {
+        throw new Error(`File too large. Maximum size is 3GB. Your file: ${formatFileSize(info.size)}`);
+      }
+
+      // Get duration
+      const duration = await window.electronAPI.getDuration(filePath);
+
+      const file: MediaFile = {
+        path: info.path,
+        name: info.name,
+        ext: info.ext,
+        size: info.size,
+        duration,
+        isVideo: isVideoFile(info.ext),
+      };
+
+      setMediaFile(file);
+      resetSubtitles([]);
+      setDuration(file.duration);
+      setAudioPath(file.path);
+
+      // Try to load existing versions
+      try {
+        const store = await window.electronAPI.getStoreValue('subtitle-versions') as Record<string, SubtitleVersion[]>;
+        const existing = store?.[file.path];
+
+        if (existing && existing.length > 0) {
+          setVersions(existing);
+          const latestVersion = existing[existing.length - 1];
+          setActiveVersionId(latestVersion.id);
+          setSubtitles(latestVersion.subtitles);
+          setShowGenerator(false);
+        } else {
+          setVersions([]);
+          setActiveVersionId(null);
+          setShowGenerator(true);
+        }
+      } catch (err) {
+        console.error('Failed to load version history:', err);
+      }
+
+      addToRecents(file, 'opened');
+    } catch (err) {
+      setProcessingError(err instanceof Error ? err.message : 'Failed to process file');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [addToRecents, resetSubtitles, setSubtitles]);
+
   const handleFileSelect = useCallback(async (file: MediaFile) => {
+    // This is now called from RecentFiles or drag-and-drop if we keep it simple
+    // but processFile handles most logic now.
     setMediaFile(file);
     resetSubtitles([]);
     setDuration(file.duration);
-    setAudioPath(file.path); // Play original file directly; extraction deferred to generate
+    setAudioPath(file.path);
 
     // Try to load existing versions
     if (window.electronAPI) {
@@ -279,18 +352,13 @@ function App() {
           setActiveVersionId(null);
           setShowGenerator(true);
         }
-      } catch (e) {
-        console.error('Failed to load versions', e);
-        setVersions([]);
-        setActiveVersionId(null);
-        setShowGenerator(true);
+      } catch (err) {
+        console.error('Failed to load version history:', err);
       }
-    } else {
-      setVersions([]);
-      setActiveVersionId(null);
-      setShowGenerator(true);
     }
-  }, [resetSubtitles, setSubtitles]);
+
+    addToRecents(file, 'opened');
+  }, [addToRecents, resetSubtitles, setSubtitles]);
 
   // Generate subtitles
   const handleGenerate = useCallback(async () => {
@@ -641,6 +709,36 @@ function App() {
     }
   }, [subtitles, currentTime, setSubtitles]);
 
+  const handleNavigateRecentUp = useCallback(() => {
+    if (mediaFile || !recentFiles.length) return;
+    setHighlightedRecentIndex(prev => {
+      if (prev === null) return recentFiles.length - 1;
+      return (prev - 1 + recentFiles.length) % recentFiles.length;
+    });
+  }, [mediaFile, recentFiles.length]);
+
+  const handleNavigateRecentDown = useCallback(() => {
+    if (mediaFile || !recentFiles.length) return;
+    setHighlightedRecentIndex(prev => {
+      if (prev === null) return 0;
+      return (prev + 1) % recentFiles.length;
+    });
+  }, [mediaFile, recentFiles.length]);
+
+  const handleSelectRecent = useCallback(() => {
+    if (mediaFile || highlightedRecentIndex === null || !recentFiles[highlightedRecentIndex]) return;
+    handleLoadRecent(recentFiles[highlightedRecentIndex]);
+  }, [mediaFile, highlightedRecentIndex, recentFiles, handleLoadRecent]);
+
+  const handleOpenFileShortcut = useCallback(async () => {
+    if (mediaFile) return;
+    if (!window.electronAPI) return;
+    const filePath = await window.electronAPI.openFileDialog();
+    if (filePath) {
+      processFile(filePath);
+    }
+  }, [mediaFile, processFile]);
+
   useKeyboardShortcuts({
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -649,7 +747,11 @@ function App() {
     onSeekBackward: handleSeekBackward,
     onSeekForward: handleSeekForward,
     onInsertSubtitle: handleInsertSubtitle,
-    onDeleteSubtitle: handleDeleteSubtitle
+    onDeleteSubtitle: handleDeleteSubtitle,
+    onOpenFile: handleOpenFileShortcut,
+    onNavigateRecentUp: handleNavigateRecentUp,
+    onNavigateRecentDown: handleNavigateRecentDown,
+    onSelectRecent: handleSelectRecent
   });
 
   const activeConfig = settings.providers[settings.activeProvider];
@@ -659,10 +761,30 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div className="header-brand">
-          <h1><img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '18px' }} /> SUBLIBR</h1>
+        <div className="header-left">
+          {mediaFile && (
+            <button
+              className="btn-icon"
+              onClick={() => {
+                setMediaFile(null);
+                setAudioPath(null);
+                resetSubtitles([]);
+                setVersions([]);
+                setActiveVersionId(null);
+                setShowGenerator(true);
+                setCurrentTime(0);
+                setDuration(0);
+                setProcessing({ status: 'idle', progress: 0 });
+              }}
+              title="Back to Home"
+              aria-label="Back to Home"
+            >
+              <span className="icon">home</span>
+            </button>
+          )}
         </div>
-        <div className="header-actions">
+
+        <div className="header-right">
           <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts" aria-label="Keyboard Shortcuts">
             <span className="icon">keyboard</span>
           </button>
@@ -670,7 +792,7 @@ function App() {
             <span className="icon">settings</span>
           </button>
         </div>
-      </header >
+      </header>
 
       <UpdateNotification />
 
@@ -683,32 +805,33 @@ function App() {
             onLoadRecent={handleLoadRecent}
             onClearRecents={handleClearRecents}
             onClearCache={handleClearCache}
+            highlightedRecentIndex={highlightedRecentIndex}
+            onProcessFile={processFile}
+            isAnalyzing={isAnalyzing}
+            error={processingError}
           />
         ) : (
           <div className="editor-container">
             <div className="editor-sidebar">
-              <button
-                className="sidebar-back-btn"
-                onClick={() => {
-                  setMediaFile(null);
-                  setAudioPath(null);
-                  resetSubtitles([]);
-                  setVersions([]);
-                  setActiveVersionId(null);
-                  setShowGenerator(true);
-                  setCurrentTime(0);
-                  setDuration(0);
-                  setProcessing({ status: 'idle', progress: 0 });
-                }}
-                title="Back to main screen"
-                aria-label="Back to Home"
-              >
-                <span className="icon icon-sm">arrow_back</span>
-                Back to Home
-              </button>
+              <div className="sidebar-brand-row">
+                <div className="sidebar-brand">
+                  <img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '16px' }} />
+                  <span className="sidebar-brand-name">SUBLIBR</span>
+                </div>
+              </div>
 
               {!isProcessing && (showGenerator || subtitles.length === 0) && (
                 <div className="sidebar-section">
+                  {versions.length > 0 && (
+                    <button
+                      className="btn-secondary sidebar-action-btn"
+                      onClick={() => setShowGenerator(false)}
+                    >
+                      <span className="icon icon-sm">chevron_left</span>
+                      Cancel
+                    </button>
+                  )}
+
                   <LanguageSelector
                     language={settings.language}
                     autoDetect={settings.autoDetectLanguage}
@@ -742,17 +865,6 @@ function App() {
                   <p className="sidebar-hint">
                     Supported formats: .srt, .vtt, .ass
                   </p>
-
-
-                  {versions.length > 0 && (
-                    <button
-                      className="btn-secondary sidebar-action-btn"
-                      onClick={() => setShowGenerator(false)}
-                      style={{ marginTop: '1rem' }}
-                    >
-                      Cancel & Return to Viewer
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -909,7 +1021,10 @@ function App() {
 
       {
         showShortcuts && (
-          <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+          <ShortcutsModal
+            onClose={() => setShowShortcuts(false)}
+            view={mediaFile ? 'editor' : 'homepage'}
+          />
         )
       }
     </div >

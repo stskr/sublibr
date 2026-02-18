@@ -147,14 +147,14 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
+  padding: 0 var(--space-md);
   padding-left: 80px;
   /* Space for macOS traffic light buttons */
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
-  height: 60px;
-  /* Explicit height to keep window controls happy */
+  height: 40px;
+  /* Slim titlebar */
 }
 
 .header-brand {
@@ -175,7 +175,8 @@ a:hover {
 
 /* .header-title removed/refactored */
 
-.header-actions {
+.header-left,
+.header-right {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -191,7 +192,7 @@ a:hover {
 .app-footer {
   background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border);
-  padding: var(--space-md);
+  padding: 4px var(--space-md);
 }
 
 .footer-bottom-row {
@@ -207,7 +208,9 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0;
+  margin: 0 calc(-1 * var(--space-md));
+  padding: 4px var(--space-md) 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .active-model-badge {
@@ -838,6 +841,26 @@ a:hover {
   overflow-y: auto;
 }
 
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sidebar-brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+}
 
 .sidebar-action-btn {
   width: 100%;
@@ -1776,15 +1799,16 @@ a:hover {
 .sidebar-back-btn {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  margin-bottom: 0;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   color: var(--color-text-secondary);
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  width: 100%;
+  flex-shrink: 0;
   transition: all 0.2s;
   font-size: 14px;
 }
@@ -1875,9 +1899,15 @@ a:hover {
   transition: all var(--transition-fast);
 }
 
-.recent-file-item:hover {
+.recent-file-item:hover,
+.recent-file-item.highlighted {
   background: var(--color-bg-tertiary);
   border-color: var(--color-border);
+}
+
+.recent-file-item.highlighted {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
 }
 
 /* Beyond Media Indicators */

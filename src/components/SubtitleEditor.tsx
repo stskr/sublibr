@@ -60,7 +60,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     return (
         <div className="subtitle-editor">
             <div className="editor-header">
-                <h2>Subtitles</h2>
                 <div className="editor-header-actions">
                     <label className="auto-scroll-toggle" title="Auto-scroll to active subtitle">
                         <input
@@ -71,8 +70,8 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                         <span className="icon icon-sm">swap_vert</span>
                         Auto-scroll
                     </label>
-                    <span className="subtitle-count">{subtitles.length} entries</span>
                 </div>
+                <span className="subtitle-count">{subtitles.length} entries</span>
             </div>
 
             {subtitles.length === 0 ? (
