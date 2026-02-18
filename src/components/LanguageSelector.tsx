@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LANGUAGES } from '../utils';
 
 interface LanguageSelectorProps {
@@ -8,17 +8,33 @@ interface LanguageSelectorProps {
 }
 
 export function LanguageSelector({ language, autoDetect, onLanguageChange }: LanguageSelectorProps) {
-    const [languageSearch, setLanguageSearch] = useState('');
+    const [searchTerm, setSearchTerm] = useState(language);
     const [showDropdown, setShowDropdown] = useState(false);
 
+    // Sync search term when external language prop changes (e.g. from settings load)
+    useEffect(() => {
+        if (!showDropdown) {
+            setSearchTerm(language);
+        }
+    }, [language, showDropdown]);
+
     const filteredLanguages = LANGUAGES.filter(lang =>
-        lang.toLowerCase().includes(languageSearch.toLowerCase())
+        lang.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleSelect = (lang: string) => {
         onLanguageChange(lang, false);
-        setLanguageSearch('');
+        setSearchTerm(lang);
         setShowDropdown(false);
+    };
+
+    const handleBlur = () => {
+        // Delay hiding dropdown to allow click event to register
+        setTimeout(() => {
+            setShowDropdown(false);
+            // Revert input to actual selected language if no new selection was made
+            setSearchTerm(language);
+        }, 200);
     };
 
     return (
@@ -30,7 +46,10 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
             <div className="language-toggle">
                 <button
                     className={`toggle-btn ${!autoDetect ? 'active' : ''}`}
-                    onClick={() => onLanguageChange(language, false)}
+                    onClick={() => {
+                        onLanguageChange(language, false);
+                        setSearchTerm(language);
+                    }}
                 >
                     Select Language
                 </button>
@@ -58,13 +77,19 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
                 <div className="language-autocomplete">
                     <input
                         type="text"
-                        value={languageSearch || language}
+                        value={searchTerm}
                         onChange={(e) => {
-                            setLanguageSearch(e.target.value);
+                            setSearchTerm(e.target.value);
                             setShowDropdown(true);
                         }}
-                        onFocus={() => setShowDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                        onFocus={() => {
+                            setSearchTerm(''); // Clear on focus to show all options? Or keep current? 
+                            // Better UX: keep current, let user delete if they want.
+                            // Actually, let's keep current behavior but select all text if possible? 
+                            // For now, just show dropdown. 
+                            setShowDropdown(true);
+                        }}
+                        onBlur={handleBlur}
                         placeholder="Search languages..."
                     />
                     {showDropdown && filteredLanguages.length > 0 && (
@@ -72,7 +97,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
                             {filteredLanguages.slice(0, 8).map(lang => (
                                 <li
                                     key={lang}
-                                    onClick={() => handleSelect(lang)}
+                                    onMouseDown={() => handleSelect(lang)} // Use onMouseDown to fire before onBlur
                                     className={lang === language ? 'selected' : ''}
                                 >
                                     {lang}

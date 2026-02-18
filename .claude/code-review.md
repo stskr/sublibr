@@ -141,10 +141,10 @@ Components communicate via global window properties instead of React context or 
 
 ---
 
-### 19. Bug: `LanguageSelector` input snaps back — DEFERRED
+### 19. ~~Bug: `LanguageSelector` input snaps back~~ FIXED
 **Files**: `src/components/LanguageSelector.tsx`
 
-Clearing the search field immediately repopulates it with the current language. Needs separate controlled state for search vs selected.
+**Fix**: Decoupled search input state from selected language prop. Input now maintains its own state and only reverts on blur if no selection is made.
 
 ---
 
@@ -201,5 +201,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 23 of 26 issues
-- **Deferred** (architectural changes): 18, 19, 20
+- **Fixed**: 24 of 26 issues
+- **Deferred** (architectural changes): 18, 20
