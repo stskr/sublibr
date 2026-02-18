@@ -203,7 +203,7 @@ a:hover {
   width: 100%;
 }
 
-.footer-bottom-row > .token-usage-wrapper {
+.footer-bottom-row>.token-usage-wrapper {
   align-self: flex-end;
 }
 
@@ -800,6 +800,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  overflow-y: auto;
 }
 
 
@@ -1300,6 +1301,53 @@ a:hover {
   border-radius: var(--radius-sm);
   color: var(--color-error);
   font-size: 12px;
+}
+
+.progress-error-message {
+  max-height: 120px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.progress-error-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(235, 117, 165, 0.2);
+}
+
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-accent {
+  background: var(--color-accent);
+  color: white;
+}
+
+.btn-accent:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-ghost:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 /* ============================================

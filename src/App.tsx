@@ -611,7 +611,12 @@ function App() {
                 </div>
               )}
 
-              <ProgressIndicator state={processing} providerLabel={PROVIDER_LABELS[settings.activeProvider]} />
+              <ProgressIndicator
+                state={processing}
+                providerLabel={PROVIDER_LABELS[settings.activeProvider]}
+                onRetry={handleGenerate}
+                onDismiss={() => setProcessing({ status: 'idle', progress: 0 })}
+              />
             </div>
 
             <div className="editor-main">

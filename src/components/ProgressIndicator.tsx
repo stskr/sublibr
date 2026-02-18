@@ -3,6 +3,8 @@ import type { ProcessingState } from '../types';
 interface ProgressIndicatorProps {
     state: ProcessingState;
     providerLabel?: string;
+    onRetry?: () => void;
+    onDismiss?: () => void;
 }
 
 const STATUS_ICONS: Record<string, string> = {
@@ -29,7 +31,7 @@ const STATUS_MESSAGES: Record<string, string> = {
     'error': 'Error occurred',
 };
 
-export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorProps) {
+export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: ProgressIndicatorProps) {
     const { status, progress, currentChunk, totalChunks, error } = state;
 
     if (status === 'idle' || status === 'done') {
@@ -74,8 +76,23 @@ export function ProgressIndicator({ state, providerLabel }: ProgressIndicatorPro
 
             {error && (
                 <div className="progress-error" role="alert">
-                    <span className="icon icon-sm">error_outline</span>
-                    {error}
+                    <div className="progress-error-message">
+                        <span className="icon icon-sm">error_outline</span>
+                        {error}
+                    </div>
+                    <div className="progress-error-actions">
+                        {onRetry && (
+                            <button className="btn btn-sm btn-accent" onClick={onRetry} aria-label="Retry generation">
+                                <span className="icon icon-sm">refresh</span>
+                                Retry
+                            </button>
+                        )}
+                        {onDismiss && (
+                            <button className="btn btn-sm btn-ghost" onClick={onDismiss} aria-label="Dismiss error">
+                                Dismiss
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
