@@ -148,10 +148,10 @@ Deleted all three files.
 
 ---
 
-### 20. Version history is in-memory only — DEFERRED
+### 20. ~~Version history is in-memory only~~ FIXED
 **Files**: `src/App.tsx`
 
-Subtitle versions are not persisted to `electron-store`. Reloading the app clears all versions except the currently active one (which is cached as the 'generated' state).
+**Fix**: Implemented `useEffect` to auto-persist `versions` to `subtitle-versions` store key whenever state changes. Versions are restored when loading recent files.
 
 ---
 
@@ -201,5 +201,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 25 of 26 issues
-- **Deferred** (architectural changes): 20
+- **Fixed**: 26 of 26 issues
+- **Deferred** (architectural changes): 0

@@ -147,6 +147,24 @@ function App() {
     });
   }, []);
 
+  // Persist versions when they change
+  useEffect(() => {
+    if (!mediaFile || !window.electronAPI) return;
+
+    // Debounce slightly to avoid rapid writes if state updates quickly
+    const timeout = setTimeout(async () => {
+      try {
+        const cache = (await window.electronAPI.getStoreValue('subtitle-versions') || {}) as Record<string, SubtitleVersion[]>;
+        cache[mediaFile.path] = versions;
+        await window.electronAPI.setStoreValue('subtitle-versions', cache);
+      } catch (error) {
+        console.error('Failed to save versions:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [versions, mediaFile]);
+
   // Load a recent file
   const handleLoadRecent = useCallback(async (recent: RecentFile) => {
     if (!window.electronAPI) return;
@@ -184,6 +202,20 @@ function App() {
       } else {
         resetSubtitles([]);
       }
+
+      // Restore versions
+      const versionCache = (await window.electronAPI.getStoreValue('subtitle-versions') || {}) as Record<string, SubtitleVersion[]>;
+      const cachedVersions = versionCache[recent.path];
+      if (cachedVersions?.length) {
+        setVersions(cachedVersions);
+        // If we have versions but no active ID, maybe set the last one? 
+        // Or just leave it null (fresh state).
+        // Actually, if we loaded cached subtitles, we might want to know which version they belong to.
+        // But the simple cache just stores current "work in progress".
+        // So we leave activeVersionId null unless we can infer it.
+      } else {
+        setVersions([]);
+      }
     } catch (error) {
       console.error('Failed to load recent file:', error);
     }
@@ -201,6 +233,7 @@ function App() {
   const handleClearCache = useCallback(async () => {
     if (window.electronAPI) {
       await window.electronAPI.deleteStoreValue('subtitle-cache');
+      await window.electronAPI.deleteStoreValue('subtitle-versions');
     }
     // Update recents to remove subtitleCount indicators
     setRecentFiles(prev => {
