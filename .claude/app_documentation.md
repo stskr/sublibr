@@ -1,6 +1,6 @@
 # SUBLIBR - Application Documentation
 
-> **Last Updated**: February 17, 2026  
+> **Last Updated**: February 18, 2026  
 > **Version**: 1.0.0
 
 ---

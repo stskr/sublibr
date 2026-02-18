@@ -66,7 +66,7 @@ export function isVideoFile(ext: string): boolean {
     return VIDEO_EXTENSIONS.includes(ext.toLowerCase());
 }
 
-export function isAudioFile(ext: string): boolean {
+function isAudioFile(ext: string): boolean {
     return AUDIO_EXTENSIONS.includes(ext.toLowerCase());
 }
 
