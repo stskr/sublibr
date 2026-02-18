@@ -143,12 +143,12 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                             </div>
                         )
                     })}
+
+                    <button className="add-subtitle-btn" onClick={handleAdd}>
+                        <span className="icon icon-sm">add</span> Add New Line
+                    </button>
                 </div>
             )}
-
-            <button className="add-subtitle-btn" onClick={handleAdd}>
-                <span className="icon icon-sm">add</span> Add New Line
-            </button>
         </div>
     );
 }

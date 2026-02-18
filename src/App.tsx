@@ -207,9 +207,21 @@ function App() {
 
       setVersions(cachedVersions || []);
 
+      // Set active version to the last (most recent) version
+      if (cachedVersions?.length) {
+        const latestVersion = cachedVersions[cachedVersions.length - 1];
+        setActiveVersionId(latestVersion.id);
+        // If no subtitle-cache, fall back to the version's subtitles
+        if (!hasSubtitles) {
+          resetSubtitles(latestVersion.subtitles);
+          hasSubtitles = true;
+        }
+      } else {
+        setActiveVersionId(null);
+      }
+
       // If we have subtitles, show the editor/download view. Otherwise show generator.
       setShowGenerator(!hasSubtitles);
-      setActiveVersionId(null);
     } catch (error) {
       console.error('Failed to load recent file:', error);
     }

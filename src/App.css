@@ -848,7 +848,7 @@ a:hover {
 
 .editor-main {
   flex: 1;
-  overflow: hidden;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -859,7 +859,8 @@ a:hover {
 .subtitle-editor {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .editor-header {
@@ -956,6 +957,7 @@ a:hover {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-md);
+  padding-bottom: var(--space-lg);
 }
 
 .subtitle-entry {
@@ -1076,8 +1078,8 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  width: calc(100% - var(--space-lg) * 2);
-  margin: var(--space-md) var(--space-lg);
+  width: 100%;
+  margin-top: var(--space-md);
   padding: var(--space-sm);
   background: transparent;
   border: 2px dashed var(--color-border);
