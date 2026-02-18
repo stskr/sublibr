@@ -1322,10 +1322,15 @@ a:hover {
   transition: width var(--transition-normal);
 }
 
+.progress-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .progress-percent {
   font-size: 12px;
   color: var(--color-text-muted);
-  text-align: right;
 }
 
 .progress-error {

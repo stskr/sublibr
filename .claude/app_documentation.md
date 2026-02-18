@@ -34,6 +34,8 @@
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
 - **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
+- **Media Streaming**: Custom `media://` protocol for efficient playback of large video files without memory issues
+- **Versioning & Regenerate**: Create multiple subtitle versions for the same file (e.g., different models/prompts) and switch between them instantly
 - **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
 
 ### Tech Stack
@@ -163,7 +165,6 @@ window.electronAPI = {
   
   // File operations
   readFile: (path: string) => ipcRenderer.invoke('file:read', path),
-  readFileAsDataUrl: (path: string) => ipcRenderer.invoke('file:readAsDataUrl', path),
   writeFile: (path: string, data: string) => ipcRenderer.invoke('file:write', path, data),
   getFileInfo: (path: string) => ipcRenderer.invoke('file:getInfo', path),
   getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
@@ -212,6 +213,10 @@ Responsibilities:
 - Store key allowlist (`settings`, `recent-files`, `subtitle-cache`)
 - Content Security Policy (CSP)
 - Sandboxed renderer process
+- **Media Protocol**: `media://` scheme for streaming local files
+  - Bypasses CSP for media elements
+  - Supports Range requests for seeking
+  - Validates paths against allowed directories
 
 **FFmpeg Integration**:
 ```typescript
@@ -408,6 +413,9 @@ const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
 const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
 const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
 const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+const [versions, setVersions] = useState<SubtitleVersion[]>([]);
+const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 const [processingState, setProcessingState] = useState<ProcessingState>({
   status: 'idle',
   progress: 0,

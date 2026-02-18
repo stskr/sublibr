@@ -14,11 +14,13 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   showMessageBox: (options) => import_electron.ipcRenderer.invoke("dialog:showMessageBox", options),
   // File operations
   readFile: (path) => import_electron.ipcRenderer.invoke("file:read", path),
-  readFileAsDataUrl: (path) => import_electron.ipcRenderer.invoke("file:readAsDataUrl", path),
   writeFile: (path, data) => import_electron.ipcRenderer.invoke("file:write", path, data),
   getFileInfo: (path) => import_electron.ipcRenderer.invoke("file:getInfo", path),
   getTempPath: () => import_electron.ipcRenderer.invoke("file:getTempPath"),
   registerPath: (path) => import_electron.ipcRenderer.invoke("file:registerPath", path),
+  // AI API proxy (calls go through main process — keys never exposed in renderer)
+  testApiKey: (provider, apiKey) => import_electron.ipcRenderer.invoke("ai:testApiKey", provider, apiKey),
+  callProvider: (provider, apiKey, model, prompt, audioBase64) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64),
   // FFmpeg operations
   extractAudio: (inputPath, outputPath) => import_electron.ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath),
   getDuration: (filePath) => import_electron.ipcRenderer.invoke("ffmpeg:getDuration", filePath),

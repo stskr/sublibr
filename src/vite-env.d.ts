@@ -12,7 +12,7 @@ export interface ElectronAPI {
     getFilePath?: (file: File) => string;
 
     readFile: (path: string) => Promise<ArrayBuffer>;
-    readFileAsDataUrl: (path: string) => Promise<string>;
+
     writeFile: (path: string, data: string) => Promise<void>;
     getFileInfo: (path: string) => Promise<{ size: number; path: string; name: string; ext: string }>;
     getTempPath: () => Promise<string>;

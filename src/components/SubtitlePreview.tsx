@@ -6,10 +6,10 @@ interface SubtitlePreviewProps {
     subtitles: Subtitle[];
     currentTime: number;
     mediaFile: MediaFile;
-    audioPath: string | null;
+
 }
 
-export function SubtitlePreview({ subtitles, currentTime, mediaFile, audioPath }: SubtitlePreviewProps) {
+export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitlePreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [videoReady, setVideoReady] = useState(false);
 
@@ -20,24 +20,13 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, audioPath }
     const subtitleText = activeSub?.text || '';
     const direction = subtitleText ? detectDirection(subtitleText) : 'ltr';
 
-    // Load video source via data URL (same approach as AudioPlayer)
+    // Load video source via media:// protocol
     useEffect(() => {
         if (!mediaFile.isVideo || !videoRef.current) return;
 
-        const loadVideo = async () => {
-            if (window.electronAPI) {
-                try {
-                    const dataUrl = await window.electronAPI.readFileAsDataUrl(mediaFile.path);
-                    if (videoRef.current) {
-                        videoRef.current.src = dataUrl;
-                        setVideoReady(true);
-                    }
-                } catch (error) {
-                    console.error('Failed to load video:', error);
-                }
-            }
-        };
-        loadVideo();
+        const safePath = encodeURIComponent(mediaFile.path);
+        videoRef.current.src = `media://${safePath}`;
+        setVideoReady(true);
     }, [mediaFile.path, mediaFile.isVideo]);
 
     // Sync video currentTime with audio player's currentTime

@@ -23,23 +23,12 @@ export function AudioPlayer({
     const [volume, setVolume] = useState(1);
 
     useEffect(() => {
-        const loadAudio = async () => {
-            if (audioRef.current && audioPath) {
-                try {
-                    // Use IPC to read file as data URL to avoid file:// protocol restrictions
-                    if (window.electronAPI) {
-                        const dataUrl = await window.electronAPI.readFileAsDataUrl(audioPath);
-                        audioRef.current.src = dataUrl;
-                    } else {
-                        // Fallback for browser mode (won't work)
-                        console.warn('Audio playback requires Electron');
-                    }
-                } catch (error) {
-                    console.error('Failed to load audio:', error);
-                }
-            }
-        };
-        loadAudio();
+        if (audioRef.current && audioPath) {
+            // Use custom media:// protocol for streaming
+            // We encode the path component to handle special characters
+            const safePath = encodeURIComponent(audioPath);
+            audioRef.current.src = `media://${safePath}`;
+        }
     }, [audioPath]);
 
     useEffect(() => {

@@ -51,11 +51,7 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: 
                     </span>
                     {message}
                 </span>
-                {status === 'transcribing' && totalChunks && (
-                    <span className="progress-chunks">
-                        Chunk {currentChunk} of {totalChunks}
-                    </span>
-                )}
+
             </div>
 
             <div
@@ -72,7 +68,14 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: 
                 />
             </div>
 
-            <div className="progress-percent">{Math.round(progress)}%</div>
+            <div className="progress-footer">
+                {status === 'transcribing' && totalChunks ? (
+                    <span className="progress-chunks">
+                        Chunk {currentChunk} of {totalChunks}
+                    </span>
+                ) : <div></div>}
+                <div className="progress-percent">{Math.round(progress)}%</div>
+            </div>
 
             {error && (
                 <div className="progress-error" role="alert">

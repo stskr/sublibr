@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -11,6 +11,19 @@ const { autoUpdater } = pkg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ============== Security: Path Validation ==============
+
+// Register custom protocol privileges
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+]);
 
 // Track file paths the user explicitly selected via native dialogs
 const allowedPaths = new Set<string>();
@@ -104,7 +117,22 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Register media:// protocol for streaming files
+  protocol.handle('media', (request) => {
+    const url = request.url.replace('media://', '');
+    try {
+      const decodedPath = decodeURIComponent(url);
+      const safePath = validatePath(decodedPath, ...getAllowedDirs());
+      return net.fetch(`file://${safePath}`);
+    } catch (error) {
+      console.error('Media protocol error:', error);
+      return new Response('Access denied or file not found', { status: 403 });
+    }
+  });
+
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -295,26 +323,7 @@ ipcMain.handle('file:read', async (_event, filePath: string) => {
   return fs.promises.readFile(safePath);
 });
 
-ipcMain.handle('file:readAsDataUrl', async (_event, filePath: string) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  const data = await fs.promises.readFile(safePath);
-  const ext = path.extname(safePath).toLowerCase().slice(1);
-  const mimeTypes: Record<string, string> = {
-    mp3: 'audio/mpeg',
-    wav: 'audio/wav',
-    ogg: 'audio/ogg',
-    m4a: 'audio/mp4',
-    aac: 'audio/aac',
-    flac: 'audio/flac',
-    mp4: 'video/mp4',
-    webm: 'video/webm',
-    mkv: 'video/x-matroska',
-    mov: 'video/quicktime',
-    avi: 'video/x-msvideo',
-  };
-  const mimeType = mimeTypes[ext] || 'application/octet-stream';
-  return `data:${mimeType};base64,${data.toString('base64')}`;
-});
+
 
 ipcMain.handle('file:write', async (_event, filePath: string, data: string) => {
   const safePath = validatePath(filePath, ...getAllowedDirs());

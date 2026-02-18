@@ -15,7 +15,7 @@ import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId, formatDisplayTime, isVideoFile } from './utils';
-import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats } from './types';
+import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats, SubtitleVersion } from './types';
 import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { UpdateNotification } from './components/UpdateNotification';
@@ -52,6 +52,11 @@ function App() {
   const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  // Versions state
+  const [versions, setVersions] = useState<SubtitleVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [showGenerator, setShowGenerator] = useState(false);
+
   const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
     totalInputTokens: 0,
     totalOutputTokens: 0,
@@ -163,6 +168,10 @@ function App() {
       setMediaFile(mediaFile);
       setDuration(duration);
       setAudioPath(mediaFile.path); // Play original file directly
+      // Reset versions on load recent
+      setVersions([]);
+      setActiveVersionId(null);
+      setShowGenerator(true);
 
       // Restore cached subtitles if available
       const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
@@ -209,6 +218,9 @@ function App() {
     resetSubtitles([]);
     setDuration(file.duration);
     setAudioPath(file.path); // Play original file directly; extraction deferred to generate
+    setVersions([]);
+    setActiveVersionId(null);
+    setShowGenerator(true);
   }, []);
 
   // Generate subtitles
@@ -291,8 +303,22 @@ function App() {
       // Step 5: Enforce subtitle quality (min duration, merge short subs, punctuation)
       merged = enforceSubtitleQuality(merged);
 
+      const versionId = generateId();
+      const newVersion: SubtitleVersion = {
+        id: versionId,
+        timestamp: Date.now(),
+        provider: settings.activeProvider,
+        model: activeConfig.model,
+        language: settings.language,
+        subtitles: merged,
+      };
+
+      setVersions(prev => [...prev, newVersion]);
+      setActiveVersionId(versionId);
       setSubtitles(merged);
       setProcessing({ status: 'done', progress: 100 });
+      setShowGenerator(false);
+
       if (mediaFile) {
         addToRecents(mediaFile, 'generated', merged.length);
         // Cache subtitles for later restoration
@@ -314,6 +340,30 @@ function App() {
       });
     }
   }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles]);
+
+  // Handle Regenerate Click
+  const handleRegenerate = useCallback(() => {
+    // Save current work to active version before switching mode
+    if (activeVersionId) {
+      setVersions(prev => prev.map(v => v.id === activeVersionId ? { ...v, subtitles } : v));
+    }
+    setShowGenerator(true);
+  }, [activeVersionId, subtitles]);
+
+  // Handle Version Switching
+  const handleVersionSelect = useCallback((versionId: string) => {
+    // Save current work to active version
+    if (activeVersionId) {
+      setVersions(prev => prev.map(v => v.id === activeVersionId ? { ...v, subtitles } : v));
+    }
+
+    const targetVersion = versions.find(v => v.id === versionId);
+    if (targetVersion) {
+      setActiveVersionId(versionId);
+      resetSubtitles(targetVersion.subtitles);
+      setShowGenerator(false);
+    }
+  }, [activeVersionId, subtitles, versions, resetSubtitles]);
 
   // Load subtitles from file
   const handleLoadSubtitles = useCallback(async () => {
@@ -528,6 +578,9 @@ function App() {
                   setMediaFile(null);
                   setAudioPath(null);
                   resetSubtitles([]);
+                  setVersions([]);
+                  setActiveVersionId(null);
+                  setShowGenerator(true);
                   setCurrentTime(0);
                   setDuration(0);
                   setProcessing({ status: 'idle', progress: 0 });
@@ -539,7 +592,7 @@ function App() {
                 Back to Home
               </button>
 
-              {!isProcessing && subtitles.length === 0 && (
+              {!isProcessing && (showGenerator || subtitles.length === 0) && (
                 <div className="sidebar-section">
                   <LanguageSelector
                     language={settings.language}
@@ -574,11 +627,46 @@ function App() {
                   <p className="sidebar-hint">
                     Supported formats: .srt, .vtt, .ass
                   </p>
+
+
+                  {versions.length > 0 && (
+                    <button
+                      className="btn-secondary sidebar-action-btn"
+                      onClick={() => setShowGenerator(false)}
+                      style={{ marginTop: '1rem' }}
+                    >
+                      Cancel & Return to Viewer
+                    </button>
+                  )}
                 </div>
               )}
 
-              {subtitles.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
+              {!isProcessing && !showGenerator && subtitles.length > 0 && (
+                <div className="sidebar-section">
+                  {/* Version Selector */}
+                  {versions.length > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label className="sidebar-label">Versions</label>
+                      <CustomSelect
+                        options={versions.map((v, i) => ({
+                          value: v.id,
+                          label: v.label || `Version ${i + 1} (${v.model})`
+                        }))}
+                        value={activeVersionId || ''}
+                        onChange={handleVersionSelect}
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    className="btn-secondary sidebar-action-btn"
+                    onClick={handleRegenerate}
+                    style={{ marginBottom: '1.5rem', width: '100%' }}
+                  >
+                    <span className="icon icon-sm">refresh</span> Regenerate
+                  </button>
+
+                  <div className="sidebar-divider"></div>
                   <label className="sidebar-label">Export Format</label>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                     <CustomSelect
@@ -642,14 +730,14 @@ function App() {
                     subtitles={subtitles}
                     currentTime={currentTime}
                     mediaFile={mediaFile}
-                    audioPath={audioPath}
                   />
                 )
               )}
             </div>
           </div>
-        )}
-      </main>
+        )
+        }
+      </main >
 
       {
         audioPath && (

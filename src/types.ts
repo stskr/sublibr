@@ -7,6 +7,16 @@ export interface Subtitle {
     text: string;
 }
 
+export interface SubtitleVersion {
+    id: string; // uuid
+    timestamp: number;
+    provider: string;
+    model: string;
+    language: string;
+    subtitles: Subtitle[];
+    label?: string; // Optional user label
+}
+
 // Audio chunk for processing
 export interface AudioChunk {
     index: number;

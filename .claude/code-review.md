@@ -23,12 +23,10 @@ All API calls (testApiKey + callProvider) proxied through the main process via I
 
 ---
 
-### 3. Memory: Large files loaded as base64 data URLs — DEFERRED
-**Files**: `src/components/SubtitlePreview.tsx:30`, `src/components/AudioPlayer.tsx:31`
+### 3. ~~Memory: Large files loaded as base64 data URLs~~ FIXED
+**Files**: `src/components/SubtitlePreview.tsx:30`, `src/components/AudioPlayer.tsx:31`, `electron/main.ts`
 
-`readFileAsDataUrl` converts entire files to base64 strings (~33% size overhead). A 1GB video becomes a ~1.33GB string in memory. This will crash the app on large files.
-
-**Fix**: Use an Electron custom protocol handler to serve files via streaming.
+**Fix**: Implemented `media://` custom protocol to stream files from disk, bypassing V8 memory limits. Removed `readFileAsDataUrl`.
 
 ---
 
@@ -150,6 +148,15 @@ Clearing the search field immediately repopulates it with the current language. 
 
 ---
 
+### 20. Version history is in-memory only — DEFERRED
+**Files**: `src/App.tsx`
+
+Subtitle versions are not persisted to `electron-store`. Reloading the app clears all versions except the currently active one (which is cached as the 'generated' state).
+
+---
+
+---
+
 ### 20. ~~Deprecated API: `navigator.platform`~~ FIXED
 **Files**: `src/hooks/useKeyboardShortcuts.ts`
 
@@ -194,5 +201,5 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 ## Summary
 
-- **Fixed**: 22 of 25 issues (1–2, 4–17, 20–25)
-- **Deferred** (architectural changes): 3, 18, 19
+- **Fixed**: 23 of 26 issues
+- **Deferred** (architectural changes): 18, 19, 20
