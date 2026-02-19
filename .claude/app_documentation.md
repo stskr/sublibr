@@ -797,7 +797,7 @@ Calculates the total estimated cost in USD for an array of `TokenUsage` entries,
 
 **Process**:
 1. Convert audio chunk to base64
-2. Build prompt:
+2. Get prompt from `prompts.ts` (Standard or Healing mode)
    ```
    Transcribe this audio to SRT format.
    Language: {language} OR Auto-detect
