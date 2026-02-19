@@ -1818,6 +1818,38 @@ a:hover {
   opacity: 0.3;
 }
 
+.preview-subtitle-textarea {
+  position: absolute;
+  bottom: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: white;
+  font-family: var(--font-subtitle);
+  font-size: 20px;
+  text-align: center;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+  pointer-events: auto;
+  min-height: 60px;
+  overflow: hidden;
+}
+
+.preview-cinema .preview-subtitle-textarea {
+  position: static;
+  transform: none;
+  font-size: 28px;
+  max-width: 70%;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-secondary);
+  border-color: var(--color-accent);
+}
+
 /* Sidebar Back Button */
 .sidebar-back-btn {
   display: flex;

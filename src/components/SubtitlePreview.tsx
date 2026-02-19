@@ -6,12 +6,16 @@ interface SubtitlePreviewProps {
     subtitles: Subtitle[];
     currentTime: number;
     mediaFile: MediaFile;
-
+    onSubtitleChange?: (id: string, text: string) => void;
 }
 
-export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitlePreviewProps) {
+export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleChange }: SubtitlePreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [videoReady, setVideoReady] = useState(false);
+    const [isPaused, setIsPaused] = useState(true);
+    const [editingSubtitleId, setEditingSubtitleId] = useState<string | null>(null);
+    const [editText, setEditText] = useState('');
 
     // Find active subtitle at current time
     const activeSub = subtitles.find(
@@ -26,6 +30,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitleP
 
         const safePath = encodeURIComponent(mediaFile.path);
         videoRef.current.src = `media://${safePath}`;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setVideoReady(true);
     }, [mediaFile.path, mediaFile.isVideo]);
 
@@ -49,15 +54,26 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitleP
         const audioEl = document.querySelector('audio');
         if (!audioEl) return;
 
-        if (audioEl.paused && !video.paused) {
+        const isAudioPaused = audioEl.paused;
+        if (isPaused !== isAudioPaused) {
+            setIsPaused(isAudioPaused);
+        }
+
+        if (isAudioPaused && !video.paused) {
             video.pause();
-        } else if (!audioEl.paused && video.paused) {
+        } else if (!isAudioPaused && video.paused) {
             video.play().catch(() => {/* ignore autoplay issues */ });
         }
-    }, [videoReady]);
+    }, [videoReady, isPaused]);
 
     useEffect(() => {
         const audioEl = document.querySelector('audio');
+        // Initial state check
+        if (audioEl && audioEl.paused !== isPaused) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setIsPaused(audioEl.paused);
+        }
+
         if (!audioEl || !mediaFile.isVideo) return;
 
         const onPlay = () => syncPlayState();
@@ -73,7 +89,91 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitleP
             audioEl.removeEventListener('play', onPlay);
             audioEl.removeEventListener('pause', onPause);
         };
-    }, [syncPlayState, mediaFile.isVideo]);
+    }, [syncPlayState, mediaFile.isVideo, isPaused]);
+
+    // Handle click to edit
+    const handleSubtitleClick = useCallback(() => {
+        if (isPaused && activeSub && onSubtitleChange) {
+            setEditingSubtitleId(activeSub.id);
+            setEditText(activeSub.text);
+            // Delay focus slightly to ensure render
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.focus();
+                    textareaRef.current.select();
+                }
+            }, 10);
+        }
+    }, [isPaused, activeSub, onSubtitleChange]);
+
+    // Save changes
+    const handleSave = useCallback(() => {
+        if (editingSubtitleId && activeSub && onSubtitleChange) {
+            if (editText !== activeSub.text) {
+                onSubtitleChange(editingSubtitleId, editText);
+            }
+        }
+        setEditingSubtitleId(null);
+    }, [editingSubtitleId, activeSub, onSubtitleChange, editText]);
+
+    // Handle keydown in textarea
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        e.stopPropagation(); // Prevent app shortcuts
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSave();
+        } else if (e.key === 'Escape') {
+            setEditingSubtitleId(null);
+        }
+    }, [handleSave]);
+
+    // Auto-resize textarea
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [editText, editingSubtitleId]);
+
+    // Render subtitle content (text or textarea)
+    const renderSubtitleContent = () => {
+        const isEditing = editingSubtitleId === activeSub?.id;
+
+        if (isEditing) {
+            return (
+                <textarea
+                    ref={textareaRef}
+                    className="preview-subtitle-textarea"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onBlur={handleSave}
+                    onKeyDown={handleKeyDown}
+                    dir={detectDirection(editText)}
+                    style={{ direction: detectDirection(editText) as import('react').CSSProperties['direction'] }}
+                    aria-label="Edit subtitle"
+                />
+            );
+        }
+
+        if (!subtitleText) return null;
+
+        return (
+            <div
+                className={`preview-subtitle${mediaFile.isVideo ? '' : ' cinema-subtitle'}`}
+                dir={direction}
+                style={{
+                    direction,
+                    cursor: isPaused && onSubtitleChange ? 'text' : 'default',
+                    border: isPaused && onSubtitleChange ? '1px dashed transparent' : 'none'
+                }}
+                onClick={handleSubtitleClick}
+                title={isPaused ? "Click to edit" : undefined}
+                aria-live="polite"
+            >
+                {subtitleText}
+            </div>
+        );
+    };
 
     if (mediaFile.isVideo) {
         return (
@@ -84,11 +184,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitleP
                         muted
                         playsInline
                     />
-                    {subtitleText && (
-                        <div className="preview-subtitle" dir={direction} style={{ direction }} aria-live="polite">
-                            {subtitleText}
-                        </div>
-                    )}
+                    {renderSubtitleContent()}
                 </div>
             </div>
         );
@@ -97,11 +193,9 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile }: SubtitleP
     // Audio file: cinema screen
     return (
         <div className="subtitle-preview">
-            <div className="preview-cinema">
-                {subtitleText ? (
-                    <div className="preview-subtitle cinema-subtitle" dir={direction} style={{ direction }} aria-live="polite">
-                        {subtitleText}
-                    </div>
+            <div className={`preview-cinema${mediaFile.isVideo ? '' : ' audio-mode'}`}>
+                {subtitleText || editingSubtitleId ? (
+                    renderSubtitleContent()
                 ) : (
                     <div className="preview-cinema-idle">
                         <span className="icon icon-xl">subtitles</span>

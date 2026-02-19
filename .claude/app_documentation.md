@@ -513,7 +513,7 @@ interface SubtitlePreviewProps {
   subtitles: Subtitle[];
   currentTime: number;
   mediaFile: MediaFile;
-  audioPath: string | null;
+  onSubtitleChange?: (id: string, text: string) => void;
 }
 ```
 
@@ -522,6 +522,7 @@ interface SubtitlePreviewProps {
 - Toggle between "Subtitles" view and "Preview" view via tab bar
 - **Video files**: Muted `<video>` element synced to the audio player's currentTime, with subtitle overlay at bottom
 - **Audio files**: Dark cinema screen (app background) with centered subtitle text
+- **Inline Editing**: Click on a subtitle when paused to edit text directly. Auto-saves on blur or Enter.
 - RTL direction detection for Hebrew/Arabic subtitles
 - Syncs play/pause state with the footer audio player
 
@@ -530,6 +531,7 @@ interface SubtitlePreviewProps {
 - Subtitle text uses same font family (`--font-subtitle`) as VideoPreview
 - Cinema mode shows a muted subtitles icon when no subtitle is active
 - Toggle bar only visible when subtitles exist
+- Textarea appears over subtitle for editing, matching the style of the display
 
 ---
 

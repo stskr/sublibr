@@ -741,6 +741,10 @@ function App() {
     }
   }, [mediaFile, processFile]);
 
+  const handleSubtitleLineChange = useCallback((id: string, text: string) => {
+    setSubtitles(subtitles.map(s => s.id === id ? { ...s, text } : s));
+  }, [subtitles, setSubtitles]);
+
   useKeyboardShortcuts({
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -957,6 +961,7 @@ function App() {
                     subtitles={subtitles}
                     currentTime={currentTime}
                     mediaFile={mediaFile}
+                    onSubtitleChange={handleSubtitleLineChange}
                   />
                 )
               )}
