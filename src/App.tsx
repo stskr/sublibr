@@ -251,6 +251,7 @@ function App() {
     // Update recents to remove subtitleCount indicators
     setRecentFiles(prev => {
       const updated = prev.map(f => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { subtitleCount: _, ...rest } = f;
         return rest;
       });
@@ -463,7 +464,7 @@ function App() {
         const updated = [...prev, newVersion];
         // Persist versions
         if (window.electronAPI) {
-          window.electronAPI.getStoreValue('subtitle-versions').then((store: any) => {
+          window.electronAPI.getStoreValue('subtitle-versions').then((store) => {
             const versionCache = (store || {}) as Record<string, SubtitleVersion[]>;
             versionCache[mediaFile.path] = updated;
             window.electronAPI.setStoreValue('subtitle-versions', versionCache);
@@ -501,7 +502,7 @@ function App() {
   // Helper to persist versions
   const persistVersions = useCallback((newVersions: SubtitleVersion[]) => {
     if (mediaFile && window.electronAPI) {
-      window.electronAPI.getStoreValue('subtitle-versions').then((store: any) => {
+      window.electronAPI.getStoreValue('subtitle-versions').then((store) => {
         const versionCache = (store || {}) as Record<string, SubtitleVersion[]>;
         versionCache[mediaFile.path] = newVersions;
         window.electronAPI.setStoreValue('subtitle-versions', versionCache);

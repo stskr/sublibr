@@ -25,7 +25,7 @@ export function useTimelineTicks(zoomStart: number, zoomEnd: number, widthPixels
         ];
 
         // Find best fit interval
-        let majorInterval = intervals.find(i => i >= idealInterval) || intervals[intervals.length - 1];
+        const majorInterval = intervals.find(i => i >= idealInterval) || intervals[intervals.length - 1];
 
         // Decide minor ticks (subdivisions)
         let minorDivisions = 4; // Default to 4 (e.g. 1s -> 0.25s)

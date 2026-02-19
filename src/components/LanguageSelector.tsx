@@ -14,6 +14,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
     // Sync search term when external language prop changes (e.g. from settings load)
     useEffect(() => {
         if (!showDropdown) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSearchTerm(language);
         }
     }, [language, showDropdown]);

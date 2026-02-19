@@ -34,6 +34,7 @@ export const Timeline: React.FC<TimelineProps> = ({
     // Reset zoom when duration changes (e.g. new file)
     useEffect(() => {
         if (duration > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setZoomStart(0);
             setZoomEnd(duration);
         }

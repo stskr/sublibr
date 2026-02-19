@@ -51,7 +51,7 @@ const htmlToTags = (html: string): string => {
         if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
         const el = node as HTMLElement;
-        let content = Array.from(el.childNodes).map(processNode).join('');
+        const content = Array.from(el.childNodes).map(processNode).join('');
 
         switch (el.tagName.toLowerCase()) {
             case 'strong':
@@ -62,14 +62,15 @@ const htmlToTags = (html: string): string => {
                 return `<i>${content}</i>`;
             case 'u':
                 return `<u>${content}</u>`;
-            case 'font':
+            case 'font': {
                 // Handle legacy font tags often produced by execCommand
                 const colorAttr = el.getAttribute('color');
                 const sizeAttr = el.getAttribute('size');
                 if (colorAttr) return `<font color="${colorAttr}">${content}</font>`;
                 if (sizeAttr) return `<font size="${sizeAttr}">${content}</font>`;
                 return content;
-            case 'span':
+            }
+            case 'span': {
                 const color = el.style.color;
                 const fontSize = el.style.fontSize;
                 // Convert complex colors to hex if needed, but execCommand might output hex or rgb
@@ -77,6 +78,7 @@ const htmlToTags = (html: string): string => {
                 if (color) return `<font color="${color}">${content}</font>`;
                 if (fontSize) return `<font size="${fontSize}">${content}</font>`;
                 return content;
+            }
             case 'br':
                 return '\n';
             case 'div':
@@ -103,6 +105,26 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     const editorRef = useRef<HTMLDivElement>(null);
     const lastValueRef = useRef<string | null>(null);
     const savedSelection = useRef<Range | null>(null);
+
+    const updateStatus = useCallback(() => {
+        if (!onStatusChange) return;
+        onStatusChange({
+            bold: document.queryCommandState('bold'),
+            italic: document.queryCommandState('italic'),
+            underline: document.queryCommandState('underline'),
+            color: document.queryCommandValue('foreColor'),
+            size: document.queryCommandValue('fontSize')
+        });
+    }, [onStatusChange]);
+
+    const handleInput = useCallback(() => {
+        if (!editorRef.current) return;
+        const html = editorRef.current.innerHTML;
+        const taggedValue = htmlToTags(html);
+        lastValueRef.current = taggedValue;
+        onChange(taggedValue);
+        updateStatus();
+    }, [onChange, updateStatus]);
 
     // Expose methods to parent
     useImperativeHandle(ref, () => ({
@@ -159,25 +181,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
     }, [value]);
 
-    const handleInput = () => {
-        if (!editorRef.current) return;
-        const html = editorRef.current.innerHTML;
-        const taggedValue = htmlToTags(html);
-        lastValueRef.current = taggedValue;
-        onChange(taggedValue);
-        updateStatus();
-    };
-
-    const updateStatus = useCallback(() => {
-        if (!onStatusChange) return;
-        onStatusChange({
-            bold: document.queryCommandState('bold'),
-            italic: document.queryCommandState('italic'),
-            underline: document.queryCommandState('underline'),
-            color: document.queryCommandValue('foreColor'),
-            size: document.queryCommandValue('fontSize')
-        });
-    }, [onStatusChange]);
+    // Removed misplaced handlers
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         updateStatus();
@@ -216,7 +220,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             onMouseUp={handleMouseUp}
             dir={direction}
             style={{
-                direction: direction as any,
+                direction: direction as "ltr" | "rtl" | undefined,
                 minHeight: '1em',
                 outline: 'none',
                 whiteSpace: 'pre-wrap',

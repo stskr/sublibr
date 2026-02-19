@@ -16,7 +16,7 @@ export const StyledText: React.FC<StyledTextProps> = ({ text, className }) => {
     if (!text) return null;
 
     // Replace curly brace variants with HTML-like tags for easier uniform parsing
-    let processedText = text
+    const processedText = text
         .replace(/\{i\}/gi, '<i>')
         .replace(/\{\/i\}/gi, '</i>')
         .replace(/\{b\}/gi, '<b>')

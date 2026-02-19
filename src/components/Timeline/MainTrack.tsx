@@ -92,7 +92,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
 
     return (
         <div
-            className={`timeline - main - track tool - ${activeTool} `}
+            className={`timeline-main-track tool-${activeTool}`}
             ref={trackRef}
             onClick={handleTrackClick}
             onMouseMove={handleMouseMove}
@@ -116,8 +116,8 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                             key={sub.id}
                             className="timeline-main-segment"
                             style={{
-                                left: `${left}% `,
-                                width: `${Math.max(0.2, width)}% `
+                                left: `${left}%`,
+                                width: `${Math.max(0.2, width)}%`
                             }}
                         >
                             <div className="timeline-segment-content">
@@ -143,7 +143,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                 {currentTime >= zoomStart && currentTime <= zoomEnd && (
                     <div
                         className="timeline-main-cursor"
-                        style={{ left: `${getPosition(currentTime)}% ` }}
+                        style={{ left: `${getPosition(currentTime)}%` }}
                     />
                 )}
             </div>
@@ -151,7 +151,7 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             <div
                 className="timeline-main-ghost-cursor"
                 style={{
-                    left: hoverTime !== null ? `${getPosition(hoverTime)}% ` : undefined,
+                    left: hoverTime !== null ? `${getPosition(hoverTime)}%` : undefined,
                     display: hoverTime !== null ? 'block' : 'none'
                 }}
             >

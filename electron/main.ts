@@ -4,8 +4,8 @@ import http from 'http';
 
 import path from 'path';
 import fs from 'fs';
-import { Readable } from 'stream';
-import { fileURLToPath, pathToFileURL } from 'url';
+// Removed stream import
+import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
