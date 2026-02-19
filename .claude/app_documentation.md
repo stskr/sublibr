@@ -1,6 +1,6 @@
 # SUBLIBR - Application Documentation
 
-> **Last Updated**: February 18, 2026  
+> **Last Updated**: February 19, 2026  
 > **Version**: 1.0.0
 
 ---
@@ -34,7 +34,7 @@
 - **Multi-Language Support**: 90+ languages with auto-detection capability
 - **Built-in Editor**: Timeline-based subtitle editor with video preview
 - **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
-- **Media Streaming**: Custom `media://` protocol for efficient playback of large video files without memory issues
+- **Media Streaming**: Local HTTP server for efficient playback and seeking of large video files, bypassing Electron protocol limitations
 - **Versioning & Regenerate**: Create multiple subtitle versions for the same file (e.g., different models/prompts) and switch between them instantly
 - **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
 
@@ -213,10 +213,11 @@ Responsibilities:
 - Store key allowlist (`settings`, `recent-files`, `subtitle-cache`)
 - Content Security Policy (CSP)
 - Sandboxed renderer process
-- **Media Protocol**: `media://` scheme for streaming local files
-  - Bypasses CSP for media elements
-  - Supports Range requests for seeking
+- **Media Streaming**: Local HTTP server (`http://localhost:*`)
+  - Redirects `media://` requests to local server
+  - Supports standard HTTP Range requests for seeking
   - Validates paths against allowed directories
+  - Secured via strict CSP and random port assignment
 
 **FFmpeg Integration**:
 ```typescript

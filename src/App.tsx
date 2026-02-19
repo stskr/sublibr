@@ -165,6 +165,8 @@ function App() {
     return () => clearTimeout(timeout);
   }, [versions, mediaFile]);
 
+
+
   // Load a recent file
   const handleLoadRecent = useCallback(async (recent: RecentFile) => {
     if (!window.electronAPI) return;

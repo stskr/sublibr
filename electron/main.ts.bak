@@ -1,5 +1,4 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage, protocol } from 'electron';
-import http from 'http';
 
 
 import path from 'path';
@@ -121,29 +120,6 @@ function createWindow() {
   }
 }
 
-function getMimeType(ext: string): string {
-  const map: Record<string, string> = {
-    '.mp3': 'audio/mpeg',
-    '.wav': 'audio/wav',
-    '.ogg': 'audio/ogg',
-    '.flac': 'audio/flac',
-    '.m4a': 'audio/mp4',
-    '.aac': 'audio/aac',
-    '.wma': 'audio/x-ms-wma',
-    '.alac': 'audio/alac',
-    '.aiff': 'audio/x-aiff',
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.mkv': 'video/x-matroska',
-    '.mov': 'video/quicktime',
-    '.avi': 'video/x-msvideo',
-    '.ts': 'video/mp2t',
-    '.mts': 'video/mp2t',
-    '.m2ts': 'video/mp2t',
-  };
-  return map[ext.toLowerCase()] || '';
-}
-
 // Media Server Logic
 let mediaServerPort = 0;
 
@@ -153,7 +129,6 @@ function startMediaServer() {
       // CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Range');
 
       if (req.method === 'OPTIONS') {
         res.writeHead(200);
@@ -225,6 +200,108 @@ function startMediaServer() {
   });
 }
 
+function getMimeType(ext: string): string {
+  const map: Record<string, string> = {
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+    '.flac': 'audio/flac',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.wma': 'audio/x-ms-wma',
+    '.alac': 'audio/alac',
+    '.aiff': 'audio/x-aiff',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mkv': 'video/x-matroska',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.ts': 'video/mp2t',
+    '.mts': 'video/mp2t',
+    '.m2ts': 'video/mp2t',
+  };
+  return map[ext.toLowerCase()] || '';
+}
+
+// Media Server Logic
+let mediaServerPort = 0;
+
+function startMediaServer() {
+  const server = http.createServer(async (req, res) => {
+    try {
+      // CORS headers
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
+      const url = new URL(req.url || '', `http://localhost:${mediaServerPort}`);
+      if (url.pathname !== '/stream') {
+        res.writeHead(404);
+        res.end('Not Found');
+        return;
+      }
+
+      const fileParam = url.searchParams.get('file');
+      if (!fileParam) {
+        res.writeHead(400);
+        res.end('Missing file parameter');
+        return;
+      }
+
+      const decodedPath = decodeURIComponent(fileParam);
+      const safePath = validatePath(decodedPath, ...getAllowedDirs());
+
+      const stat = await fs.promises.stat(safePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+      const mimeType = getMimeType(path.extname(safePath));
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(safePath, { start, end });
+
+        const head = {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': mimeType,
+        };
+
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        const head = {
+          'Content-Length': fileSize,
+          'Content-Type': mimeType,
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(safePath).pipe(res);
+      }
+    } catch (error) {
+      console.error('Media server error:', error);
+      if (!res.headersSent) {
+        res.writeHead(500);
+        res.end('Internal Server Error');
+      }
+    }
+  });
+
+  server.listen(0, '127.0.0.1', () => {
+    const address = server.address();
+    if (address && typeof address !== 'string') {
+      mediaServerPort = address.port;
+      console.log(`Media server listening on port ${mediaServerPort}`);
+    }
+  });
+}
 
 app.whenReady().then(() => {
   // Register media:// protocol for streaming files

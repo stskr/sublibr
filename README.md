@@ -9,7 +9,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **🎙️ AI Transcription**: Multi-provider support — Google Gemini and OpenAI — with per-provider API key validation.
 - **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
 - **🔄 Versions & Regenerate**: Create multiple subtitle versions with different settings and switch between them instantly.
-- **⚡ Efficient Streaming**: Handles large video files smoothly using a custom streaming protocol.
+- **⚡ Efficient Streaming**: Handles large video files smoothly using a local HTTP server for instant seeking.
 - **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware overlap.
 - **🩹 Gap Healing**: intelligently detects and fills in missing subtitles that AI might have skipped.
 - **📤 Multi-Format Export**: Support for SRT, WebVTT, and ASS formats.

@@ -1,7 +1,8 @@
-import { protocol, app, net, BrowserWindow, ipcMain, dialog, shell, safeStorage } from "electron";
+import { protocol, app, BrowserWindow, ipcMain, dialog, net, shell, safeStorage } from "electron";
+import http from "http";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath, pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 import Store from "electron-store";
 import ffmpeg from "fluent-ffmpeg";
 import { createRequire } from "module";
@@ -85,16 +86,111 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
   }
 }
+function getMimeType(ext) {
+  const map = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wma": "audio/x-ms-wma",
+    ".alac": "audio/alac",
+    ".aiff": "audio/x-aiff",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mkv": "video/x-matroska",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".ts": "video/mp2t",
+    ".mts": "video/mp2t",
+    ".m2ts": "video/mp2t"
+  };
+  return map[ext.toLowerCase()] || "";
+}
+let mediaServerPort = 0;
+function startMediaServer() {
+  const server = http.createServer(async (req, res) => {
+    try {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Range");
+      if (req.method === "OPTIONS") {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+      const url = new URL(req.url || "", `http://localhost:${mediaServerPort}`);
+      if (url.pathname !== "/stream") {
+        res.writeHead(404);
+        res.end("Not Found");
+        return;
+      }
+      const fileParam = url.searchParams.get("file");
+      if (!fileParam) {
+        res.writeHead(400);
+        res.end("Missing file parameter");
+        return;
+      }
+      const decodedPath = decodeURIComponent(fileParam);
+      const safePath = validatePath(decodedPath, ...getAllowedDirs());
+      const stat = await fs.promises.stat(safePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+      const mimeType = getMimeType(path.extname(safePath));
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = end - start + 1;
+        const file = fs.createReadStream(safePath, { start, end });
+        const head = {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunksize,
+          "Content-Type": mimeType
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        const head = {
+          "Content-Length": fileSize,
+          "Content-Type": mimeType
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(safePath).pipe(res);
+      }
+    } catch (error) {
+      console.error("Media server error:", error);
+      if (!res.headersSent) {
+        res.writeHead(500);
+        res.end("Internal Server Error");
+      }
+    }
+  });
+  server.listen(0, "127.0.0.1", () => {
+    const address = server.address();
+    if (address && typeof address !== "string") {
+      mediaServerPort = address.port;
+      console.log(`Media server listening on port ${mediaServerPort}`);
+    }
+  });
+}
 app.whenReady().then(() => {
+  startMediaServer();
   protocol.handle("media", (request) => {
     const url = request.url.replace("media://", "");
     try {
-      const decodedPath = decodeURIComponent(url);
-      const safePath = validatePath(decodedPath, ...getAllowedDirs());
-      return net.fetch(pathToFileURL(safePath).toString());
+      const redirectUrl = `http://localhost:${mediaServerPort}/stream?file=${url}`;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Location": redirectUrl
+        }
+      });
     } catch (error) {
       console.error("Media protocol error:", error);
-      return new Response("Access denied or file not found", { status: 403 });
+      return new Response("Error", { status: 500 });
     }
   });
   createWindow();
