@@ -78,7 +78,11 @@ subtitles-gen/
 │   │   ├── Timeline/
 │   │   │   ├── Timeline.tsx       # Main timeline orchestrator
 │   │   │   ├── Minimap.tsx        # Overview track with zoom slider
-│   │   │   ├── MainTrack.tsx      # Zoomed detail track
+│   │   │   ├── MainTrack.tsx      # Zoomed detail track with Ruler & Grid
+│   │   │   ├── Minimap.tsx        # Overview track with zoom slider
+│   │   │   ├── Ruler.tsx          # Time ruler with comb-style ticks
+│   │   │   ├── TimelineGrid.tsx   # Vertical grid lines for alignment
+│   │   │   ├── useTimelineTicks.ts # Shared tick generation logic
 │   │   │   └── Timeline.css       # Timeline styles
 │   │   ├── TokenUsageDisplay.tsx
 │   │   └── UpdateNotification.tsx
@@ -113,7 +117,7 @@ subtitles-gen/
 
 ### File Counts & Organization
 
-- **React Components**: 12 files
+- **React Components**: ~15 files
 - **Services**: 4 core modules
 - **Electron Process Files**: 2 (main + preload)
 - **Total Source Files**: ~15 TypeScript/TSX files
@@ -563,6 +567,10 @@ interface TimelineProps {
 - **Panning**: Drag the minimap window body to scroll the main track.
 - **Seeking**: Click on either track to seek.
 - **Synchronization**: Playhead stays synced across both tracks.
+- **Ruler & Grid**:
+  - **Comb-Style Ruler**: Precision time ruler with major and minor ticks adapting to zoom level.
+  - **Vertical Grid**: Background grid lines extending from major ticks for visual alignment.
+  - **Compact Design**: Optimized height (approx. 45px main track) for screen efficiency.
 
 **UX Details**:
 - Smooth 60fps interaction using local state for dragging

@@ -66,23 +66,9 @@ export const Timeline: React.FC<TimelineProps> = ({
                 onZoomChange={handleZoomChange}
                 onSeek={onSeek}
             />
-            <div className="timeline-info-row" style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: 'var(--color-text-muted)',
-                padding: '0 4px'
-            }}>
-                <span>{formatTime(zoomStart)}</span>
-                <span>Zoomed View</span>
-                <span>{formatTime(effectiveZoomEnd)}</span>
-            </div>
+
         </div>
     );
 };
 
-function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
+

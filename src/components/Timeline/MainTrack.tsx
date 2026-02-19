@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import type { Subtitle } from '../../types';
+import { Ruler } from './Ruler';
+import { TimelineGrid } from './TimelineGrid';
 import './Timeline.css';
 
 interface MainTrackProps {
@@ -44,30 +46,36 @@ export const MainTrack: React.FC<MainTrackProps> = ({
             ref={trackRef}
             onClick={handleTrackClick}
         >
-            {renderSubtitles.map(sub => {
-                const left = getPosition(sub.startTime);
-                const width = getPosition(sub.endTime) - left;
+            <Ruler zoomStart={zoomStart} zoomEnd={zoomEnd} />
 
-                return (
+            <div className="timeline-subtitles-container">
+                <TimelineGrid zoomStart={zoomStart} zoomEnd={zoomEnd} />
+
+                {renderSubtitles.map(sub => {
+                    const left = getPosition(sub.startTime);
+                    const width = getPosition(sub.endTime) - left;
+
+                    return (
+                        <div
+                            key={sub.id}
+                            className="timeline-main-segment"
+                            style={{
+                                left: `${left}%`,
+                                width: `${Math.max(0.2, width)}%`
+                            }}
+                            title={sub.text}
+                        />
+                    );
+                })}
+
+                {/* Playhead */}
+                {currentTime >= zoomStart && currentTime <= zoomEnd && (
                     <div
-                        key={sub.id}
-                        className="timeline-main-segment"
-                        style={{
-                            left: `${left}%`,
-                            width: `${Math.max(0.2, width)}%`
-                        }}
-                        title={sub.text}
+                        className="timeline-main-cursor"
+                        style={{ left: `${getPosition(currentTime)}%` }}
                     />
-                );
-            })}
-
-            {/* Playhead */}
-            {currentTime >= zoomStart && currentTime <= zoomEnd && (
-                <div
-                    className="timeline-main-cursor"
-                    style={{ left: `${getPosition(currentTime)}%` }}
-                />
-            )}
+                )}
+            </div>
 
             {/* Ghost Cursor (Optional, JS based or CSS based using :hover and css vars? CSS alone can't know time) */}
             <div className="timeline-main-ghost-cursor" />
