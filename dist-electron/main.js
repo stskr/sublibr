@@ -1,93 +1,73 @@
-import { protocol, app, BrowserWindow, ipcMain, dialog, net, shell, safeStorage } from "electron";
-import http from "http";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import Store from "electron-store";
-import ffmpeg from "fluent-ffmpeg";
-import { createRequire } from "module";
-import pkg from "electron-updater";
-const { autoUpdater } = pkg;
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-protocol.registerSchemesAsPrivileged([
+import { protocol as M, app as p, BrowserWindow as U, ipcMain as n, dialog as C, net as T, shell as D, safeStorage as A } from "electron";
+import L from "http";
+import l from "path";
+import S from "fs";
+import { fileURLToPath as H } from "url";
+import W from "electron-store";
+import P from "fluent-ffmpeg";
+import { createRequire as N } from "module";
+import V from "electron-updater";
+const { autoUpdater: v } = V, O = l.dirname(H(import.meta.url));
+M.registerSchemesAsPrivileged([
   {
     scheme: "media",
     privileges: {
-      secure: true,
-      supportFetchAPI: true,
-      bypassCSP: true,
-      stream: true
+      secure: !0,
+      supportFetchAPI: !0,
+      bypassCSP: !0,
+      stream: !0
     }
   }
 ]);
-const allowedPaths = /* @__PURE__ */ new Set();
-function validatePath(filePath, ...allowedDirs) {
-  if (typeof filePath !== "string") throw new Error("Invalid path: must be a string");
-  const resolved = path.resolve(filePath);
-  if (allowedPaths.has(resolved)) return resolved;
-  for (const dir of allowedDirs) {
-    const resolvedDir = path.resolve(dir);
-    if (resolved === resolvedDir || resolved.startsWith(resolvedDir + path.sep)) {
-      return resolved;
-    }
+const E = /* @__PURE__ */ new Set();
+function b(r, ...t) {
+  if (typeof r != "string") throw new Error("Invalid path: must be a string");
+  const e = l.resolve(r);
+  if (E.has(e)) return e;
+  for (const a of t) {
+    const o = l.resolve(a);
+    if (e === o || e.startsWith(o + l.sep))
+      return e;
   }
-  throw new Error(`Access denied: path is outside allowed directories`);
+  throw new Error("Access denied: path is outside allowed directories");
 }
-function getAllowedDirs() {
+function y() {
   return [
-    app.getPath("temp"),
-    app.getPath("userData")
+    p.getPath("temp"),
+    p.getPath("userData")
   ];
 }
-const ALLOWED_STORE_KEYS = ["settings", "recent-files", "subtitle-cache", "subtitle-versions"];
-if (app.isPackaged) {
-  const ext = process.platform === "win32" ? ".exe" : "";
-  ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
-  ffmpeg.setFfprobePath(path.join(process.resourcesPath, "ffprobe", "ffprobe" + ext));
+const R = ["settings", "recent-files", "subtitle-cache", "subtitle-versions"];
+if (p.isPackaged) {
+  const r = process.platform === "win32" ? ".exe" : "";
+  P.setFfmpegPath(l.join(process.resourcesPath, "ffmpeg", "ffmpeg" + r)), P.setFfprobePath(l.join(process.resourcesPath, "ffprobe", "ffprobe" + r));
 } else {
-  const _require = createRequire(import.meta.url);
-  ffmpeg.setFfmpegPath(_require("@ffmpeg-installer/ffmpeg").path);
-  ffmpeg.setFfprobePath(_require("@ffprobe-installer/ffprobe").path);
+  const r = N(import.meta.url);
+  P.setFfmpegPath(r("@ffmpeg-installer/ffmpeg").path), P.setFfprobePath(r("@ffprobe-installer/ffprobe").path);
 }
-const store = new Store();
-let mainWindow = null;
-function createWindow() {
-  mainWindow = new BrowserWindow({
+const x = new W();
+let u = null;
+function j() {
+  u = new U({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
+      preload: l.join(O, "preload.js"),
+      contextIsolation: !0,
+      nodeIntegration: !1,
+      sandbox: !0
     },
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0a0a0f"
-  });
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      shell.openExternal(url);
-    }
-    return { action: "deny" };
-  });
-  mainWindow.webContents.on("will-navigate", (event, url) => {
-    const appUrl = process.env.VITE_DEV_SERVER_URL || "file://";
-    if (!url.startsWith(appUrl)) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
-  }
+  }), u.webContents.setWindowOpenHandler(({ url: r }) => ((r.startsWith("http://") || r.startsWith("https://")) && D.openExternal(r), { action: "deny" })), u.webContents.on("will-navigate", (r, t) => {
+    const e = process.env.VITE_DEV_SERVER_URL || "file://";
+    t.startsWith(e) || (r.preventDefault(), D.openExternal(t));
+  }), process.env.VITE_DEV_SERVER_URL ? (u.loadURL(process.env.VITE_DEV_SERVER_URL), u.webContents.openDevTools()) : u.loadFile(l.join(O, "../dist/index.html"));
 }
-function getMimeType(ext) {
-  const map = {
+function K(r) {
+  return {
     ".mp3": "audio/mpeg",
     ".wav": "audio/wav",
     ".ogg": "audio/ogg",
@@ -105,265 +85,195 @@ function getMimeType(ext) {
     ".ts": "video/mp2t",
     ".mts": "video/mp2t",
     ".m2ts": "video/mp2t"
-  };
-  return map[ext.toLowerCase()] || "";
+  }[r.toLowerCase()] || "";
 }
-let mediaServerPort = 0;
-function startMediaServer() {
-  const server = http.createServer(async (req, res) => {
+let k = 0;
+function B() {
+  const r = L.createServer(async (t, e) => {
     try {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Range");
-      if (req.method === "OPTIONS") {
-        res.writeHead(200);
-        res.end();
+      if (e.setHeader("Access-Control-Allow-Origin", "*"), e.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS"), e.setHeader("Access-Control-Allow-Headers", "Range"), t.method === "OPTIONS") {
+        e.writeHead(200), e.end();
         return;
       }
-      const url = new URL(req.url || "", `http://localhost:${mediaServerPort}`);
-      if (url.pathname !== "/stream") {
-        res.writeHead(404);
-        res.end("Not Found");
+      const a = new URL(t.url || "", `http://localhost:${k}`);
+      if (a.pathname !== "/stream") {
+        e.writeHead(404), e.end("Not Found");
         return;
       }
-      const fileParam = url.searchParams.get("file");
-      if (!fileParam) {
-        res.writeHead(400);
-        res.end("Missing file parameter");
+      const o = a.searchParams.get("file");
+      if (!o) {
+        e.writeHead(400), e.end("Missing file parameter");
         return;
       }
-      const decodedPath = decodeURIComponent(fileParam);
-      const safePath = validatePath(decodedPath, ...getAllowedDirs());
-      const stat = await fs.promises.stat(safePath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-      const mimeType = getMimeType(path.extname(safePath));
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = end - start + 1;
-        const file = fs.createReadStream(safePath, { start, end });
-        const head = {
-          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      const s = decodeURIComponent(o), d = b(s, ...y()), i = (await S.promises.stat(d)).size, f = t.headers.range, h = K(l.extname(d));
+      if (f) {
+        const c = f.replace(/bytes=/, "").split("-"), w = parseInt(c[0], 10), g = c[1] ? parseInt(c[1], 10) : i - 1, _ = g - w + 1, F = S.createReadStream(d, { start: w, end: g }), $ = {
+          "Content-Range": `bytes ${w}-${g}/${i}`,
           "Accept-Ranges": "bytes",
-          "Content-Length": chunksize,
-          "Content-Type": mimeType
+          "Content-Length": _,
+          "Content-Type": h
         };
-        res.writeHead(206, head);
-        file.pipe(res);
+        e.writeHead(206, $), F.pipe(e);
       } else {
-        const head = {
-          "Content-Length": fileSize,
-          "Content-Type": mimeType
+        const c = {
+          "Content-Length": i,
+          "Content-Type": h
         };
-        res.writeHead(200, head);
-        fs.createReadStream(safePath).pipe(res);
+        e.writeHead(200, c), S.createReadStream(d).pipe(e);
       }
-    } catch (error) {
-      console.error("Media server error:", error);
-      if (!res.headersSent) {
-        res.writeHead(500);
-        res.end("Internal Server Error");
-      }
+    } catch (a) {
+      console.error("Media server error:", a), e.headersSent || (e.writeHead(500), e.end("Internal Server Error"));
     }
   });
-  server.listen(0, "127.0.0.1", () => {
-    const address = server.address();
-    if (address && typeof address !== "string") {
-      mediaServerPort = address.port;
-      console.log(`Media server listening on port ${mediaServerPort}`);
-    }
+  r.listen(0, "127.0.0.1", () => {
+    const t = r.address();
+    t && typeof t != "string" && (k = t.port, console.log(`Media server listening on port ${k}`));
   });
 }
-app.whenReady().then(() => {
-  startMediaServer();
-  protocol.handle("media", (request) => {
-    const url = request.url.replace("media://", "");
+p.whenReady().then(() => {
+  B(), M.handle("media", (r) => {
+    const t = r.url.replace("media://", "");
     try {
-      const redirectUrl = `http://localhost:${mediaServerPort}/stream?file=${url}`;
+      const e = `http://localhost:${k}/stream?file=${t}`;
       return new Response(null, {
         status: 302,
         headers: {
-          "Location": redirectUrl
+          Location: e
         }
       });
-    } catch (error) {
-      console.error("Media protocol error:", error);
-      return new Response("Error", { status: 500 });
+    } catch (e) {
+      return console.error("Media protocol error:", e), new Response("Error", { status: 500 });
     }
-  });
-  createWindow();
+  }), j();
 });
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+p.on("window-all-closed", () => {
+  process.platform !== "darwin" && p.quit();
 });
-app.on("before-quit", () => {
+p.on("before-quit", () => {
   try {
-    const tempDir = app.getPath("temp");
-    const entries = fs.readdirSync(tempDir);
-    for (const entry of entries) {
-      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(entry)) {
-        fs.unlinkSync(path.join(tempDir, entry));
-      }
-    }
+    const r = p.getPath("temp"), t = S.readdirSync(r);
+    for (const e of t)
+      /^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(e) && S.unlinkSync(l.join(r, e));
   } catch {
   }
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+p.on("activate", () => {
+  U.getAllWindows().length === 0 && j();
 });
-if (app.isPackaged) {
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-  app.whenReady().then(() => {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => {
-      });
-    }, 5e3);
-  });
-  autoUpdater.on("update-available", (info) => {
-    mainWindow?.webContents.send("update-available", {
-      version: info.version,
-      releaseNotes: info.releaseNotes,
-      releaseDate: info.releaseDate
+p.isPackaged && (v.autoDownload = !1, v.autoInstallOnAppQuit = !0, p.whenReady().then(() => {
+  setTimeout(() => {
+    v.checkForUpdates().catch(() => {
     });
+  }, 5e3);
+}), v.on("update-available", (r) => {
+  u?.webContents.send("update-available", {
+    version: r.version,
+    releaseNotes: r.releaseNotes,
+    releaseDate: r.releaseDate
   });
-  autoUpdater.on("download-progress", (progress) => {
-    mainWindow?.webContents.send("update-download-progress", {
-      percent: Math.round(progress.percent),
-      transferred: progress.transferred,
-      total: progress.total
-    });
+}), v.on("download-progress", (r) => {
+  u?.webContents.send("update-download-progress", {
+    percent: Math.round(r.percent),
+    transferred: r.transferred,
+    total: r.total
   });
-  autoUpdater.on("update-downloaded", (info) => {
-    mainWindow?.webContents.send("update-downloaded", {
-      version: info.version
-    });
+}), v.on("update-downloaded", (r) => {
+  u?.webContents.send("update-downloaded", {
+    version: r.version
   });
-  autoUpdater.on("error", (err) => {
-    mainWindow?.webContents.send("update-error", err.message);
-  });
-}
-const ENC_PREFIX = "enc:";
-function encryptApiKeys(settings) {
-  if (!safeStorage.isEncryptionAvailable()) return settings;
-  const providers = settings.providers;
-  if (!providers) return settings;
-  const encrypted = { ...settings, providers: { ...providers } };
-  for (const name of Object.keys(encrypted.providers)) {
-    const provider = { ...encrypted.providers[name] };
-    if (typeof provider.apiKey === "string" && provider.apiKey && !provider.apiKey.startsWith(ENC_PREFIX)) {
-      provider.apiKey = ENC_PREFIX + safeStorage.encryptString(provider.apiKey).toString("base64");
-    }
-    encrypted.providers[name] = provider;
+}), v.on("error", (r) => {
+  u?.webContents.send("update-error", r.message);
+}));
+const I = "enc:";
+function z(r) {
+  if (!A.isEncryptionAvailable()) return r;
+  const t = r.providers;
+  if (!t) return r;
+  const e = { ...r, providers: { ...t } };
+  for (const a of Object.keys(e.providers)) {
+    const o = { ...e.providers[a] };
+    typeof o.apiKey == "string" && o.apiKey && !o.apiKey.startsWith(I) && (o.apiKey = I + A.encryptString(o.apiKey).toString("base64")), e.providers[a] = o;
   }
-  return encrypted;
+  return e;
 }
-function decryptApiKeys(settings) {
-  if (!safeStorage.isEncryptionAvailable()) return settings;
-  const providers = settings.providers;
-  if (!providers) return settings;
-  const decrypted = { ...settings, providers: { ...providers } };
-  for (const name of Object.keys(decrypted.providers)) {
-    const provider = { ...decrypted.providers[name] };
-    if (typeof provider.apiKey === "string" && provider.apiKey.startsWith(ENC_PREFIX)) {
+function q(r) {
+  if (!A.isEncryptionAvailable()) return r;
+  const t = r.providers;
+  if (!t) return r;
+  const e = { ...r, providers: { ...t } };
+  for (const a of Object.keys(e.providers)) {
+    const o = { ...e.providers[a] };
+    if (typeof o.apiKey == "string" && o.apiKey.startsWith(I))
       try {
-        const buf = Buffer.from(provider.apiKey.slice(ENC_PREFIX.length), "base64");
-        provider.apiKey = safeStorage.decryptString(buf);
+        const s = Buffer.from(o.apiKey.slice(I.length), "base64");
+        o.apiKey = A.decryptString(s);
       } catch {
       }
-    }
-    decrypted.providers[name] = provider;
+    e.providers[a] = o;
   }
-  return decrypted;
+  return e;
 }
-ipcMain.handle("store:get", (_event, key) => {
-  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
-    throw new Error(`Invalid store key: ${key}`);
-  }
-  const value = store.get(key);
-  if (key === "settings" && value && typeof value === "object") {
-    return decryptApiKeys(value);
-  }
-  return value;
+n.handle("store:get", (r, t) => {
+  if (typeof t != "string" || !R.includes(t))
+    throw new Error(`Invalid store key: ${t}`);
+  const e = x.get(t);
+  return t === "settings" && e && typeof e == "object" ? q(e) : e;
 });
-ipcMain.handle("store:set", (_event, key, value) => {
-  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
-    throw new Error(`Invalid store key: ${key}`);
-  }
-  if (key === "settings" && value && typeof value === "object") {
-    store.set(key, encryptApiKeys(value));
-  } else {
-    store.set(key, value);
-  }
+n.handle("store:set", (r, t, e) => {
+  if (typeof t != "string" || !R.includes(t))
+    throw new Error(`Invalid store key: ${t}`);
+  t === "settings" && e && typeof e == "object" ? x.set(t, z(e)) : x.set(t, e);
 });
-ipcMain.handle("store:delete", (_event, key) => {
-  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
-    throw new Error(`Invalid store key: ${key}`);
-  }
-  store.delete(key);
+n.handle("store:delete", (r, t) => {
+  if (typeof t != "string" || !R.includes(t))
+    throw new Error(`Invalid store key: ${t}`);
+  x.delete(t);
 });
-ipcMain.handle("dialog:openFile", async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+n.handle("dialog:openFile", async () => {
+  const t = (await C.showOpenDialog(u, {
     properties: ["openFile"],
     filters: [
       { name: "Media Files", extensions: ["mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "aac", "m4a", "ogg", "flac"] }
     ]
-  });
-  const filePath = result.filePaths[0] || null;
-  if (filePath) allowedPaths.add(path.resolve(filePath));
-  return filePath;
+  })).filePaths[0] || null;
+  return t && E.add(l.resolve(t)), t;
 });
-ipcMain.handle("dialog:openSubtitleFile", async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+n.handle("dialog:openSubtitleFile", async () => {
+  const t = (await C.showOpenDialog(u, {
     properties: ["openFile"],
     filters: [
       { name: "Subtitle Files", extensions: ["srt", "vtt", "ass", "ssa"] }
     ]
-  });
-  const filePath = result.filePaths[0] || null;
-  if (filePath) allowedPaths.add(path.resolve(filePath));
-  return filePath;
+  })).filePaths[0] || null;
+  return t && E.add(l.resolve(t)), t;
 });
-ipcMain.handle("dialog:saveFile", async (_event, defaultName, filterName, filterExtensions) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: defaultName,
-    filters: [{ name: filterName || "Subtitle File", extensions: filterExtensions || [defaultName.split(".").pop() || "srt"] }]
-  });
-  const filePath = result.filePath || null;
-  if (filePath) allowedPaths.add(path.resolve(filePath));
-  return filePath;
+n.handle("dialog:saveFile", async (r, t, e, a) => {
+  const s = (await C.showSaveDialog(u, {
+    defaultPath: t,
+    filters: [{ name: e || "Subtitle File", extensions: a || [t.split(".").pop() || "srt"] }]
+  })).filePath || null;
+  return s && E.add(l.resolve(s)), s;
 });
-ipcMain.handle("dialog:showMessageBox", async (_event, options) => {
-  return dialog.showMessageBox(mainWindow, options);
+n.handle("dialog:showMessageBox", async (r, t) => C.showMessageBox(u, t));
+n.handle("file:read", async (r, t) => {
+  const e = b(t, ...y());
+  return S.promises.readFile(e);
 });
-ipcMain.handle("file:read", async (_event, filePath) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  return fs.promises.readFile(safePath);
+n.handle("file:write", async (r, t, e) => {
+  const a = b(t, ...y());
+  await S.promises.writeFile(a, e, "utf-8");
 });
-ipcMain.handle("file:write", async (_event, filePath, data) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  await fs.promises.writeFile(safePath, data, "utf-8");
-});
-ipcMain.handle("file:getInfo", async (_event, filePath) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  const stats = await fs.promises.stat(safePath);
+n.handle("file:getInfo", async (r, t) => {
+  const e = b(t, ...y());
   return {
-    size: stats.size,
-    path: safePath,
-    name: path.basename(safePath),
-    ext: path.extname(safePath).toLowerCase()
+    size: (await S.promises.stat(e)).size,
+    path: e,
+    name: l.basename(e),
+    ext: l.extname(e).toLowerCase()
   };
 });
-ipcMain.handle("file:getTempPath", () => {
-  return app.getPath("temp");
-});
-const ALLOWED_MEDIA_EXTENSIONS = /* @__PURE__ */ new Set([
+n.handle("file:getTempPath", () => p.getPath("temp"));
+const G = /* @__PURE__ */ new Set([
   ".mp4",
   ".mkv",
   ".avi",
@@ -382,111 +292,87 @@ const ALLOWED_MEDIA_EXTENSIONS = /* @__PURE__ */ new Set([
   ".alac",
   ".aiff"
 ]);
-ipcMain.handle("file:registerPath", (_event, filePath) => {
-  if (typeof filePath !== "string") return;
-  const resolved = path.resolve(filePath);
-  const ext = path.extname(resolved).toLowerCase();
-  if (!ALLOWED_MEDIA_EXTENSIONS.has(ext)) {
+n.handle("file:registerPath", (r, t) => {
+  if (typeof t != "string") return;
+  const e = l.resolve(t), a = l.extname(e).toLowerCase();
+  if (!G.has(a))
     throw new Error("Only media files can be registered");
-  }
-  allowedPaths.add(resolved);
+  E.add(e);
 });
-ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath, format = "flac") => {
-  const safeInput = validatePath(inputPath, ...getAllowedDirs());
-  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
-  const codec = format === "mp3" ? "libmp3lame" : "flac";
-  return new Promise((resolve, reject) => {
-    ffmpeg(safeInput).audioCodec(codec).toFormat(format).on("end", () => resolve(safeOutput)).on("error", (err) => reject(err.message)).save(safeOutput);
+n.handle("ffmpeg:extractAudio", async (r, t, e, a = "flac") => {
+  const o = b(t, ...y()), s = b(e, ...y()), d = a === "mp3" ? "libmp3lame" : "flac";
+  return new Promise((m, i) => {
+    P(o).audioCodec(d).toFormat(a).on("end", () => m(s)).on("error", (f) => i(f.message)).save(s);
   });
 });
-ipcMain.handle("ffmpeg:getDuration", async (_event, filePath) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(safePath, (err, data) => {
-      if (err) reject(err.message);
-      else resolve(data.format.duration || 0);
+n.handle("ffmpeg:getDuration", async (r, t) => {
+  const e = b(t, ...y());
+  return new Promise((a, o) => {
+    P.ffprobe(e, (s, d) => {
+      s ? o(s.message) : a(d.format.duration || 0);
     });
   });
 });
-ipcMain.handle("ffmpeg:detectSilences", async (_event, filePath, threshold, minDuration) => {
-  const safePath = validatePath(filePath, ...getAllowedDirs());
-  if (!Number.isFinite(threshold) || threshold < -100 || threshold > 0) {
+n.handle("ffmpeg:detectSilences", async (r, t, e, a) => {
+  const o = b(t, ...y());
+  if (!Number.isFinite(e) || e < -100 || e > 0)
     throw new Error("Invalid threshold: must be between -100 and 0");
-  }
-  if (!Number.isFinite(minDuration) || minDuration < 0.1 || minDuration > 60) {
+  if (!Number.isFinite(a) || a < 0.1 || a > 60)
     throw new Error("Invalid minDuration: must be between 0.1 and 60");
-  }
-  return new Promise((resolve, reject) => {
-    const silences = [];
-    let currentSilence = null;
-    ffmpeg(safePath).audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`).format("null").on("stderr", (line) => {
-      const startMatch = line.match(/silence_start:\s*([\d.]+)/);
-      if (startMatch) {
-        currentSilence = { start: parseFloat(startMatch[1]) };
-      }
-      const endMatch = line.match(/silence_end:\s*([\d.]+)/);
-      if (endMatch && currentSilence) {
-        currentSilence.end = parseFloat(endMatch[1]);
-        silences.push(currentSilence);
-        currentSilence = null;
-      }
-    }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
+  return new Promise((s, d) => {
+    const m = [];
+    let i = null;
+    P(o).audioFilters(`silencedetect=noise=${e}dB:d=${a}`).format("null").on("stderr", (f) => {
+      const h = f.match(/silence_start:\s*([\d.]+)/);
+      h && (i = { start: parseFloat(h[1]) });
+      const c = f.match(/silence_end:\s*([\d.]+)/);
+      c && i && (i.end = parseFloat(c[1]), m.push(i), i = null);
+    }).on("end", () => s(m)).on("error", (f) => d(f.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
-ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks, format = "flac") => {
-  const safeInput = validatePath(inputPath, ...getAllowedDirs());
-  const results = [];
-  const codec = format === "mp3" ? "libmp3lame" : "flac";
-  for (const chunk of chunks) {
-    const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
-    await new Promise((resolve, reject) => {
-      ffmpeg(safeInput).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec(codec).toFormat(format).on("end", () => {
-        results.push(safeOutput);
-        resolve();
-      }).on("error", (err) => reject(err.message)).save(safeOutput);
+n.handle("ffmpeg:splitAudio", async (r, t, e, a = "flac") => {
+  const o = b(t, ...y()), s = [], d = a === "mp3" ? "libmp3lame" : "flac";
+  for (const m of e) {
+    const i = b(m.outputPath, ...y());
+    await new Promise((f, h) => {
+      P(o).setStartTime(m.start).setDuration(m.end - m.start).audioCodec(d).toFormat(a).on("end", () => {
+        s.push(i), f();
+      }).on("error", (c) => h(c.message)).save(i);
     });
   }
-  return results;
+  return s;
 });
-ipcMain.handle("app:getVersion", () => {
-  return app.getVersion();
-});
-ipcMain.handle("app:checkForUpdates", async () => {
-  if (!app.isPackaged) return { updateAvailable: false };
+n.handle("app:getVersion", () => p.getVersion());
+n.handle("app:checkForUpdates", async () => {
+  if (!p.isPackaged) return { updateAvailable: !1 };
   try {
-    const result = await autoUpdater.checkForUpdates();
-    return { updateAvailable: !!result?.updateInfo };
+    return { updateAvailable: !!(await v.checkForUpdates())?.updateInfo };
   } catch {
-    return { updateAvailable: false };
+    return { updateAvailable: !1 };
   }
 });
-ipcMain.handle("app:downloadUpdate", async () => {
-  if (!app.isPackaged) return;
-  await autoUpdater.downloadUpdate();
+n.handle("app:downloadUpdate", async () => {
+  p.isPackaged && await v.downloadUpdate();
 });
-ipcMain.handle("app:installUpdate", () => {
-  autoUpdater.quitAndInstall(false, true);
+n.handle("app:installUpdate", () => {
+  v.quitAndInstall(!1, !0);
 });
-ipcMain.handle("ai:testApiKey", async (_event, provider, apiKey) => {
+n.handle("ai:testApiKey", async (r, t, e) => {
   try {
-    switch (provider) {
+    switch (t) {
       case "gemini": {
-        const res = await net.fetch(
+        const a = await T.fetch(
           "https://generativelanguage.googleapis.com/v1beta/models",
-          { headers: { "x-goog-api-key": apiKey } }
+          { headers: { "x-goog-api-key": e } }
         );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
-        }
-        return { ok: true };
+        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
       }
       case "anthropic": {
-        const res = await net.fetch("https://api.anthropic.com/v1/messages", {
+        const a = await T.fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey,
+            "x-api-key": e,
             "anthropic-version": "2023-06-01"
           },
           body: JSON.stringify({
@@ -495,87 +381,66 @@ ipcMain.handle("ai:testApiKey", async (_event, provider, apiKey) => {
             messages: [{ role: "user", content: "ping" }]
           })
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
-        }
-        return { ok: true };
+        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
       }
       case "openai": {
-        const res = await net.fetch("https://api.openai.com/v1/models", {
-          headers: { "Authorization": `Bearer ${apiKey}` }
+        const a = await T.fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${e}` }
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
-        }
-        return { ok: true };
+        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
       }
     }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Network error" };
+  } catch (a) {
+    return { ok: !1, error: a instanceof Error ? a.message : "Network error" };
   }
 });
-ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt, audioBase64, audioFormat = "flac") => {
-  const mimeType = `audio/${audioFormat}`;
-  switch (provider) {
+n.handle("ai:callProvider", async (r, t, e, a, o, s, d = "flac") => {
+  const m = `audio/${d}`;
+  switch (t) {
     case "gemini": {
-      const { GoogleGenerativeAI } = await import("./index-B6HwN2S4.js");
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const geminiModel = genAI.getGenerativeModel({ model });
-      const result = await geminiModel.generateContent([
-        prompt,
+      const { GoogleGenerativeAI: i } = await import("./index-C45_meK_.js"), w = await (await new i(e).getGenerativeModel({ model: a }).generateContent([
+        o,
         {
           inlineData: {
-            mimeType,
-            data: audioBase64
+            mimeType: m,
+            data: s
           }
         }
-      ]);
-      const response = await result.response;
-      const usage = response.usageMetadata;
+      ])).response, g = w.usageMetadata;
       return {
-        text: response.text(),
+        text: w.text(),
         tokenUsage: {
-          inputTokens: usage?.promptTokenCount ?? 0,
-          outputTokens: usage?.candidatesTokenCount ?? 0,
+          inputTokens: g?.promptTokenCount ?? 0,
+          outputTokens: g?.candidatesTokenCount ?? 0,
           provider: "gemini",
-          model,
+          model: a,
           timestamp: Date.now()
         }
       };
     }
     case "openai": {
-      const buffer = Buffer.from(audioBase64, "base64");
-      const blob = new Blob([buffer], { type: mimeType });
-      const formData = new FormData();
-      formData.append("file", blob, `audio.${audioFormat}`);
-      formData.append("model", "whisper-1");
-      formData.append("response_format", "verbose_json");
-      const res = await net.fetch("https://api.openai.com/v1/audio/transcriptions", {
+      const i = Buffer.from(s, "base64"), f = new Blob([i], { type: m }), h = new FormData();
+      h.append("file", f, `audio.${d}`), h.append("model", "whisper-1"), h.append("response_format", "verbose_json");
+      const c = await T.fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`
+          Authorization: `Bearer ${e}`
         },
-        body: formData
+        body: h
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
+      if (!c.ok) {
+        const _ = await c.json().catch(() => ({ error: { message: c.statusText } }));
+        throw new Error(`OpenAI API error: ${_.error?.message || c.statusText}`);
       }
-      const data = await res.json();
-      let formattedText = "";
-      if (data.segments) {
-        formattedText = data.segments.map((seg) => {
-          const minutes = Math.floor(seg.start / 60).toString().padStart(2, "0");
-          const seconds = Math.floor(seg.start % 60).toString().padStart(2, "0");
-          return `[${minutes}:${seconds}] ${seg.text.trim()}`;
-        }).join("\n\n");
-      } else {
-        formattedText = `[00:00] ${data.text}`;
-      }
-      return {
-        text: formattedText,
+      const w = await c.json();
+      let g = "";
+      return w.segments ? g = w.segments.map((_) => {
+        const F = Math.floor(_.start / 60).toString().padStart(2, "0"), $ = Math.floor(_.start % 60).toString().padStart(2, "0");
+        return `[${F}:${$}] ${_.text.trim()}`;
+      }).join(`
+
+`) : g = `[00:00] ${w.text}`, {
+        text: g,
         tokenUsage: {
           inputTokens: 0,
           // Whisper doesn't report traditional token usage in the same way

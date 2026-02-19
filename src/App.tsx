@@ -928,22 +928,20 @@ function App() {
             </div>
 
             <div className="editor-main">
-              {subtitles.length > 0 && (
-                <div className="view-toggle-bar">
-                  <button
-                    className={`view-toggle-btn${editorView === 'subtitles' ? ' active' : ''}`}
-                    onClick={() => setEditorView('subtitles')}
-                  >
-                    <span className="icon icon-sm">list</span> Subtitles
-                  </button>
-                  <button
-                    className={`view-toggle-btn${editorView === 'preview' ? ' active' : ''}`}
-                    onClick={() => setEditorView('preview')}
-                  >
-                    <span className="icon icon-sm">visibility</span> Preview
-                  </button>
-                </div>
-              )}
+              <div className="view-toggle-bar">
+                <button
+                  className={`view-toggle-btn${editorView === 'subtitles' ? ' active' : ''}`}
+                  onClick={() => setEditorView('subtitles')}
+                >
+                  <span className="icon icon-sm">list</span> Subtitles
+                </button>
+                <button
+                  className={`view-toggle-btn${editorView === 'preview' ? ' active' : ''}`}
+                  onClick={() => setEditorView('preview')}
+                >
+                  <span className="icon icon-sm">visibility</span> Preview
+                </button>
+              </div>
 
               {editorView === 'subtitles' ? (
                 <SubtitleEditor

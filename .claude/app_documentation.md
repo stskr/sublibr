@@ -32,7 +32,8 @@
 - **Subtitle Caching**: Generated subtitles are persisted to `electron-store` and restored when loading a recent file
 - **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown
 - **Multi-Language Support**: 90+ languages with auto-detection capability
-- **Built-in Editor**: Timeline-based subtitle editor with video preview
+- **Built-in Editor**: Timeline-based subtitle editor with video preview and Search/Replace capabilities
+- **Search & Replace**: Global search with highlighting, replacement, and keyboard navigation (Cmd/Ctrl+F)
 - **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
 - **Media Streaming**: Local HTTP server for efficient playback and seeking of large video files, bypassing Electron protocol limitations
 - **Versioning & Regenerate**: Create multiple subtitle versions for the same file (e.g., different models/prompts) and switch between them instantly

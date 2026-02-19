@@ -18,6 +18,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **🛠️ Customizable**: Extensive language support and editor features.
 - **⌨️ Keyboard Shortcuts**: Control playback (Space, Arrows) and editing (Undo/Redo, Insert/Delete) with global shortcuts.
 - **🎬 Visual Editor**: Built-in timeline editor with real-time video preview and integrated file info.
+- **🔍 Search & Replace**: Find and correct text across all subtitles with highlighting and "Replace All" functionality.
 - **👁️ Preview Mode**: Toggle between subtitle list and inline preview — video with subtitle overlay for video files, cinema screen for audio files.
 - **♿ Accessible**: Full ARIA support with keyboard navigation, focus traps on modals, screen reader announcements, and labeled controls.
 - **🔒 Private & Local**: Your files stay on your machine (except for the audio chunks sent securely to the selected AI provider).

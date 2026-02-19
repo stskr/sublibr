@@ -15,11 +15,172 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
 
+    // Search State
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [replaceQuery, setReplaceQuery] = useState('');
+    const [matches, setMatches] = useState<string[]>([]); // Array of subtitle IDs
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
-        if (autoScroll && activeRef.current) {
+        if (autoScroll && activeRef.current && !editingId) {
             activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }, [autoScroll, currentTime]);
+    }, [autoScroll, currentTime, editingId]);
+
+    // Focus search input when shown
+    useEffect(() => {
+        if (showSearch && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [showSearch]);
+
+    // Keyboard shortcut for search
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                setShowSearch(prev => !prev);
+                if (!showSearch) {
+                    // Reset search when opening
+                    setSearchQuery('');
+                    setMatches([]);
+                    setCurrentMatchIndex(-1);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [showSearch]);
+
+    // Search Logic
+    const performSearch = useCallback((query: string) => {
+        setSearchQuery(query);
+        if (!query.trim()) {
+            setMatches([]);
+            setCurrentMatchIndex(-1);
+            return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        const newMatches = subtitles
+            .filter(sub => sub.text.toLowerCase().includes(lowerQuery))
+            .map(sub => sub.id);
+
+        setMatches(newMatches);
+
+        // Try to preserve current match if still valid, otherwise reset
+        if (newMatches.length > 0) {
+            const currentId = matches[currentMatchIndex];
+            const newIndex = newMatches.indexOf(currentId);
+            setCurrentMatchIndex(newIndex !== -1 ? newIndex : 0);
+
+            // Scroll to first match if new search
+            if (newIndex === -1 && matches.length !== newMatches.length) {
+                const sub = subtitles.find(s => s.id === newMatches[0]);
+                if (sub) onSeek(sub.startTime);
+            }
+        } else {
+            setCurrentMatchIndex(-1);
+        }
+    }, [subtitles, matches, currentMatchIndex, onSeek]);
+
+    const handleNextMatch = useCallback(() => {
+        if (matches.length === 0) return;
+        const nextIndex = (currentMatchIndex + 1) % matches.length;
+        setCurrentMatchIndex(nextIndex);
+
+        const subId = matches[nextIndex];
+        const sub = subtitles.find(s => s.id === subId);
+        if (sub) {
+            onSeek(sub.startTime);
+            // Ensure visualization follows
+            setAutoScroll(true);
+        }
+    }, [matches, currentMatchIndex, subtitles, onSeek]);
+
+    const handlePrevMatch = useCallback(() => {
+        if (matches.length === 0) return;
+        const prevIndex = (currentMatchIndex - 1 + matches.length) % matches.length;
+        setCurrentMatchIndex(prevIndex);
+
+        const subId = matches[prevIndex];
+        const sub = subtitles.find(s => s.id === subId);
+        if (sub) {
+            onSeek(sub.startTime);
+            setAutoScroll(true);
+        }
+    }, [matches, currentMatchIndex, subtitles, onSeek]);
+
+    const handleReplace = useCallback(() => {
+        if (currentMatchIndex === -1 || matches.length === 0) return;
+
+        const subId = matches[currentMatchIndex];
+        const sub = subtitles.find(s => s.id === subId);
+        if (!sub) return;
+
+        // Replace only the first occurrence or all? Standard is usually next occurrence.
+        // Simple regex replace for the first occurrence (case insensitive to match search)
+        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const newText = sub.text.replace(regex, replaceQuery);
+
+        // Update subtitles
+        const newSubtitles = subtitles.map(s => s.id === subId ? { ...s, text: newText } : s);
+        onSubtitlesChange(newSubtitles);
+
+        // Re-run search to update matches, but try to stay close to current position
+        // We need to wait for the update to propagate? Or just manually update local state logic?
+        // Since onSubtitlesChange triggers a re-render and re-eval of this component,
+        // we might lose the search interaction if we don't be careful.
+        // Actually, performSearch depends on `subtitles`. 
+        // We can manually adjust matches list.
+
+        // If the replacement means it no longer matches the query, remove from matches
+        if (!newText.toLowerCase().includes(searchQuery.toLowerCase())) {
+            const newMatches = matches.filter(id => id !== subId);
+            setMatches(newMatches);
+            if (newMatches.length > 0) {
+                setCurrentMatchIndex(currentMatchIndex % newMatches.length);
+            } else {
+                setCurrentMatchIndex(-1);
+            }
+        }
+        // If it still matches (e.g. replaced "test" with "testing"), keep it?
+        // Usually "Replace" moves to the NEXT match after replacing.
+        else {
+            handleNextMatch();
+        }
+
+    }, [currentMatchIndex, matches, subtitles, searchQuery, replaceQuery, onSubtitlesChange, handleNextMatch]);
+
+    const handleReplaceAll = useCallback(() => {
+        if (!searchQuery.trim()) return;
+
+        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        let count = 0;
+
+        const newSubtitles = subtitles.map(sub => {
+            if (matches.includes(sub.id)) {
+                if (sub.text.match(regex)) {
+                    count++;
+                }
+                return { ...sub, text: sub.text.replace(regex, replaceQuery) };
+            }
+            return sub;
+        });
+
+        if (count > 0) {
+            onSubtitlesChange(newSubtitles);
+            // Clear matches as we likely replaced them all (unless replace string contains search string)
+            if (!replaceQuery.toLowerCase().includes(searchQuery.toLowerCase())) {
+                setMatches([]);
+                setCurrentMatchIndex(-1);
+            }
+        }
+    }, [subtitles, matches, searchQuery, replaceQuery, onSubtitlesChange]);
+
 
     const handleTextChange = useCallback((id: string, text: string) => {
         onSubtitlesChange(
@@ -57,10 +218,30 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     const isActive = (sub: Subtitle) =>
         currentTime >= sub.startTime && currentTime <= sub.endTime;
 
+    // Helper to highlight text
+    const highlightText = (text: string, query: string) => {
+        if (!query.trim()) return text;
+
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const parts = text.split(regex);
+
+        return parts.map((part, i) =>
+            part.toLowerCase() === query.toLowerCase() ?
+                <mark key={i}>{part}</mark> : part
+        );
+    };
+
     return (
         <div className="subtitle-editor">
             <div className="editor-header">
                 <div className="editor-header-actions">
+                    <button
+                        className={`btn-icon ${showSearch ? 'active' : ''}`}
+                        onClick={() => setShowSearch(!showSearch)}
+                        title="Search and Replace (Cmd/Ctrl+F)"
+                    >
+                        <span className="icon icon-sm">search</span>
+                    </button>
                     <label className="auto-scroll-toggle" title="Auto-scroll to active subtitle">
                         <input
                             type="checkbox"
@@ -74,6 +255,62 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                 <span className="subtitle-count">{subtitles.length} entries</span>
             </div>
 
+            {showSearch && (
+                <div className="search-bar">
+                    <div className="search-inputs">
+                        <div className="search-input-group">
+                            <span className="icon icon-sm search-icon">search</span>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Find..."
+                                value={searchQuery}
+                                onChange={(e) => performSearch(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        if (e.shiftKey) handlePrevMatch();
+                                        else handleNextMatch();
+                                    }
+                                    if (e.key === 'Escape') setShowSearch(false);
+                                }}
+                            />
+                            {matches.length > 0 && (
+                                <span className="search-counter">
+                                    {currentMatchIndex + 1} of {matches.length}
+                                </span>
+                            )}
+                            <div className="search-nav">
+                                <button className="btn-icon-tiny" onClick={handlePrevMatch} title="Previous Match" disabled={matches.length === 0}>
+                                    <span className="icon icon-sm">expand_less</span>
+                                </button>
+                                <button className="btn-icon-tiny" onClick={handleNextMatch} title="Next Match" disabled={matches.length === 0}>
+                                    <span className="icon icon-sm">expand_more</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="search-input-group">
+                            <span className="icon icon-sm search-icon">edit</span>
+                            <input
+                                type="text"
+                                placeholder="Replace with..."
+                                value={replaceQuery}
+                                onChange={(e) => setReplaceQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleReplace();
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="search-actions">
+                        <button className="btn-small" onClick={handleReplace} disabled={matches.length === 0}>Replace</button>
+                        <button className="btn-small" onClick={handleReplaceAll} disabled={matches.length === 0}>Replace All</button>
+                        <button className="btn-icon-tiny close-search" onClick={() => setShowSearch(false)}>
+                            <span className="icon icon-sm">close</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {subtitles.length === 0 ? (
                 <div className="empty-state">
                     <p>No subtitles yet</p>
@@ -83,12 +320,17 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                 <div className="subtitle-list" role="list">
                     {subtitles.map((sub) => {
                         const isBeyondMedia = mediaDuration ? sub.startTime > mediaDuration : false;
+                        const isMatch = matches.includes(sub.id);
+                        const isCurrentMatch = matches[currentMatchIndex] === sub.id;
+
+                        // Viewing logic: if not editing, check for search highlights
+                        const showHighlight = (showSearch && searchQuery && isMatch) && editingId !== sub.id;
 
                         return (
                             <div
                                 key={sub.id}
                                 ref={isActive(sub) ? activeRef : null}
-                                className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''} ${isBeyondMedia ? 'beyond-media' : ''}`}
+                                className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''} ${isBeyondMedia ? 'beyond-media' : ''} ${isCurrentMatch ? 'search-match' : ''}`}
                                 onClick={() => onSeek(sub.startTime)}
                                 title={isBeyondMedia ? "This subtitle starts after the media ends" : ""}
                             >
@@ -116,17 +358,34 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     />
                                 </div>
 
-                                <textarea
-                                    className="subtitle-text"
-                                    dir={detectDirection(sub.text)}
-                                    value={sub.text}
-                                    onChange={(e) => handleTextChange(sub.id, e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onFocus={() => setEditingId(sub.id)}
-                                    onBlur={() => setEditingId(null)}
-                                    placeholder="Enter subtitle text..."
-                                    aria-label={`Subtitle ${sub.index} text`}
-                                />
+                                {showHighlight ? (
+                                    <div
+                                        className="subtitle-text-display"
+                                        dir={detectDirection(sub.text)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingId(sub.id);
+                                        }}
+                                    >
+                                        {highlightText(sub.text, searchQuery)}
+                                    </div>
+                                ) : (
+                                    <textarea
+                                        className="subtitle-text"
+                                        dir={detectDirection(sub.text)}
+                                        value={sub.text}
+                                        onChange={(e) => handleTextChange(sub.id, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={() => {
+                                            setEditingId(sub.id);
+                                            // Optional: If we just clicked a search match, might want to update currentMatchIndex
+                                        }}
+                                        onBlur={() => setEditingId(null)}
+                                        placeholder="Enter subtitle text..."
+                                        aria-label={`Subtitle ${sub.index} text`}
+                                        autoFocus={editingId === sub.id}
+                                    />
+                                )}
 
                                 <button
                                     className="delete-btn"
