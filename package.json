@@ -60,6 +60,8 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "extraResources": [
         {
           "from": "node_modules/@ffmpeg-installer/darwin-${arch}/ffmpeg",
