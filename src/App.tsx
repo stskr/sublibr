@@ -58,6 +58,9 @@ function App() {
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [showGenerator, setShowGenerator] = useState(false);
   const [highlightedRecentIndex, setHighlightedRecentIndex] = useState<number | null>(null);
+  const [activeTool, setActiveTool] = useState<'select' | 'scissors' | 'trim'>('select');
+
+  console.log('[App Render] canUndo:', canUndo, 'canRedo:', canRedo, 'history length:', subtitles.length);
 
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
 
@@ -650,10 +653,12 @@ function App() {
 
   // Keyboard Shortcuts Handlers
   const handleUndo = useCallback(() => {
+    console.log('[App] handleUndo called. canUndo:', canUndo);
     if (canUndo) undoSubtitles();
   }, [canUndo, undoSubtitles]);
 
   const handleRedo = useCallback(() => {
+    console.log('[App] handleRedo called. canRedo:', canRedo);
     if (canRedo) redoSubtitles();
   }, [canRedo, redoSubtitles]);
 
@@ -746,6 +751,48 @@ function App() {
     setSubtitles(subtitles.map(s => s.id === id ? { ...s, text } : s));
   }, [subtitles, setSubtitles]);
 
+  const handleSplitSubtitle = useCallback((id: string, splitTime: number) => {
+    const sub = subtitles.find(s => s.id === id);
+    if (!sub) return;
+
+    const newSub: Subtitle = {
+      id: generateId(),
+      index: 0, // Will be re-indexed
+      startTime: splitTime,
+      endTime: sub.endTime,
+      text: sub.text // Copy text initially
+    };
+
+    const updatedSub = { ...sub, endTime: splitTime };
+    const subIndex = subtitles.findIndex(s => s.id === id);
+
+    const newSubtitles = [...subtitles];
+    newSubtitles[subIndex] = updatedSub;
+    newSubtitles.splice(subIndex + 1, 0, newSub);
+
+    const reindexed = newSubtitles.map((s, i) => ({ ...s, index: i + 1 }));
+    setSubtitles(reindexed);
+  }, [subtitles, setSubtitles]);
+
+  const handleTrimSubtitle = useCallback((id: string, startTime: number, endTime: number) => {
+    setSubtitles(subtitles.map(s =>
+      s.id === id ? { ...s, startTime, endTime } : s
+    ));
+  }, [subtitles, setSubtitles]);
+
+  const handleEscape = useCallback(() => {
+    // 1. Reset tool to select
+    setActiveTool('select');
+
+    // 2. Close modals if open
+    setShowSettings(false);
+    setShowShortcuts(false);
+    setShowGenerator(false);
+
+    // 3. Clear recent files highlight
+    setHighlightedRecentIndex(null);
+  }, []);
+
   useKeyboardShortcuts({
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -758,7 +805,9 @@ function App() {
     onOpenFile: handleOpenFileShortcut,
     onNavigateRecentUp: handleNavigateRecentUp,
     onNavigateRecentDown: handleNavigateRecentDown,
-    onSelectRecent: handleSelectRecent
+    onSelectRecent: handleSelectRecent,
+    onSelectTool: setActiveTool,
+    onEscape: handleEscape
   });
 
   const activeConfig = settings.providers[settings.activeProvider];
@@ -955,6 +1004,10 @@ function App() {
                   currentTime={currentTime}
                   onSeek={handleSeek}
                   mediaDuration={mediaFile?.duration}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
                 />
               ) : (
                 mediaFile && (
@@ -963,6 +1016,10 @@ function App() {
                     currentTime={currentTime}
                     mediaFile={mediaFile}
                     onSubtitleChange={handleSubtitleLineChange}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
                   />
                 )
               )}
@@ -981,6 +1038,9 @@ function App() {
               currentTime={currentTime}
               onSeek={handleSeek}
               mediaDuration={mediaFile?.duration}
+              onSplitSubtitle={handleSplitSubtitle}
+              onTrimSubtitle={handleTrimSubtitle}
+              activeTool={activeTool}
             />
 
             <div className="footer-bottom-row">
@@ -1000,15 +1060,41 @@ function App() {
                 mediaDuration={mediaFile?.duration}
               />
               <div className="footer-info-row">
-                <button className="active-model-badge" onClick={() => setShowSettings(true)} title="Click to change model">
-                  <span className="icon icon-sm">smart_toy</span>
-                  <span className="active-model-label">Model in use:</span>
-                  <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
-                  <span className="active-model-name">
-                    {MODEL_OPTIONS[settings.activeProvider]?.find(m => m.value === activeConfig.model)?.label ?? activeConfig.model}
-                  </span>
-                </button>
-                <TokenUsageDisplay stats={tokenStats} />
+                <div className="footer-left-group">
+                  <button className="active-model-badge" onClick={() => setShowSettings(true)} title="Click to change model">
+                    <span className="icon icon-sm">smart_toy</span>
+                    <span className="active-model-label">Model in use:</span>
+                    <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
+                    <span className="active-model-name">
+                      {MODEL_OPTIONS[settings.activeProvider]?.find(m => m.value === activeConfig.model)?.label ?? activeConfig.model}
+                    </span>
+                  </button>
+                  <TokenUsageDisplay stats={tokenStats} />
+                </div>
+
+                <div className="footer-toolbox">
+                  <button
+                    className={`btn-tool ${activeTool === 'select' ? 'active' : ''}`}
+                    onClick={() => setActiveTool('select')}
+                    title="Select Tool (V)"
+                  >
+                    <span className="icon">near_me</span>
+                  </button>
+                  <button
+                    className={`btn-tool ${activeTool === 'scissors' ? 'active' : ''}`}
+                    onClick={() => setActiveTool('scissors')}
+                    title="Scissors Tool (C)"
+                  >
+                    <span className="icon">content_cut</span>
+                  </button>
+                  <button
+                    className={`btn-tool ${activeTool === 'trim' ? 'active' : ''}`}
+                    onClick={() => setActiveTool('trim')}
+                    title="Trim Tool (T)"
+                  >
+                    <span className="icon">straighten</span>
+                  </button>
+                </div>
               </div>
             </div>
           </footer>

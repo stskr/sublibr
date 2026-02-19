@@ -4,10 +4,45 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    /* Space between main track and minimap */
     width: 100%;
     user-select: none;
     padding-bottom: var(--space-xs);
+}
+
+.timeline-tracks {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.btn-tool {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-tool:hover {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+}
+
+.btn-tool.active {
+    background: var(--color-accent);
+    color: #fff;
+}
+
+.btn-tool .icon {
+    font-size: 18px;
 }
 
 /* --- Main Track (Zoomed View) --- */
@@ -17,11 +52,71 @@
     height: 45px;
     background: var(--color-bg-secondary);
     border-radius: var(--radius-sm);
-    overflow: hidden;
-    cursor: text;
+    /* overflow: hidden; -- Removed to allow hover tooltips to show outside */
     border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
+}
+
+.timeline-main-track.tool-select {
+    cursor: default;
+}
+
+.timeline-main-track.tool-trim {
+    cursor: cell;
+    /* Or crosshair/default, let's use cell for "area management" or default */
+}
+
+.timeline-main-track.tool-scissors {
+    /* Hotspot at 0, 10 (tip of the scissors) for precision splitting */
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23ffffff' stroke='%23000000' stroke-width='1'%3E%3Cpath d='M19 2l-14 14.5m0-14.5l14 14.5M6 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/%3E%3C/svg%3E") 0 10, crosshair;
+}
+
+/* Precision Hover Timecode */
+/* Precision Hover Tooltip */
+.timeline-hover-subtitle {
+    position: absolute;
+    top: 50px;
+    /* Below the track */
+    left: 50%;
+    /* transform handled by JS for boundary check */
+    background: #d1d1d1;
+    color: #1a1a1a;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: pre-wrap;
+    /* Support multi-line if needed */
+    width: auto !important;
+    min-width: 300px !important;
+    max-width: 600px !important;
+    z-index: 100;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 1px solid #999;
+    pointer-events: none;
+    text-align: center;
+    /* Generally safer for tooltips */
+}
+
+.timeline-hover-timecode {
+    position: absolute;
+    top: 4px;
+    /* Inside the track at top */
+    left: 50%;
+    /* transform handled by JS for boundary check */
+    background: rgba(0, 0, 0, 0.85);
+    /* Black box */
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    pointer-events: none;
+    z-index: 15;
+    white-space: nowrap;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid #444;
 }
 
 /* Ruler */
@@ -109,6 +204,51 @@
     /* Improve performance for many segments */
     will-change: width, left;
     min-width: 1px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+    font-size: 11px;
+    color: #fff;
+    overflow: hidden;
+}
+
+.timeline-segment-content {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: var(--timeline-height, 27px);
+    /* Updated to reflect reduced height */
+    text-align: center;
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.trim-handle {
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.timeline-main-segment:hover .trim-handle {
+    opacity: 1;
+}
+
+.trim-handle:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.trim-handle.start {
+    border-top-left-radius: 2px;
+    border-bottom-left-radius: 2px;
+}
+
+.trim-handle.end {
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
 }
 
 .timeline-main-segment:hover {

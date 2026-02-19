@@ -10,14 +10,22 @@ interface TimelineProps {
     duration: number; // Max duration to display
     mediaDuration?: number; // Actual media duration
     onSeek: (time: number) => void;
+    onSplitSubtitle: (id: string, time: number) => void;
+    onTrimSubtitle: (id: string, startTime: number, endTime: number) => void;
+    activeTool: TimelineTool;
 }
+
+export type TimelineTool = 'select' | 'scissors' | 'trim';
 
 export const Timeline: React.FC<TimelineProps> = ({
     subtitles,
     currentTime,
     duration,
     mediaDuration,
-    onSeek
+    onSeek,
+    onSplitSubtitle,
+    onTrimSubtitle,
+    activeTool
 }) => {
     // Zoom state
     const [zoomStart, setZoomStart] = useState(0);
@@ -30,11 +38,6 @@ export const Timeline: React.FC<TimelineProps> = ({
             setZoomEnd(duration);
         }
     }, [duration]);
-
-    // Ensure we don't have invalid state if duration updates
-    // e.g. if duration shrinks, clamp end
-    // But effect above handles reset. 
-    // Maybe we want to preserve relative zoom? No, reset is safer for now.
 
     const handleZoomChange = useCallback((start: number, end: number) => {
         setZoomStart(Math.max(0, start));
@@ -49,24 +52,28 @@ export const Timeline: React.FC<TimelineProps> = ({
 
     return (
         <div className="timeline-container">
-            <MainTrack
-                subtitles={subtitles}
-                currentTime={currentTime}
-                zoomStart={zoomStart}
-                zoomEnd={effectiveZoomEnd}
-                onSeek={onSeek}
-            />
-            <Minimap
-                subtitles={subtitles}
-                currentTime={currentTime}
-                duration={duration}
-                mediaDuration={mediaDuration}
-                zoomStart={zoomStart}
-                zoomEnd={effectiveZoomEnd}
-                onZoomChange={handleZoomChange}
-                onSeek={onSeek}
-            />
-
+            <div className="timeline-tracks">
+                <MainTrack
+                    subtitles={subtitles}
+                    currentTime={currentTime}
+                    zoomStart={zoomStart}
+                    zoomEnd={effectiveZoomEnd}
+                    onSeek={onSeek}
+                    activeTool={activeTool}
+                    onSplitSubtitle={onSplitSubtitle}
+                    onTrimSubtitle={onTrimSubtitle}
+                />
+                <Minimap
+                    subtitles={subtitles}
+                    currentTime={currentTime}
+                    duration={duration}
+                    mediaDuration={mediaDuration}
+                    zoomStart={zoomStart}
+                    zoomEnd={effectiveZoomEnd}
+                    onZoomChange={handleZoomChange}
+                    onSeek={onSeek}
+                />
+            </div>
         </div>
     );
 };

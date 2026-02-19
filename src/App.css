@@ -225,6 +225,51 @@ a:hover {
   border-top: 1px solid var(--color-border);
 }
 
+.footer-left-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.footer-toolbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--color-bg-tertiary);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.footer-toolbox .btn-tool {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.footer-toolbox .btn-tool:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.footer-toolbox .btn-tool.active {
+  background: var(--color-accent);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.footer-toolbox .btn-tool .icon {
+  font-size: 16px;
+}
+
 .active-model-badge {
   display: inline-flex;
   align-items: center;
@@ -912,9 +957,24 @@ a:hover {
 .editor-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--color-border);
+}
+
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.editor-toolbars {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-right: auto;
+  /* Pushes the count to the right */
+  margin-left: var(--space-md);
 }
 
 .editor-header h2 {
@@ -2477,4 +2537,121 @@ a:hover {
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+}
+
+.editor-history-toolbar,
+.editor-styling-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--color-bg-tertiary);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.btn-tool-small {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-tool-small:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.subtitle-text-display.styled-preview {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  min-height: 60px;
+  cursor: text;
+  white-space: pre-wrap;
+}
+
+.subtitle-entry.active .subtitle-text-display.styled-preview {
+  color: #fff;
+}
+
+.preview-subtitle-editor-container {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  border: 1px solid var(--color-accent);
+  box-shadow: var(--shadow-lg);
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  z-index: 1000;
+}
+
+.preview-subtitle-toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.preview-subtitle-toolbar button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.preview-subtitle-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+
+.preview-subtitle-textarea {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  text-align: center;
+  resize: none;
+  width: 100%;
+  outline: none;
+  font-family: var(--font-subtitle);
+}
+
+.btn-tool-small.active,
+.preview-subtitle-toolbar button.active {
+  background: var(--color-accent) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+.rich-text-editor:empty:before {
+  content: attr(data-placeholder);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.rich-text-editor br {
+  display: block;
+  content: "";
+  margin-top: 0;
 }

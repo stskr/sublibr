@@ -264,7 +264,7 @@ Four core services handle subtitle processing:
 | API/Tool | Purpose | Configuration |
 |----------|---------|---------------|
 | **Google Gemini API** | Transcription | API key stored in settings, tested via `GET /v1beta/models` |
-| **OpenAI API** | Transcription | Chat Completions API (`v1/chat/completions`) for GPT-4o with Audio input. Legacy Whisper-1 support as fallback. |
+| **OpenAI API** | Transcription | Chat Completions API (`v1/chat/completions`) for GPT-4o with Audio input (Standard models mapped internally to `gpt-4o-audio-preview` and `gpt-4o-mini-audio-preview`). Legacy Whisper-1 support as fallback. |
 | **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
 | **ffprobe** | Media metadata | Bundled with FFmpeg |
 | **electron-updater** | Auto-updates | GitHub Releases backend, check+prompt UX |

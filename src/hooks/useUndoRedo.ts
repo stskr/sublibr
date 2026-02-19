@@ -17,8 +17,10 @@ export function useUndoRedo<T>(initialState: T) {
     const canRedo = state.future.length > 0;
 
     const undo = useCallback(() => {
+        console.log('[useUndoRedo] undo called');
         setState((currentState) => {
             const { past, present, future } = currentState;
+            console.log('[useUndoRedo] undoing. Past length:', past.length);
             if (past.length === 0) return currentState;
 
             const previous = past[past.length - 1];
@@ -33,8 +35,10 @@ export function useUndoRedo<T>(initialState: T) {
     }, []);
 
     const redo = useCallback(() => {
+        console.log('[useUndoRedo] redo called');
         setState((currentState) => {
             const { past, present, future } = currentState;
+            console.log('[useUndoRedo] redoing. Future length:', future.length);
             if (future.length === 0) return currentState;
 
             const next = future[0];

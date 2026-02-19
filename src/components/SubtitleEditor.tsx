@@ -1,5 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { formatSrtTime, parseSrtTime, generateId, detectDirection } from '../utils';
+import { StyledText } from './common/StyledText';
+import { RichTextEditor } from './common/RichTextEditor';
+import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle } from '../types';
 
 interface SubtitleEditorProps {
@@ -8,12 +11,19 @@ interface SubtitleEditorProps {
     currentTime: number;
     mediaDuration?: number; // Actual media file duration
     onSeek: (time: number) => void;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
 }
 
-export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, mediaDuration, onSeek }: SubtitleEditorProps) {
+export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, mediaDuration, onSeek, onUndo, onRedo, canUndo, canRedo }: SubtitleEditorProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
+    const editorRefs = useRef<{ [key: string]: RichTextEditorRef | null }>({});
+    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, color: '', size: '' });
+    const colorInputRef = useRef<HTMLInputElement>(null);
 
     // Search State
     const [showSearch, setShowSearch] = useState(false);
@@ -231,6 +241,61 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
         );
     };
 
+    const applyStyle = useCallback((tag: string) => {
+        if (!editingId) return;
+        const editor = editorRefs.current[editingId];
+        if (!editor) return;
+
+        if (tag === 'b') editor.execCommand('bold');
+        else if (tag === 'i') editor.execCommand('italic');
+        else if (tag === 'u') editor.execCommand('underline');
+        else if (tag === 'font') {
+            // Trigger color input
+            colorInputRef.current?.click();
+        } else if (tag === 'size') {
+            // Safe fallback for now - maybe cycle sizes later
+            // const size = window.prompt("Enter size (1-7):", "3") || "3";
+            // editor.execCommand('fontSize', size);
+        }
+    }, [editingId]);
+
+    const handleColorClick = useCallback(() => {
+        if (!editingId) return;
+        const editor = editorRefs.current[editingId];
+        if (editor) editor.saveSelection();
+    }, [editingId]);
+
+    const handleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!editingId) return;
+        const editor = editorRefs.current[editingId];
+        if (!editor) return;
+
+        editor.restoreSelection();
+        editor.execCommand('foreColor', e.target.value);
+    }, [editingId]);
+
+    // Global keyboard shortcuts for styling when editing
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!editingId) return;
+            if (!(e.metaKey || e.ctrlKey)) return;
+
+            if (e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                applyStyle('b');
+            } else if (e.key.toLowerCase() === 'i') {
+                e.preventDefault();
+                applyStyle('i');
+            } else if (e.key.toLowerCase() === 'u') {
+                e.preventDefault();
+                applyStyle('u');
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [editingId, applyStyle]);
+
     return (
         <div className="subtitle-editor">
             <div className="editor-header">
@@ -252,7 +317,80 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                         Auto-scroll
                     </label>
                 </div>
-                <span className="subtitle-count">{subtitles.length} entries</span>
+
+                <div className="editor-toolbars">
+                    <div className="editor-history-toolbar">
+                        <button
+                            className="btn-tool-small"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => onUndo && onUndo()}
+                            title="Undo (Ctrl+Z)"
+                            disabled={!canUndo}
+                        >
+                            <span className="icon icon-sm">undo</span>
+                        </button>
+                        <button
+                            className="btn-tool-small"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => onRedo && onRedo()}
+                            title="Redo (Ctrl+Shift+Z)"
+                            disabled={!canRedo}
+                        >
+                            <span className="icon icon-sm">redo</span>
+                        </button>
+                    </div>
+
+                    <div className="editor-styling-toolbar">
+                        <button
+                            className={`btn-tool-small ${activeStyles.bold ? 'active' : ''}`}
+                            onMouseDown={(e) => { e.preventDefault(); applyStyle('b'); }}
+                            title="Bold (Ctrl+B)"
+                        >
+                            <span className="icon icon-sm">format_bold</span>
+                        </button>
+                        <button
+                            className={`btn-tool-small ${activeStyles.italic ? 'active' : ''}`}
+                            onMouseDown={(e) => { e.preventDefault(); applyStyle('i'); }}
+                            title="Italic (Ctrl+I)"
+                        >
+                            <span className="icon icon-sm">format_italic</span>
+                        </button>
+                        <button
+                            className={`btn-tool-small ${activeStyles.underline ? 'active' : ''}`}
+                            onMouseDown={(e) => { e.preventDefault(); applyStyle('u'); }}
+                            title="Underline (Ctrl+U)"
+                        >
+                            <span className="icon icon-sm">format_underlined</span>
+                        </button>
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <button
+                                className="btn-tool-small"
+                                onMouseDown={(e) => { e.preventDefault(); }}
+                                title="Color"
+                            >
+                                <span className="icon icon-sm">palette</span>
+                            </button>
+                            <input
+                                type="color"
+                                ref={colorInputRef}
+                                style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                }}
+                                onMouseDown={handleColorClick}
+                                onChange={handleColorChange}
+                            />
+                        </div>
+
+                    </div>
+
+                    <span className="subtitle-count">{subtitles.length} entries</span>
+                </div>
             </div>
 
             {showSearch && (
@@ -369,20 +507,38 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     >
                                         {highlightText(sub.text, searchQuery)}
                                     </div>
-                                ) : (
-                                    <textarea
-                                        className="subtitle-text"
+                                ) : editingId !== sub.id ? (
+                                    <div
+                                        className="subtitle-text-display styled-preview"
                                         dir={detectDirection(sub.text)}
-                                        value={sub.text}
-                                        onChange={(e) => handleTextChange(sub.id, e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onFocus={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             setEditingId(sub.id);
-                                            // Optional: If we just clicked a search match, might want to update currentMatchIndex
                                         }}
-                                        onBlur={() => setEditingId(null)}
+                                    >
+                                        <StyledText text={sub.text} />
+                                    </div>
+                                ) : (
+                                    <RichTextEditor
+                                        ref={el => { editorRefs.current[sub.id] = el; }}
+                                        className="subtitle-text"
+                                        value={sub.text}
+                                        onChange={(text) => handleTextChange(sub.id, text)}
+                                        onBlur={(e) => {
+                                            // Don't effectively blur if we're clicking the color picker
+                                            // The color picker input handles focus restoration
+                                            if (e.relatedTarget && (e.relatedTarget as HTMLElement).getAttribute('type') === 'color') {
+                                                return;
+                                            }
+                                            // Also check if we're clicking inside the color picker container
+                                            // Sometimes the click target might be the wrapper
+                                            if (e.relatedTarget && (e.relatedTarget as HTMLElement).closest('.editor-styling-toolbar')) {
+                                                return;
+                                            }
+                                            setEditingId(null);
+                                        }}
+                                        onStatusChange={setActiveStyles}
                                         placeholder="Enter subtitle text..."
-                                        aria-label={`Subtitle ${sub.index} text`}
                                         autoFocus={editingId === sub.id}
                                     />
                                 )}
@@ -399,7 +555,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     <span className="icon icon-sm">close</span>
                                 </button>
                             </div>
-                        )
+                        );
                     })}
 
                     <button className="add-subtitle-btn" onClick={handleAdd}>
@@ -410,7 +566,3 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
         </div>
     );
 }
-
-
-
-

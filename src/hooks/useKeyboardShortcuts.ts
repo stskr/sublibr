@@ -14,6 +14,8 @@ interface Shortcuts {
     onNavigateRecentUp?: () => void;
     onNavigateRecentDown?: () => void;
     onSelectRecent?: () => void;
+    onSelectTool?: (tool: 'select' | 'scissors' | 'trim') => void;
+    onEscape?: () => void;
 }
 
 export function useKeyboardShortcuts(shortcuts: Shortcuts) {
@@ -42,6 +44,16 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
                     e.preventDefault();
                     shortcuts.onOpenFile();
                     return;
+                }
+            }
+
+            // Escape: Deselect / Blur
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (isInput) {
+                    target.blur();
+                } else if (shortcuts.onEscape) {
+                    shortcuts.onEscape();
                 }
             }
 
@@ -104,6 +116,13 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts) {
             if (e.altKey && (e.key === 'Backspace' || e.key === 'Delete')) {
                 e.preventDefault();
                 shortcuts.onDeleteSubtitle();
+            }
+
+            // Tool Shortcuts
+            if (!isInput && shortcuts.onSelectTool) {
+                if (e.key.toLowerCase() === 'v') shortcuts.onSelectTool('select');
+                if (e.key.toLowerCase() === 'c') shortcuts.onSelectTool('scissors');
+                if (e.key.toLowerCase() === 't') shortcuts.onSelectTool('trim');
             }
         };
 

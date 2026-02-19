@@ -1,5 +1,8 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { detectDirection } from '../utils';
+import { StyledText } from './common/StyledText';
+import { RichTextEditor } from './common/RichTextEditor';
+import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle, MediaFile } from '../types';
 
 interface SubtitlePreviewProps {
@@ -7,15 +10,20 @@ interface SubtitlePreviewProps {
     currentTime: number;
     mediaFile: MediaFile;
     onSubtitleChange?: (id: string, text: string) => void;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
 }
 
-export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleChange }: SubtitlePreviewProps) {
+export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleChange, onUndo, onRedo, canUndo, canRedo }: SubtitlePreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<RichTextEditorRef>(null);
     const [videoReady, setVideoReady] = useState(false);
     const [isPaused, setIsPaused] = useState(true);
     const [editingSubtitleId, setEditingSubtitleId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
+    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, color: '', size: '' });
 
     // Find active subtitle at current time
     const activeSub = subtitles.find(
@@ -100,7 +108,6 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
             setTimeout(() => {
                 if (textareaRef.current) {
                     textareaRef.current.focus();
-                    textareaRef.current.select();
                 }
             }, 10);
         }
@@ -116,9 +123,26 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
         setEditingSubtitleId(null);
     }, [editingSubtitleId, activeSub, onSubtitleChange, editText]);
 
+    const applyStyle = useCallback((tag: string) => {
+        if (!editingSubtitleId || !textareaRef.current) return;
+        const editor = textareaRef.current;
+
+        if (tag === 'b') editor.execCommand('bold');
+        else if (tag === 'i') editor.execCommand('italic');
+        else if (tag === 'u') editor.execCommand('underline');
+        else if (tag === 'font') {
+            const color = window.prompt("Enter color (e.g. red, #ff0000):", "red") || "red";
+            editor.execCommand('foreColor', color);
+        }
+    }, [editingSubtitleId]);
+
     // Handle keydown in textarea
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         e.stopPropagation(); // Prevent app shortcuts
+
+        // WYSIWYG shortcuts are handled by browser/RichTextEditor, 
+        // but we can still intercept them here if needed.
+
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSave();
@@ -127,13 +151,72 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
         }
     }, [handleSave]);
 
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-    }, [editText, editingSubtitleId]);
+
+    // No auto-resize needed for contenteditable as it grows with content
+
+    // Render toolbar
+    const renderToolbar = () => (
+        <div className="preview-subtitle-toolbar" style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+            opacity: 1, // Always visible
+            display: 'flex',
+            gap: '4px',
+            background: 'rgba(0,0,0,0.6)',
+            padding: '8px',
+            borderRadius: '8px'
+        }}>
+            <button
+                onMouseDown={(e) => { e.preventDefault(); if (onUndo) onUndo(); }}
+                title="Undo (Ctrl+Z)"
+                disabled={!canUndo}
+            >
+                <span className="icon icon-sm">undo</span>
+            </button>
+            <button
+                onMouseDown={(e) => { e.preventDefault(); if (onRedo) onRedo(); }}
+                title="Redo (Ctrl+Shift+Z)"
+                disabled={!canRedo}
+            >
+                <span className="icon icon-sm">redo</span>
+            </button>
+            <div className="toolbar-divider" style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+            <button
+                className={activeStyles.bold ? 'active' : ''}
+                onMouseDown={(e) => { e.preventDefault(); applyStyle('b'); }}
+                title="Bold (Ctrl+B)"
+                disabled={!editingSubtitleId}
+            >
+                <span className="icon icon-sm">format_bold</span>
+            </button>
+            <button
+                className={activeStyles.italic ? 'active' : ''}
+                onMouseDown={(e) => { e.preventDefault(); applyStyle('i'); }}
+                title="Italic (Ctrl+I)"
+                disabled={!editingSubtitleId}
+            >
+                <span className="icon icon-sm">format_italic</span>
+            </button>
+            <button
+                className={activeStyles.underline ? 'active' : ''}
+                onMouseDown={(e) => { e.preventDefault(); applyStyle('u'); }}
+                title="Underline (Ctrl+U)"
+                disabled={!editingSubtitleId}
+            >
+                <span className="icon icon-sm">format_underlined</span>
+            </button>
+            <button
+                onMouseDown={(e) => { e.preventDefault(); applyStyle('font'); }}
+                title="Color"
+                disabled={!editingSubtitleId}
+            >
+                <span className="icon icon-sm">palette</span>
+            </button>
+        </div>
+    );
 
     // Render subtitle content (text or textarea)
     const renderSubtitleContent = () => {
@@ -141,17 +224,18 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
 
         if (isEditing) {
             return (
-                <textarea
-                    ref={textareaRef}
-                    className="preview-subtitle-textarea"
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    onBlur={handleSave}
-                    onKeyDown={handleKeyDown}
-                    dir={detectDirection(editText)}
-                    style={{ direction: detectDirection(editText) as import('react').CSSProperties['direction'] }}
-                    aria-label="Edit subtitle"
-                />
+                <div className="preview-subtitle-editor-container">
+                    {/* Toolbar is now rendered globally */}
+                    <RichTextEditor
+                        ref={textareaRef}
+                        className="preview-subtitle-textarea"
+                        value={editText}
+                        onChange={setEditText}
+                        onBlur={handleSave}
+                        onKeyDown={handleKeyDown}
+                        onStatusChange={setActiveStyles}
+                    />
+                </div>
             );
         }
 
@@ -163,14 +247,14 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
                 dir={direction}
                 style={{
                     direction,
-                    cursor: isPaused && onSubtitleChange ? 'text' : 'default',
+                    cursor: isPaused && onSubtitleChange ? 'pointer' : 'default',
                     border: isPaused && onSubtitleChange ? '1px dashed transparent' : 'none'
                 }}
                 onClick={handleSubtitleClick}
                 title={isPaused ? "Click to edit" : undefined}
                 aria-live="polite"
             >
-                {subtitleText}
+                <StyledText text={subtitleText} />
             </div>
         );
     };
@@ -185,6 +269,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
                         playsInline
                     />
                     {renderSubtitleContent()}
+                    {renderToolbar()}
                 </div>
             </div>
         );
@@ -194,11 +279,13 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
     return (
         <div className="subtitle-preview">
             <div className={`preview-cinema${mediaFile.isVideo ? '' : ' audio-mode'}`}>
+                {renderToolbar()}
                 {subtitleText || editingSubtitleId ? (
                     renderSubtitleContent()
                 ) : (
                     <div className="preview-cinema-idle">
                         <span className="icon icon-xl">subtitles</span>
+                        <p>No subtitle at current time</p>
                     </div>
                 )}
             </div>

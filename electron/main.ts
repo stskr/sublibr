@@ -704,6 +704,16 @@ ipcMain.handle('ai:callProvider', async (
         // Chat Completions API with Audio Input
         // Docs: https://platform.openai.com/docs/guides/audio?lang=node
 
+        let mappedModel = model;
+        // The standard gpt-4o and gpt-4o-mini models do not support audio input blocks.
+        // We must use the specific audio-preview models.
+        if (model === 'gpt-4o') {
+          mappedModel = 'gpt-4o-audio-preview';
+        } else if (model === 'gpt-4o-mini') {
+          mappedModel = 'gpt-4o-mini-audio-preview';
+        }
+
+        const formatOption = audioFormat === 'mp3' ? 'mp3' : 'wav';
         const messages = [
           {
             role: 'user',
@@ -713,10 +723,7 @@ ipcMain.handle('ai:callProvider', async (
                 type: 'input_audio',
                 input_audio: {
                   data: audioBase64,
-                  format: audioFormat === 'mp3' ? 'mp3' : 'flac', // OpenAI supports wav, mp3. Flac is supported in some contexts but let's be careful.
-                  // Actually, strictly speaking input_audio supports: wav, mp3. 
-                  // If we receive flac, we might be in trouble if the API rejects it.
-                  // However, let's assume the frontend will send mp3.
+                  format: formatOption, // OpenAI supports wav, mp3. 
                 },
               },
             ],
@@ -730,7 +737,7 @@ ipcMain.handle('ai:callProvider', async (
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: model,
+            model: mappedModel,
             modalities: ['text'], // We only want text back
             messages: messages,
           }),
