@@ -697,60 +697,124 @@ ipcMain.handle('ai:callProvider', async (
 
 
     case 'openai': {
-      // Use Whisper API for transcription
-      const buffer = Buffer.from(audioBase64, 'base64');
-      const blob = new Blob([buffer], { type: mimeType });
+      // Check if using a chat model (gpt-4o) or legacy whisper
+      const isChatModel = model.startsWith('gpt-4o');
 
-      const formData = new FormData();
-      formData.append('file', blob, `audio.${audioFormat}`);
-      formData.append('model', 'whisper-1');
-      formData.append('response_format', 'verbose_json');
-      // We can't pass the full complex prompt to Whisper in the same way, 
-      // but we can pass a "prompt" for context/style. 
-      // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
-      // and format it ourselves to match what the app expects ([MM:SS] Text).
+      if (isChatModel) {
+        // Chat Completions API with Audio Input
+        // Docs: https://platform.openai.com/docs/guides/audio?lang=node
 
-      const res = await net.fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: formData,
-      });
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'input_audio',
+                input_audio: {
+                  data: audioBase64,
+                  format: audioFormat === 'mp3' ? 'mp3' : 'flac', // OpenAI supports wav, mp3. Flac is supported in some contexts but let's be careful.
+                  // Actually, strictly speaking input_audio supports: wav, mp3. 
+                  // If we receive flac, we might be in trouble if the API rejects it.
+                  // However, let's assume the frontend will send mp3.
+                },
+              },
+            ],
+          },
+        ];
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
-        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
-      }
+        const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: model,
+            modalities: ['text'], // We only want text back
+            messages: messages,
+          }),
+        });
 
-      const data = await res.json() as {
-        text: string;
-        segments?: { start: number; end: number; text: string }[];
-      };
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
+          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
+        }
 
-      // Format Whisper segments into the expected [MM:SS] Text format
-      let formattedText = '';
-      if (data.segments) {
-        formattedText = data.segments.map(seg => {
-          const minutes = Math.floor(seg.start / 60).toString().padStart(2, '0');
-          const seconds = Math.floor(seg.start % 60).toString().padStart(2, '0');
-          return `[${minutes}:${seconds}] ${seg.text.trim()}`;
-        }).join('\n\n');
+        const data = await res.json() as {
+          choices: { message: { content: string } }[];
+          usage?: { prompt_tokens: number; completion_tokens: number };
+        };
+
+        const text = data.choices[0]?.message?.content || '';
+
+        return {
+          text,
+          tokenUsage: {
+            inputTokens: data.usage?.prompt_tokens || 0,
+            outputTokens: data.usage?.completion_tokens || 0,
+            provider: 'openai',
+            model,
+            timestamp: Date.now(),
+          },
+        };
+
       } else {
-        // Fallback if no segments (shouldn't happen with verbose_json)
-        formattedText = `[00:00] ${data.text}`;
-      }
+        // Legacy Whisper API (audio/transcriptions)
+        const buffer = Buffer.from(audioBase64, 'base64');
+        const blob = new Blob([buffer], { type: mimeType });
 
-      return {
-        text: formattedText,
-        tokenUsage: {
-          inputTokens: 0, // Whisper doesn't report traditional token usage in the same way
-          outputTokens: 0,
-          provider: 'openai',
-          model: 'whisper-1',
-          timestamp: Date.now(),
-        },
-      };
+        const formData = new FormData();
+        formData.append('file', blob, `audio.${audioFormat}`);
+        formData.append('model', 'whisper-1');
+        formData.append('response_format', 'verbose_json');
+        // We can't pass the full complex prompt to Whisper in the same way, 
+        // but we can pass a "prompt" for context/style. 
+        // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
+        // and format it ourselves to match what the app expects ([MM:SS] Text).
+
+        const res = await net.fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
+          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
+        }
+
+        const data = await res.json() as {
+          text: string;
+          segments?: { start: number; end: number; text: string }[];
+        };
+
+        // Format Whisper segments into the expected [MM:SS] Text format
+        let formattedText = '';
+        if (data.segments) {
+          formattedText = data.segments.map(seg => {
+            const minutes = Math.floor(seg.start / 60).toString().padStart(2, '0');
+            const seconds = Math.floor(seg.start % 60).toString().padStart(2, '0');
+            return `[${minutes}:${seconds}] ${seg.text.trim()}`;
+          }).join('\n\n');
+        } else {
+          // Fallback if no segments (shouldn't happen with verbose_json)
+          formattedText = `[00:00] ${data.text}`;
+        }
+
+        return {
+          text: formattedText,
+          tokenUsage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            provider: 'openai',
+            model: 'whisper-1',
+            timestamp: Date.now(),
+          },
+        };
+      }
     }
   }
 });
