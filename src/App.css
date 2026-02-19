@@ -81,6 +81,16 @@ textarea {
   font-family: inherit;
 }
 
+input,
+textarea,
+.selectable,
+.error-message,
+.user-select-text {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
 html,
 body,
 #root {
@@ -95,6 +105,8 @@ body {
   background: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 a {

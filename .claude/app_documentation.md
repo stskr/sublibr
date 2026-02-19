@@ -254,7 +254,7 @@ Four core services handle subtitle processing:
 | API/Tool | Purpose | Configuration |
 |----------|---------|---------------|
 | **Google Gemini API** | Transcription | API key stored in settings, tested via `GET /v1beta/models` |
-| **OpenAI API** | Transcription | API key stored in settings, tested via `GET /v1/models` |
+| **OpenAI API** | Transcription | Chat Completions API (`v1/chat/completions`) for GPT-4o with Audio input. Legacy Whisper-1 support as fallback. |
 | **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
 | **ffprobe** | Media metadata | Bundled with FFmpeg |
 | **electron-updater** | Auto-updates | GitHub Releases backend, check+prompt UX |
@@ -374,6 +374,7 @@ The app uses a **dark theme** with a modern, premium aesthetic built on design t
 > - **Micro-animations**: Smooth hover states, transitions
 > - **Generous spacing**: Clean, breathable layout
 > - **Consistent iconography**: Material Icons Round throughout
+> - **Restricted Selection**: Text selection is disabled globally to prevent accidental UI highlighting, but enabled for all text inputs, textareas, and error messages.
 
 ---
 
@@ -755,7 +756,7 @@ Calculates the total estimated cost in USD for an array of `TokenUsage` entries,
 
 #### **2. audioProcessor.ts**
 
-**Main Function**: `createAudioChunks(audioPath, tempDir)`
+**Main Function**: `createAudioChunks(audioPath, tempDir, format)`
 
 **Process**:
 1. Get total audio duration via `ffprobe`
@@ -768,7 +769,7 @@ Calculates the total estimated cost in USD for an array of `TokenUsage` entries,
    - **Max**: 240s (4 minutes)
    - **Overlap**: 20s between chunks
 4. Split at silence points closest to target
-5. Extract chunks using FFmpeg to FLAC format
+5. Extract chunks using FFmpeg (FLAC for Gemini, MP3 for OpenAI)
 6. Return `AudioChunk[]` + `SilenceSegment[]`
 
 **Output**:
