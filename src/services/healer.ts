@@ -124,7 +124,8 @@ export async function healSubtitles(
                 apiKey,
                 model,
                 language,
-                autoDetect
+                autoDetect,
+                'healing' // Use healing-specific prompt
             );
 
             if (result.subtitles.length > 0) {

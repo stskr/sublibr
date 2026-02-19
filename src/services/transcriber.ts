@@ -73,13 +73,18 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
     return subtitles;
 }
 
+import { getStandardTranscriptionPrompt, getHealingTranscriptionPrompt } from './prompts';
+
+// ... (existing imports and code)
+
 export async function transcribeChunk(
     chunk: AudioChunk,
     provider: AIProvider,
     apiKey: string,
     model: string,
     language: string,
-    autoDetect: boolean
+    autoDetect: boolean,
+    mode: 'standard' | 'healing' = 'standard'
 ): Promise<TranscriptionResult> {
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
@@ -88,27 +93,9 @@ export async function transcribeChunk(
         ? 'Auto-detect the language of the audio.'
         : `The audio is in ${language}.`;
 
-    const prompt = `Transcribe this audio file into text with timestamps. ${languageInstruction}
-
-Format your response as:
-[MM:SS] Transcribed text for this segment
-[MM:SS] Next segment of text
-...
-
-Rules:
-- Transcribe all speech accurately and completely. Do not summarize or omit any words.
-- Capture every word spoken, including distinct fillers.
-- Add proper written punctuation: end sentences with periods, use commas for natural pauses and clause boundaries, use question marks for questions, and exclamation marks where appropriate.
-- START A NEW SUBTITLE SEGMENT IMMEDIATELY WHEN THE SPEAKER CHANGES.
-- Each subtitle should contain a complete thought or natural phrase. Do NOT create very short fragments under 3 words.
-- Aim for 1-4 seconds of speech per subtitle segment. Group short phrases together.
-- Max 2 lines of text per subtitle.
-- Max 8 words per line.
-- Keep natural phrases together. Do not break mid-phrase.
-- Timestamps should be relative to the start of this audio clip (starting at 00:00).
-- If there's silence, skip to the next speech segment.
-
-Transcribe the audio now:`;
+    const prompt = mode === 'healing'
+        ? getHealingTranscriptionPrompt(languageInstruction)
+        : getStandardTranscriptionPrompt(languageInstruction);
 
     // Infer format from extension
     const ext = chunk.filePath.split('.').pop()?.toLowerCase() || 'flac';
