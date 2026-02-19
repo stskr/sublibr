@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from './components/Settings';
 import { FileUpload } from './components/FileUpload';
-import { SubtitleEditor, TimelinePreview } from './components/SubtitleEditor';
+import { SubtitleEditor } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AudioPlayer } from './components/AudioPlayer';
 import type { AudioPlayerHandle } from './components/AudioPlayer';
 import { SubtitlePreview } from './components/SubtitlePreview';
+import { Timeline } from './components/Timeline/Timeline';
 import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
 import { CustomSelect } from './components/CustomSelect';
@@ -974,7 +975,7 @@ function App() {
       {
         audioPath && (
           <footer className="app-footer">
-            <TimelinePreview
+            <Timeline
               subtitles={subtitles}
               duration={duration}
               currentTime={currentTime}

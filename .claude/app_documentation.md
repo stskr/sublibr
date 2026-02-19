@@ -35,6 +35,7 @@
 - **Built-in Editor**: Timeline-based subtitle editor with video preview and Search/Replace capabilities
 - **Search & Replace**: Global search with highlighting, replacement, and keyboard navigation (Cmd/Ctrl+F)
 - **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
+- **Advanced Timeline Editor**: Two-tier timeline with a zoomed main track and a full-duration minimap for precise navigation and global context.
 - **Media Streaming**: Local HTTP server for efficient playback and seeking of large video files, bypassing Electron protocol limitations
 - **Versioning & Regenerate**: Create multiple subtitle versions for the same file (e.g., different models/prompts) and switch between them instantly
 - **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
@@ -74,6 +75,11 @@ subtitles-gen/
 │   │   ├── ShortcutsModal.tsx
 │   │   ├── SubtitleEditor.tsx
 │   │   ├── SubtitlePreview.tsx
+│   │   ├── Timeline/
+│   │   │   ├── Timeline.tsx       # Main timeline orchestrator
+│   │   │   ├── Minimap.tsx        # Overview track with zoom slider
+│   │   │   ├── MainTrack.tsx      # Zoomed detail track
+│   │   │   └── Timeline.css       # Timeline styles
 │   │   ├── TokenUsageDisplay.tsx
 │   │   └── UpdateNotification.tsx
 │   │
@@ -399,6 +405,7 @@ All components are **functional React components** using hooks. No class compone
 | `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
 | `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
 | `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
+| `Timeline` | [Timeline.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Timeline/Timeline.tsx) | Two-tier timeline navigation (MainTrack + Minimap) |
 | `TokenUsageDisplay` | [TokenUsageDisplay.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/TokenUsageDisplay.tsx) | Session token usage badge + detailed popup |
 | `UpdateNotification` | [UpdateNotification.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/UpdateNotification.tsx) | Auto-update banner (available, downloading, ready) |
 
@@ -532,6 +539,36 @@ interface SubtitlePreviewProps {
 - Cinema mode shows a muted subtitles icon when no subtitle is active
 - Toggle bar only visible when subtitles exist
 - Textarea appears over subtitle for editing, matching the style of the display
+
+---
+
+#### **Timeline**
+
+**Props**:
+```typescript
+interface TimelineProps {
+  subtitles: Subtitle[];
+  currentTime: number;
+  duration: number;
+  mediaDuration?: number;
+  onSeek: (time: number) => void;
+}
+```
+
+**Features**:
+- **Two-Tier System**:
+  - **Main Track**: Zoomed-in view showing subtitles in the selected time range with high precision.
+  - **Minimap**: Full-width track showing the entire duration with a dual-handle slider window.
+- **Zooming**: Drag handles on the minimap window to adjust the zoom level of the main track.
+- **Panning**: Drag the minimap window body to scroll the main track.
+- **Seeking**: Click on either track to seek.
+- **Synchronization**: Playhead stays synced across both tracks.
+
+**UX Details**:
+- Smooth 60fps interaction using local state for dragging
+- Visual feedback on hover and drag
+- Playhead and subtitle segments are color-coded (Accent Purple)
+- Supports displaying media duration limit line
 
 ---
 

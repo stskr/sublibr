@@ -1,0 +1,208 @@
+/* Timeline Component Styles */
+
+.timeline-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* Space between main track and minimap */
+    width: 100%;
+    user-select: none;
+    padding-bottom: var(--space-xs);
+}
+
+/* --- Main Track (Zoomed View) --- */
+.timeline-main-track {
+    position: relative;
+    height: 24px;
+    /* Slightly taller for better visibility */
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+}
+
+.timeline-main-segment {
+    position: absolute;
+    height: 100%;
+    background: var(--color-accent);
+    opacity: 0.7;
+    border-radius: 2px;
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    /* Improve performance for many segments */
+    will-change: width, left;
+    min-width: 1px;
+}
+
+.timeline-main-segment:hover {
+    opacity: 1;
+    background: var(--color-accent-hover);
+}
+
+.timeline-main-cursor {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-text-primary);
+    z-index: 10;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+/* Ghost cursor for hover effect (optional, good for UX) */
+.timeline-main-ghost-cursor {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+    display: none;
+}
+
+.timeline-main-track:hover .timeline-main-ghost-cursor {
+    display: block;
+}
+
+
+/* --- Minimap Track (Full View) --- */
+.timeline-minimap {
+    position: relative;
+    height: 32px;
+    /* Taller to accommodate handles */
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    /* Keep subtitles inside, but handles might poke out? No, overlay handles on top */
+    margin-top: 2px;
+    cursor: default;
+}
+
+.timeline-minimap-track-bg {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
+
+.timeline-minimap-segment {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    background: var(--color-accent);
+    opacity: 0.4;
+    border-radius: 1px;
+}
+
+/* Unselected outer areas (dimmed) */
+/* We can implement this by having the window be bright/clear and the rest dimmed, 
+   or by overlays. Overlays are easier. */
+.timeline-minimap-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.timeline-minimap-overlay.left {
+    left: 0;
+    border-right: 1px solid var(--color-border);
+}
+
+.timeline-minimap-overlay.right {
+    right: 0;
+    border-left: 1px solid var(--color-border);
+}
+
+/* The Visible Window (Slider) */
+.timeline-window {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    /* width and left set by JS */
+    border-top: 2px solid var(--color-accent);
+    border-bottom: 2px solid var(--color-accent);
+    cursor: grab;
+    z-index: 6;
+    background: rgba(128, 117, 235, 0.05);
+    /* Very subtle tint */
+}
+
+.timeline-window:active {
+    cursor: grabbing;
+    background: rgba(128, 117, 235, 0.1);
+}
+
+/* Handles */
+.timeline-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    background: var(--color-accent);
+    cursor: col-resize;
+    z-index: 7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+}
+
+.timeline-handle::after {
+    content: '';
+    display: block;
+    height: 12px;
+    width: 2px;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.timeline-handle.left {
+    left: -6px;
+    /* Center firmly on the edge */
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.timeline-handle.right {
+    right: -6px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.timeline-handle:hover {
+    background: var(--color-accent-hover);
+}
+
+/* Playhead on Minimap */
+.timeline-minimap-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #fff;
+    z-index: 4;
+    /* Below overlay, or above? Usually playhead is visible everywhere */
+    z-index: 8;
+    pointer-events: none;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Media duration limit line */
+.timeline-media-limit {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--color-warning);
+    border-right: 1px dashed var(--color-warning);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 3;
+}

@@ -411,68 +411,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     );
 }
 
-// Wrap subtitle text to max 8 words per line for tooltip
-function wrapTooltip(text: string): string {
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    for (let i = 0; i < words.length; i += 8) {
-        lines.push(words.slice(i, i + 8).join(' '));
-    }
-    return lines.join('\n');
-}
 
-// Mini timeline preview component
-export function TimelinePreview({ subtitles, duration, currentTime, onSeek, mediaDuration }: {
-    subtitles: Subtitle[];
-    duration: number; // Max duration
-    currentTime: number;
-    onSeek: (time: number) => void;
-    mediaDuration?: number; // Actual media duration
-}) {
-    const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const percent = x / rect.width;
-        onSeek(percent * duration);
-    };
 
-    return (
-        <div className="timeline-preview" onClick={handleClick}>
-            {/* Media duration background indicator */}
-            {mediaDuration && duration > mediaDuration && (
-                <div
-                    className="timeline-media-zone"
-                    style={{
-                        width: `${(mediaDuration / duration) * 100}%`,
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                        borderRight: '1px dashed var(--color-warning)',
-                        pointerEvents: 'none'
-                    }}
-                    title="Media Duration"
-                />
-            )}
 
-            <div className="timeline-subtitles">
-                {subtitles.map((sub) => (
-                    <div
-                        key={sub.id}
-                        className={`timeline-segment ${mediaDuration && sub.startTime > mediaDuration ? 'beyond-media' : ''}`}
-                        title={wrapTooltip(sub.text)}
-                        style={{
-                            left: `${(sub.startTime / duration) * 100}%`,
-                            width: `${((sub.endTime - sub.startTime) / duration) * 100}%`,
-                        }}
-                    />
-                ))}
-            </div>
-            <div
-                className="timeline-cursor"
-                style={{ left: `${(currentTime / duration) * 100}%` }}
-            />
-        </div>
-    );
-}
