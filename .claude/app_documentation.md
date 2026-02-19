@@ -862,7 +862,7 @@ Today we're talking about subtitles.
 
 ---
 
-#### **4. healer.ts**
+#### **5. healer.ts**
 
 **Main Function**: `healSubtitles(subtitles, audioPath, silences, ...)`
 
