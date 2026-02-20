@@ -1512,6 +1512,7 @@ npm run build:electron
 - [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
 - [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List / Clear Cache actions in recents UI
 - [x] **Accessibility** — Comprehensive ARIA support: dialog roles with focus traps, combobox/listbox on custom selects, slider on progress bar, keyboard navigation, live regions, alert roles
+- [x] **Model Labels Update** — Updated UI model labels to rate Gemini Pro as best for foreign languages and Whisper-1 as Standard.
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

@@ -10,10 +10,10 @@ export const PROVIDER_LABELS: Record<AIProvider, string> = {
 export const MODEL_OPTIONS: Record<AIProvider, { value: string; label: string }[]> = {
     gemini: [
         { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Fast)' },
-        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Powerful)' },
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Best for Foreign Languages)' },
     ],
     openai: [
-        { value: 'whisper-1', label: 'Whisper-1 (Best for Subtitles)' },
+        { value: 'whisper-1', label: 'Whisper-1 (Standard)' },
         { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
         { value: 'gpt-4o', label: 'GPT-4o (Powerful)' },
     ],
