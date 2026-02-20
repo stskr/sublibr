@@ -505,9 +505,12 @@ export async function translateSubtitles(
             totalOutputTokens += response.tokenUsage.outputTokens;
 
             let resultText = response.text.trim();
-            // Remove markdown code blocks if the AI ignored instructions
-            if (resultText.startsWith('```')) {
-                resultText = resultText.replace(/^```[a-z]*\n/, '').replace(/\n```$/, '');
+
+            // Extract the JSON array portion robustly
+            const startIdx = resultText.indexOf('[');
+            const endIdx = resultText.lastIndexOf(']');
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                resultText = resultText.substring(startIdx, endIdx + 1);
             }
 
             const parsed = JSON.parse(resultText) as { id: string; text: string }[];
