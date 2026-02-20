@@ -39,7 +39,7 @@ export function EditorHeader({
 }: EditorHeaderProps) {
     return (
         <div className="editor-header">
-            <div className="editor-header-actions">
+            <div className="editor-header-left">
                 {!hideSearch && (
                     <button
                         className={`btn-icon ${showSearch ? 'active' : ''}`}
@@ -62,7 +62,7 @@ export function EditorHeader({
                 )}
             </div>
 
-            <div className="editor-toolbars">
+            <div className="editor-header-center">
                 <div className="editor-history-toolbar">
                     <button
                         className="btn-tool-small"
@@ -110,7 +110,9 @@ export function EditorHeader({
                         <span className="icon icon-sm">format_underlined</span>
                     </button>
                 </div>
+            </div>
 
+            <div className="editor-header-right">
                 <span className="subtitle-count">{entryCount} entries</span>
             </div>
         </div>
