@@ -777,7 +777,8 @@ ipcMain.handle('ai:callProvider', async (
         const formData = new FormData();
         formData.append('file', blob, `audio.${audioFormat}`);
         formData.append('model', 'whisper-1');
-        formData.append('response_format', 'srt');
+        formData.append('response_format', 'verbose_json');
+        formData.append('timestamp_granularities[]', 'word');
 
         if (language) {
           formData.append('language', language);
@@ -808,10 +809,14 @@ ipcMain.handle('ai:callProvider', async (
           const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
           throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
         }
-        const srtText = await res.text();
+
+        const data = await res.json() as {
+          text: string;
+          words?: { start: number; end: number; word: string }[];
+        };
 
         return {
-          text: srtText,
+          text: JSON.stringify(data),
           tokenUsage: {
             inputTokens: 0,
             outputTokens: 0,

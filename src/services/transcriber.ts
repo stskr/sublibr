@@ -73,6 +73,79 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
     return subtitles;
 }
 
+// Build standard subtitles from individual word-level timestamps (native Whisper)
+function buildSubtitlesFromWords(words: { start: number; end: number; word: string }[], startOffset: number, maxLines: number, maxCharsPerLine: number): Subtitle[] {
+    const subtitles: Subtitle[] = [];
+    const MAX_CHARS_TOTAL = maxLines * maxCharsPerLine;
+
+    let currentText = "";
+    let currentStart = 0;
+    let currentEnd = 0;
+
+    for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        const cleanWord = w.word.trim();
+        if (!cleanWord) continue;
+
+        if (currentText === "") {
+            currentText = cleanWord;
+            currentStart = w.start;
+            currentEnd = w.end;
+            continue;
+        }
+
+        const potentialText = currentText + " " + cleanWord;
+        const gap = w.start - currentEnd;
+        const isEndPunctuation = /[.!?]$/.test(currentText);
+        const isComma = /[,]$/.test(currentText);
+
+        // Break if:
+        // - Exceeds total allowed chars
+        // - Natural sentence end (. ! ?)
+        // - Long gap (> 1.5s)
+        // - After a comma if the current line is getting long (> maxCharsPerLine)
+        let shouldBreak = false;
+
+        if (potentialText.length > MAX_CHARS_TOTAL) {
+            shouldBreak = true;
+        } else if (gap > 1.5) {
+            shouldBreak = true;
+        } else if (isEndPunctuation && currentText.length > 20) {
+            shouldBreak = true; // Natural break at end of sentence
+        } else if (isComma && currentText.length >= maxCharsPerLine * 0.8) {
+            shouldBreak = true; // Natural break at comma
+        }
+
+        if (shouldBreak) {
+            subtitles.push({
+                id: generateId(),
+                index: subtitles.length + 1,
+                startTime: startOffset + currentStart,
+                endTime: startOffset + currentEnd,
+                text: currentText,
+            });
+            currentText = cleanWord;
+            currentStart = w.start;
+            currentEnd = w.end;
+        } else {
+            currentText = potentialText;
+            currentEnd = w.end;
+        }
+    }
+
+    if (currentText !== "") {
+        subtitles.push({
+            id: generateId(),
+            index: subtitles.length + 1,
+            startTime: startOffset + currentStart,
+            endTime: startOffset + currentEnd,
+            text: currentText,
+        });
+    }
+
+    return subtitles;
+}
+
 
 import { getStandardTranscriptionPrompt as getGeminiTranscriptionPrompt } from '../prompts/gemini/transcription';
 import { getHealingTranscriptionPrompt as getGeminiHealingPrompt } from '../prompts/gemini/healing';
@@ -133,15 +206,26 @@ export async function transcribeChunk(
 
     let subtitles: Subtitle[] = [];
     if (provider === 'openai') {
-        // OpenAI Whisper is now natively returning fully-formatted SRT strings
-        subtitles = parseSrt(text);
-
-        // Adjust chunk offsets securely since Whisper creates SRT from 00:00:00 internally
-        subtitles = subtitles.map(s => ({
-            ...s,
-            startTime: chunk.startTime + s.startTime,
-            endTime: chunk.startTime + s.endTime,
-        }));
+        if (model === 'whisper-1') {
+            try {
+                const data = JSON.parse(text) as { words?: { start: number; end: number; word: string }[] };
+                if (data.words && data.words.length > 0) {
+                    subtitles = buildSubtitlesFromWords(data.words, chunk.startTime, maxLines, maxCharsPerLine);
+                } else {
+                    subtitles = parseTranscription(text, chunk.startTime);
+                }
+            } catch {
+                subtitles = parseTranscription(text, chunk.startTime);
+            }
+        } else {
+            // GPT models return SRT strings
+            subtitles = parseSrt(text);
+            subtitles = subtitles.map(s => ({
+                ...s,
+                startTime: chunk.startTime + s.startTime,
+                endTime: chunk.startTime + s.endTime,
+            }));
+        }
     } else {
         // Gemini returns our custom [MM:SS] format
         subtitles = parseTranscription(text, chunk.startTime);

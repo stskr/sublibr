@@ -45,8 +45,8 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: 
     return (
         <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`} aria-live="polite">
             <div className="progress-header">
-                <span className="progress-status">
-                    <span className={`icon icon-sm ${status === 'transcribing' ? 'spin' : ''}`}>
+                <span className="progress-status" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="icon icon-sm">
                         {STATUS_ICONS[status] || 'sync'}
                     </span>
                     {message}
