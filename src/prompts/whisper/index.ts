@@ -6,4 +6,4 @@
  * By passing properly punctuated sentences, we strongly coerce Whisper 
  * to return punctuated sentences instead of long unpunctuated blocks.
  */
-export const WHISPER_PUNCTUATION_PROMPT = 'Please transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?';
+export const WHISPER_PUNCTUATION_PROMPT = 'Transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?';

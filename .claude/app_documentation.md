@@ -27,7 +27,7 @@
 - **Multi-Provider AI Transcription**: Supports Google Gemini and OpenAI with per-provider API key validation and a unified "Active Model" selector
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
 - **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
-- **Quality Enforcement**: Ensures subtitles meet display standards (max 2 lines, 8 words/line, proper duration)
+- **Quality Enforcement**: Ensures subtitles meet display standards configured by **Screen Size** format (Wide: 16:9, Square: 1:1, Vertical: 9:16) with proper durations and max limits
 - **Recent Files History**: Tracks the last 10 generated or opened files for quick access, with automatic subtitle caching
 - **Subtitle Caching**: Generated subtitles are persisted to `electron-store` and restored when loading a recent file
 - **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown

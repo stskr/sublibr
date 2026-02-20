@@ -55,12 +55,16 @@ export interface ProviderConfig {
     model: string;
 }
 
+// Screen constraint options for generating subtitles
+export type ScreenSize = 'wide' | 'square' | 'vertical';
+
 // Settings
 export interface AppSettings {
     activeProvider: AIProvider;
     providers: Record<AIProvider, ProviderConfig>;
     language: string;
     autoDetectLanguage: boolean;
+    screenSize: ScreenSize;
 }
 
 // File info

@@ -115,7 +115,8 @@ export function useTranscriptionPipeline({
                     settings.language,
                     settings.autoDetectLanguage,
                     'standard',
-                    previousTranscript
+                    previousTranscript,
+                    settings.screenSize
                 );
                 allSubtitles.push(result.subtitles);
                 addTokenUsage(result.tokenUsage);
@@ -138,7 +139,8 @@ export function useTranscriptionPipeline({
                     apiKey,
                     model,
                     settings.language,
-                    settings.autoDetectLanguage
+                    settings.autoDetectLanguage,
+                    settings.screenSize
                 );
                 merged = healResult.subtitles;
                 healResult.tokenUsages.forEach(addTokenUsage);
@@ -146,7 +148,7 @@ export function useTranscriptionPipeline({
                 console.error('Healing failed:', err);
             }
 
-            merged = enforceSubtitleQuality(merged);
+            merged = enforceSubtitleQuality(merged, settings.screenSize);
 
             let finalLanguage = settings.language;
             let displayLanguage = settings.autoDetectLanguage ? 'Auto-Detect' : settings.language;

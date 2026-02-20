@@ -20,7 +20,7 @@ import { useVersionHistory } from './hooks/useVersionHistory';
 import { useTranscriptionPipeline } from './hooks/useTranscriptionPipeline';
 
 import { generateId } from './utils';
-import type { Subtitle, AppSettings, MediaFile, RecentFile } from './types';
+import type { Subtitle, AppSettings, MediaFile, RecentFile, ScreenSize } from './types';
 import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
 
 import './App.css';
@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   language: 'English',
   autoDetectLanguage: false,
+  screenSize: 'wide',
 };
 
 const DEFAULT_SUBTITLE_DURATION = 2; // seconds
@@ -68,6 +69,7 @@ function App() {
             },
             language: (saved.language as string) || 'English',
             autoDetectLanguage: (saved.autoDetectLanguage as boolean) ?? false,
+            screenSize: (saved.screenSize as ScreenSize) || 'wide',
           };
           setSettings(migrated);
           await window.electronAPI.setStoreValue('settings', migrated);
@@ -425,6 +427,25 @@ function App() {
                       }
                     }}
                   />
+
+                  <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
+                    <label className="sidebar-label">Screen Format</label>
+                    <CustomSelect
+                      options={[
+                        { value: 'wide', label: 'Wide-screen (16:9)' },
+                        { value: 'square', label: 'Square (1:1)' },
+                        { value: 'vertical', label: 'Vertical (9:16)' }
+                      ]}
+                      value={settings.screenSize}
+                      onChange={(value) => {
+                        const updated = { ...settings, screenSize: value as ScreenSize };
+                        setSettings(updated);
+                        if (window.electronAPI) {
+                          window.electronAPI.setStoreValue('settings', updated);
+                        }
+                      }}
+                    />
+                  </div>
 
                   <button
                     className="btn-primary sidebar-action-btn"

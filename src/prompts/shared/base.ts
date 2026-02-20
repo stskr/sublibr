@@ -1,5 +1,5 @@
-export const BASE_TRANSCRIPTION_RULES = `
-Format your response as:
+export function getBaseTranscriptionRules(maxLines: number, maxCharsPerLine: number): string {
+    return `Format your response as:
 [MM:SS] Transcribed text for this segment
 [MM:SS] Next segment of text
 ...
@@ -12,9 +12,9 @@ Rules:
 - Ensure that speech from two different speakers NEVER appears within the same timestamped segment.
 - Within a single speaker's turn, aim for 1-4 seconds of speech per segment, grouping short phrases together.
 - Each subtitle should contain a complete thought or natural phrase. Do NOT create very short fragments under 3 words.
-- Max 2 lines of text per subtitle.
-- Max 40 characters per line.
+- Max ${maxLines} lines of text per subtitle.
+- Max ${maxCharsPerLine} characters per line.
 - Keep natural phrases together. Do not break mid-phrase.
 - Timestamps should be relative to the start of this audio clip (starting at 00:00).
-- If there's silence, skip to the next speech segment.
-`;
+- If there's silence, skip to the next speech segment.`;
+}

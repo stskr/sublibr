@@ -1,4 +1,4 @@
-import type { Subtitle, SilenceSegment, AIProvider, TokenUsage } from '../types';
+import type { Subtitle, SilenceSegment, AIProvider, TokenUsage, ScreenSize } from '../types';
 import { transcribeChunk } from './transcriber';
 
 // Interface for a gap that needs healing
@@ -26,6 +26,7 @@ export async function healSubtitles(
     model: string,
     language: string,
     autoDetect: boolean,
+    screenSize: ScreenSize = 'wide'
 ): Promise<HealResult> {
     if (subtitles.length === 0) return { subtitles, tokenUsages: [] };
 
@@ -125,7 +126,9 @@ export async function healSubtitles(
                 model,
                 language,
                 autoDetect,
-                'healing' // Use healing-specific prompt
+                'healing', // Use healing-specific prompt
+                undefined,
+                screenSize
             );
 
             if (result.subtitles.length > 0) {

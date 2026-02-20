@@ -1,12 +1,12 @@
-import { BASE_TRANSCRIPTION_RULES } from '../shared/base';
+import { getBaseTranscriptionRules } from '../shared/base';
 
 /**
  * Prompt for standard full-file transcription
  */
-export function getStandardTranscriptionPrompt(languageInstruction: string): string {
+export function getStandardTranscriptionPrompt(languageInstruction: string, maxLines: number, maxCharsPerLine: number): string {
     return `Transcribe this audio file into text with timestamps. ${languageInstruction}
 
-${BASE_TRANSCRIPTION_RULES}
+${getBaseTranscriptionRules(maxLines, maxCharsPerLine)}
 
 Transcribe the audio now:`;
 }

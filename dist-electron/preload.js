@@ -20,7 +20,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   registerPath: (path) => import_electron.ipcRenderer.invoke("file:registerPath", path),
   // AI API proxy (calls go through main process — keys never exposed in renderer)
   testApiKey: (provider, apiKey) => import_electron.ipcRenderer.invoke("ai:testApiKey", provider, apiKey),
-  callProvider: (provider, apiKey, model, prompt, audioBase64, audioFormat) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64, audioFormat),
+  callProvider: (provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript),
   callTextProvider: (provider, apiKey, model, prompt) => import_electron.ipcRenderer.invoke("ai:callTextProvider", provider, apiKey, model, prompt),
   // FFmpeg operations
   extractAudio: (inputPath, outputPath, format) => import_electron.ipcRenderer.invoke("ffmpeg:extractAudio", inputPath, outputPath, format),

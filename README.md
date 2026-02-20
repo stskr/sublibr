@@ -16,7 +16,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **📤 Multi-Format Export**: Support for SRT, WebVTT, and ASS formats.
 - **📝 Recent Files History**: Keep track of your last 10 generated or opened files for quick access, with automatic subtitle caching for instant restoration.
 - **⚡ Quality Control**: Enforces reading speeds, line limits, and minimum durations for professional-looking subtitles.
-- **🛠️ Customizable**: Extensive language support and editor features.
+- **🛠️ Customizable**: Screen size formatting (Wide, Square, Vertical), extensive language support, and editor features.
 - **⌨️ Keyboard Shortcuts**: Control playback (Space, Arrows) and editing (Undo/Redo, Insert/Delete) with global shortcuts.
 - **🎬 Advanced Visual Editor**: Two-tier timeline with zoomed detail view, **precision ruler**, **vertical grid**, and global minimap for precise navigation using a dual-handle slider. Includes **Scissors tool** (shortcut C) for splitting and **drag-to-trim** functionality.
 - **🔍 Search & Replace**: Find and correct text across all subtitles with highlighting and "Replace All" functionality.
@@ -70,7 +70,7 @@ npm run build && npx electron-builder --linux
 
 1.  **Set API Key**: Click the **Settings** (gear icon) in the top right, toggle the providers you want, paste an API key for each, and click **Test** to verify. Select your active model from the hero dropdown.
 2.  **Import Media**: Drag & drop a file, or click to browse. Robustly supports audio (mp3, wav, flac, etc.) and video (mp4, mkv, mov, etc.).
-3.  **Generate**: Select your language (or leave as Auto-detect) and click **Generate Subtitles**.
+3.  **Generate**: Select your language (or leave as Auto-detect), choose your target Screen Format (Wide, Square, Vertical), and click **Generate Subtitles**.
 4.  **Edit & Export**: Review the generated subtitles in the timeline editor, make any fixes, and click **Download SRT** to save.
 
 ## ⚙️ Configuration

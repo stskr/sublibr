@@ -1,4 +1,4 @@
-import type { Subtitle, AudioChunk, AIProvider, TokenUsage } from '../types';
+import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
 import { callProvider, callTextProvider } from './providers';
 
@@ -81,6 +81,16 @@ import { getOpenAIHealingPrompt } from '../prompts/openai/healing';
 import { getIsoLanguage } from '../utils';
 import { parseSrt } from './subtitleParser';
 
+export function getScreenSizeConstraints(screenSize: ScreenSize) {
+    switch (screenSize) {
+        case 'square': return { maxLines: 2, maxCharsPerLine: 25 };
+        case 'vertical': return { maxLines: 2, maxCharsPerLine: 15 };
+        case 'wide':
+        default:
+            return { maxLines: 2, maxCharsPerLine: 40 };
+    }
+}
+
 export async function transcribeChunk(
     chunk: AudioChunk,
     provider: AIProvider,
@@ -89,7 +99,8 @@ export async function transcribeChunk(
     language: string,
     autoDetect: boolean,
     mode: 'standard' | 'healing' = 'standard',
-    previousTranscript?: string
+    previousTranscript?: string,
+    screenSize: ScreenSize = 'wide'
 ): Promise<TranscriptionResult> {
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
@@ -98,15 +109,17 @@ export async function transcribeChunk(
         ? 'Auto-detect the language of the audio.'
         : `The audio is in ${language}.`;
 
+    const { maxLines, maxCharsPerLine } = getScreenSizeConstraints(screenSize);
+
     let prompt = '';
     if (provider === 'gemini') {
         prompt = mode === 'healing'
-            ? getGeminiHealingPrompt(languageInstruction)
-            : getGeminiTranscriptionPrompt(languageInstruction);
+            ? getGeminiHealingPrompt(languageInstruction, maxLines, maxCharsPerLine)
+            : getGeminiTranscriptionPrompt(languageInstruction, maxLines, maxCharsPerLine);
     } else {
         prompt = mode === 'healing'
-            ? getOpenAIHealingPrompt(languageInstruction)
-            : getOpenAITranscriptionPrompt(languageInstruction);
+            ? getOpenAIHealingPrompt(languageInstruction, maxLines, maxCharsPerLine)
+            : getOpenAITranscriptionPrompt(languageInstruction, maxLines, maxCharsPerLine);
     }
 
     // Infer format from extension
@@ -135,9 +148,8 @@ export async function transcribeChunk(
     }
 
     // Post-processing: Split long subtitles (Safety Net)
-    // Max chars per subtitle line is usually ~42. Two lines ~84.
-    // We'll set a safe limit of around 90 chars to allow for 2 full lines.
-    const MAX_CHARS = 90;
+    // We'll set a safe limit to allow for full lines.
+    const MAX_CHARS = maxLines * maxCharsPerLine + 10;
 
     const splitSubtitles: Subtitle[] = [];
 
@@ -317,12 +329,8 @@ const QUALITY = {
     MAX_DURATION: 7.0,       // Maximum display time (seconds)
     READING_SPEED: 20,       // Characters per second (comfortable pace)
     MIN_GAP: 0.05,           // Minimum gap between subtitles (50ms)
-    MAX_CHARS_PER_LINE: 42,  // Standard subtitle line width
-    MAX_LINES: 2,
     MERGE_GAP_LIMIT: 1.0,   // Max gap between subs to consider merging (seconds)
 };
-
-const MAX_CHARS_TOTAL = QUALITY.MAX_CHARS_PER_LINE * QUALITY.MAX_LINES;
 
 function minReadingDuration(text: string): number {
     return Math.max(QUALITY.MIN_DURATION, text.length / QUALITY.READING_SPEED);
@@ -336,7 +344,7 @@ function minReadingDuration(text: string): number {
  * - Cap maximum duration
  * - Remove degenerate entries (empty text, zero/negative duration)
  */
-export function enforceSubtitleQuality(subtitles: Subtitle[]): Subtitle[] {
+export function enforceSubtitleQuality(subtitles: Subtitle[], screenSize: ScreenSize = 'wide'): Subtitle[] {
     if (subtitles.length === 0) return [];
 
     // Remove degenerate entries first
@@ -344,8 +352,11 @@ export function enforceSubtitleQuality(subtitles: Subtitle[]): Subtitle[] {
         .filter(s => s.text.trim().length > 0 && s.endTime > s.startTime)
         .sort((a, b) => a.startTime - b.startTime);
 
+    const { maxLines, maxCharsPerLine } = getScreenSizeConstraints(screenSize);
+    const MAX_CHARS_TOTAL = maxLines * maxCharsPerLine;
+
     // Phase 1: Merge consecutive subtitles that are too short to read
-    subs = mergeShortSubtitles(subs);
+    subs = mergeShortSubtitles(subs, MAX_CHARS_TOTAL);
 
     // Phase 2: Extend short subtitles into available gaps
     subs = extendShortDurations(subs);
@@ -371,7 +382,7 @@ export function enforceSubtitleQuality(subtitles: Subtitle[]): Subtitle[] {
     return subs.map((s, i) => ({ ...s, index: i + 1 }));
 }
 
-function mergeShortSubtitles(subs: Subtitle[]): Subtitle[] {
+function mergeShortSubtitles(subs: Subtitle[], maxCharsTotal: number): Subtitle[] {
     const merged: Subtitle[] = [];
     let i = 0;
 
@@ -390,7 +401,7 @@ function mergeShortSubtitles(subs: Subtitle[]): Subtitle[] {
                 const combinedText = current.text + '\n' + next.text;
 
                 // Only merge if combined text fits within subtitle limits
-                if (combinedText.length <= MAX_CHARS_TOTAL) {
+                if (combinedText.length <= maxCharsTotal) {
                     merged.push({
                         ...current,
                         id: current.id,
