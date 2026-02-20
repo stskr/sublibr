@@ -450,10 +450,26 @@ a:hover {
   border-color: var(--color-border-focus);
 }
 
+.custom-select-value-wrapper {
+  overflow: hidden;
+  container-type: inline-size;
+  flex: 1;
+  text-align: left;
+}
+
 .custom-select-value {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.custom-select-trigger:hover .custom-select-value {
+  max-width: none;
+  overflow: visible;
+  animation: track-name-marquee 6s linear infinite alternate;
 }
 
 .custom-select-arrow {
@@ -499,6 +515,28 @@ a:hover {
   transition: background var(--transition-fast);
   white-space: nowrap;
   position: relative;
+}
+
+.custom-select-option-wrapper {
+  overflow: hidden;
+  container-type: inline-size;
+  flex: 1;
+  text-align: left;
+}
+
+.custom-select-option-text {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-select-option:hover .custom-select-option-text {
+  max-width: none;
+  overflow: visible;
+  animation: track-name-marquee 6s linear infinite alternate;
 }
 
 .custom-select-option:hover {

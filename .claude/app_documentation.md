@@ -1515,6 +1515,7 @@ npm run build:electron
 - [x] **Simulated Progress** — Added simulated progress animation during long translation API requests to prevent the progress bar from appearing frozen.
 - [x] **Word-Level Subtitle Breaking** — Configured Whisper API to use word-level timestamp granularities to ensure accurate subtitle chunking.
 - [x] **UI Refinement** — Improved progress indicator styling (removed redundant spinner, aligned center).
+- [x] **Version Name Auto-Scroll** — Added hover tooltips and a marquee auto-scroll effect for long version names in the model selector.
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

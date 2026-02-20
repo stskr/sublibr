@@ -70,8 +70,11 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
                 role="combobox"
                 aria-expanded={open}
                 aria-haspopup="listbox"
+                title={selected?.label || ''}
             >
-                <span className="custom-select-value">{selected?.label || ''}</span>
+                <div className="custom-select-value-wrapper">
+                    <span className="custom-select-value">{selected?.label || ''}</span>
+                </div>
                 <span className={`custom-select-arrow ${open ? 'open' : ''}`} />
             </button>
             {open && (
@@ -82,6 +85,7 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
                             className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
                             role="option"
                             aria-selected={opt.value === value}
+                            title={opt.label}
                             onClick={() => {
                                 if (opt.disabled) return;
                                 onChange(opt.value);
@@ -89,7 +93,9 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
                             }}
                         >
                             {opt.value === value && <span className="icon icon-sm custom-select-check">check</span>}
-                            {opt.label}
+                            <div className="custom-select-option-wrapper">
+                                <span className="custom-select-option-text">{opt.label}</span>
+                            </div>
                         </li>
                     ))}
                 </ul>
