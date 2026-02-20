@@ -13,6 +13,7 @@ export const MODEL_OPTIONS: Record<AIProvider, { value: string; label: string }[
         { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Powerful)' },
     ],
     openai: [
+        { value: 'whisper-1', label: 'Whisper-1 (Best for Subtitles)' },
         { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
         { value: 'gpt-4o', label: 'GPT-4o (Powerful)' },
     ],
@@ -30,6 +31,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
     'gemini-2.5-flash': { input: 0.15, output: 0.60 },
     'gemini-2.5-pro': { input: 1.25, output: 10.00 },
     // OpenAI
+    'whisper-1': { input: 0, output: 0 },
     'gpt-4o-mini': { input: 0.15, output: 0.60 },
     'gpt-4o': { input: 2.50, output: 10.00 },
 };

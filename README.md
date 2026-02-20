@@ -31,7 +31,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 - **Node.js**: v18 or newer
 - **AI Provider API Key** (at least one):
   - [Google AI Studio](https://aistudio.google.com/apikey) (Gemini)
-  - [OpenAI Platform](https://platform.openai.com/api-keys) (GPT)
+  - [OpenAI Platform](https://platform.openai.com/api-keys) (GPT, Whisper)
 
 ### Installation
 
@@ -75,7 +75,7 @@ npm run build && npx electron-builder --linux
 
 ## ⚙️ Configuration
 
-- **Model Selection**: Choose from models across all enabled providers in the "Active Model" dropdown (e.g. Gemini 2.5 Flash, GPT-4o).
+- **Model Selection**: Choose from models across all enabled providers in the "Active Model" dropdown (e.g. Gemini 2.5 Flash, GPT-4o, Whisper-1).
 - **Theme**: The app defaults to a modern dark theme optimized for video editing.
 
 ## 🏗️ Tech Stack

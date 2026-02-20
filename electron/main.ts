@@ -863,6 +863,8 @@ ipcMain.handle('ai:callTextProvider', async (
       // We don't need audio-preview models for text-to-text
       if (model === 'gpt-4o-audio-preview') mappedModel = 'gpt-4o';
       if (model === 'gpt-4o-mini-audio-preview') mappedModel = 'gpt-4o-mini';
+      // Whisper cannot do text translations, fall back to mini
+      if (model === 'whisper-1') mappedModel = 'gpt-4o-mini';
 
       const messages = [
         {
