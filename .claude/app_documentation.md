@@ -909,6 +909,19 @@ Hello, welcome to the show.
 Today we're talking about subtitles.
 ```
 
+**Export Formatting Rules**:
+When exporting files, the application applies strict formatting rules automatically:
+- **Source Tags Filtering**: All generated formats have internal processing tags (e.g., `<00:00:01.000>`) automatically stripped to prevent parser crashes.
+- **WebVTT (`.vtt`)**:
+  - Includes the exact `WEBVTT` header followed by exactly one blank line.
+  - Preserves numeric cue identifiers.
+  - Ensures exactly one blank line between subtitle sequences, with no blank lines allowed inside the text payload.
+- **SubRip (`.srt`)**:
+  - Ensures exactly one blank line between sequences to maintain parser integrity.
+- **Advanced SubStation Alpha (`.ass`)**:
+  - Converts internal newline characters to the standard `\N` inline format separator.
+
+
 ---
 
 #### **5. healer.ts**

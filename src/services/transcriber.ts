@@ -401,18 +401,26 @@ function extendShortDurations(subs: Subtitle[]): Subtitle[] {
     return subs;
 }
 
+// Helper to strip source tags like <00:00:01.000>
+function stripSourceTags(text: string): string {
+    return text.replace(/<[^>]+>/g, '').trim();
+}
+
 // Generate SRT file content
 export function generateSrt(subtitles: Subtitle[]): string {
     return subtitles.map((sub, i) => {
-        return `${i + 1}\n${formatSrtTime(sub.startTime)} --> ${formatSrtTime(sub.endTime)}\n${sub.text}\n`;
-    }).join('\n');
+        const cleanText = stripSourceTags(sub.text);
+        return `${i + 1}\n${formatSrtTime(sub.startTime)} --> ${formatSrtTime(sub.endTime)}\n${cleanText}\n`;
+    }).join('\n'); // Exactly one blank line between sequences due to the trailing \n in the map combined with \n in the join
 }
 
 // Generate WebVTT file content
 export function generateWebVtt(subtitles: Subtitle[]): string {
-    return `WEBVTT\n\n` + subtitles.map((sub) => {
-        return `${formatVttTime(sub.startTime)} --> ${formatVttTime(sub.endTime)}\n${sub.text}\n`;
-    }).join('\n');
+    return `WEBVTT\n\n` + subtitles.map((sub, i) => {
+        // VTT specifies no blank lines inside the cue text
+        const cleanText = stripSourceTags(sub.text).replace(/\n\s*\n/g, '\n');
+        return `${i + 1}\n${formatVttTime(sub.startTime)} --> ${formatVttTime(sub.endTime)}\n${cleanText}\n`;
+    }).join('\n'); // Exactly one blank line between cues
 }
 
 // Generate ASS file content
@@ -433,7 +441,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
     const events = subtitles.map((sub) => {
-        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${sub.text.replace(/\n/g, '\\N')}`;
+        const cleanText = stripSourceTags(sub.text);
+        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${cleanText.replace(/\n/g, '\\N')}`;
     }).join('\n');
 
     return header + events;
