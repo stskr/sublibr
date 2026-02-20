@@ -5,9 +5,10 @@ interface LanguageSelectorProps {
     language: string;
     autoDetect: boolean;
     onLanguageChange: (language: string, autoDetect: boolean) => void;
+    mode?: 'transcription' | 'translation';
 }
 
-export function LanguageSelector({ language, autoDetect, onLanguageChange }: LanguageSelectorProps) {
+export function LanguageSelector({ language, autoDetect, onLanguageChange, mode = 'transcription' }: LanguageSelectorProps) {
     const [searchTerm, setSearchTerm] = useState(language);
     const [showDropdown, setShowDropdown] = useState(false);
 
@@ -24,7 +25,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
     );
 
     const handleSelect = (lang: string) => {
-        onLanguageChange(lang, false);
+        onLanguageChange(lang, mode === 'transcription' ? false : autoDetect);
         setSearchTerm(lang);
         setShowDropdown(false);
     };
@@ -40,28 +41,34 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
 
     return (
         <div className="language-selection-inline">
-            <label>Language</label>
+            <label>{mode === 'transcription' ? 'Language' : 'Target Language'}</label>
             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px', lineHeight: '1.4' }}>
-                Choose the source language or select Auto-Detect
+                {mode === 'transcription'
+                    ? 'Choose the source language or select Auto-Detect'
+                    : 'Choose the language to translate to'}
             </p>
-            <div className="language-toggle">
-                <button
-                    className={`toggle-btn ${!autoDetect ? 'active' : ''}`}
-                    onClick={() => {
-                        onLanguageChange(language, false);
-                        setSearchTerm(language);
-                    }}
-                >
-                    Select Language
-                </button>
-                <button
-                    className={`toggle-btn ${autoDetect ? 'active' : ''}`}
-                    onClick={() => onLanguageChange(language, true)}
-                >
-                    Auto-detect
-                </button>
-            </div>
-            {autoDetect && (
+
+            {mode === 'transcription' && (
+                <div className="language-toggle">
+                    <button
+                        className={`toggle-btn ${!autoDetect ? 'active' : ''}`}
+                        onClick={() => {
+                            onLanguageChange(language, false);
+                            setSearchTerm(language);
+                        }}
+                    >
+                        Select Language
+                    </button>
+                    <button
+                        className={`toggle-btn ${autoDetect ? 'active' : ''}`}
+                        onClick={() => onLanguageChange(language, true)}
+                    >
+                        Auto-detect
+                    </button>
+                </div>
+            )}
+
+            {autoDetect && mode === 'transcription' && (
                 <div style={{
                     marginTop: '8px',
                     padding: '8px 12px',
@@ -74,7 +81,8 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
                     Auto-detect may be less accurate. Select a specific language for best results.
                 </div>
             )}
-            {!autoDetect && (
+
+            {(!autoDetect || mode === 'translation') && (
                 <div className="language-autocomplete">
                     <input
                         type="text"
@@ -84,10 +92,6 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange }: Lan
                             setShowDropdown(true);
                         }}
                         onFocus={() => {
-                            setSearchTerm(''); // Clear on focus to show all options? Or keep current? 
-                            // Better UX: keep current, let user delete if they want.
-                            // Actually, let's keep current behavior but select all text if possible? 
-                            // For now, just show dropdown. 
                             setShowDropdown(true);
                         }}
                         onBlur={handleBlur}

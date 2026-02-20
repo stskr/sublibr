@@ -1009,6 +1009,7 @@ function App() {
                     language={translateTargetLang}
                     autoDetect={false}
                     onLanguageChange={(language) => setTranslateTargetLang(language)}
+                    mode="translation"
                   />
 
                   <button
