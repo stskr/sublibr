@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
+import { WHISPER_PUNCTUATION_PROMPT } from '../src/prompts/whisper';
 import { createRequire } from 'module';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
@@ -788,7 +789,7 @@ ipcMain.handle('ai:callProvider', async (
         // but we can pass a "prompt" for context/style. 
         // By passing properly punctuated sentences, we strongly coerce Whisper 
         // to return punctuated sentences instead of long unpunctuated blocks.
-        formData.append('prompt', 'Please transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?');
+        formData.append('prompt', WHISPER_PUNCTUATION_PROMPT);
 
         // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
         // and format it ourselves to match what the app expects ([MM:SS] Text).

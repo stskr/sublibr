@@ -1,4 +1,4 @@
-import { BASE_TRANSCRIPTION_RULES } from './base';
+import { BASE_TRANSCRIPTION_RULES } from '../shared/base';
 
 /**
  * Prompt for standard full-file transcription
