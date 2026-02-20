@@ -1516,6 +1516,7 @@ npm run build:electron
 - [x] **Word-Level Subtitle Breaking** — Configured Whisper API to use word-level timestamp granularities to ensure accurate subtitle chunking.
 - [x] **UI Refinement** — Improved progress indicator styling (removed redundant spinner, aligned center).
 - [x] **Version Name Auto-Scroll** — Added hover tooltips and a marquee auto-scroll effect for long version names in the model selector.
+- [x] **Version Name Condensation** — Shortened version label formatting from "Version X" to "VX" to conserve space.
 
 ### Under Consideration
 - [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*

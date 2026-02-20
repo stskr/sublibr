@@ -66,7 +66,7 @@ export function useVersionHistory({
                 model: settings.providers[settings.activeProvider].model,
                 language: settings.language,
                 subtitles: subtitles,
-                label: `Restored Version (${settings.language}, ${settings.providers[settings.activeProvider].model})`,
+                label: `Restored V (${settings.language}, ${settings.providers[settings.activeProvider].model})`,
             };
             updatedVersions = [restoredVersion];
             setVersions(updatedVersions);
