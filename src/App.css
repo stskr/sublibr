@@ -529,10 +529,15 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   flex: 1;
   padding: var(--space-2xl);
   overflow-y: auto;
+}
+
+.file-upload-container::before,
+.file-upload-container::after {
+  content: '';
+  margin: auto;
 }
 
 .drop-zone {
