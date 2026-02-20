@@ -460,6 +460,7 @@ function App() {
         model: activeConfig.model,
         language: settings.language,
         subtitles: merged,
+        label: `${settings.autoDetectLanguage ? 'Auto-Detect' : settings.language} (${activeConfig.model})`,
       };
 
       setVersions(prev => {
@@ -526,7 +527,7 @@ function App() {
         model: settings.providers[settings.activeProvider].model,
         language: settings.language,
         subtitles: subtitles,
-        label: 'Restored Version',
+        label: `Restored Version (${settings.language}, ${settings.providers[settings.activeProvider].model})`,
       };
       updatedVersions = [restoredVersion];
       setVersions(updatedVersions);
@@ -570,7 +571,7 @@ function App() {
         model: activeConfig.model,
         language: translateTargetLang,
         subtitles: result.subtitles,
-        label: `Translated to ${translateTargetLang}`,
+        label: `Translated to ${translateTargetLang} (${activeConfig.model})`,
       };
 
       setVersions(prev => {
