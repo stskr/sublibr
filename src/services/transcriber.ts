@@ -73,7 +73,9 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
     return subtitles;
 }
 
-import { getStandardTranscriptionPrompt, getHealingTranscriptionPrompt } from './prompts';
+import { getStandardTranscriptionPrompt } from '../prompts/transcription';
+import { getHealingTranscriptionPrompt } from '../prompts/healing';
+import { getTranslationPrompt } from '../prompts/translation';
 import { getIsoLanguage } from '../utils';
 
 // ... (existing imports and code)
@@ -452,7 +454,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 }
 
 // Translate subtitles via text-only AI model
-import { getTranslationPrompt } from './prompts';
+// ... 
 import { callTextProvider } from './providers';
 
 export async function translateSubtitles(
