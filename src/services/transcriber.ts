@@ -96,22 +96,28 @@ function buildSubtitlesFromWords(words: { start: number; end: number; word: stri
 
         const potentialText = currentText + " " + cleanWord;
         const gap = w.start - currentEnd;
+        const duration = w.end - currentStart;
         const isEndPunctuation = /[.!?]$/.test(currentText);
         const isComma = /[,]$/.test(currentText);
 
         // Break if:
         // - Exceeds total allowed chars
+        // - Exceeds max comfortable duration (e.g. 5.5 seconds)
         // - Natural sentence end (. ! ?)
-        // - Long gap (> 1.5s)
-        // - After a comma if the current line is getting long (> maxCharsPerLine)
+        // - Moderate conversational gap (> 0.5s)
+        // - Minor gap (> 0.2s) IF we already have a reasonably long text
         let shouldBreak = false;
 
         if (potentialText.length > MAX_CHARS_TOTAL) {
             shouldBreak = true;
-        } else if (gap > 1.5) {
-            shouldBreak = true;
-        } else if (isEndPunctuation && currentText.length > 20) {
+        } else if (duration >= 5.5) {
+            shouldBreak = true; // Enforce max 5.5s length
+        } else if (gap >= 0.5) {
+            shouldBreak = true; // Natural conversational pause
+        } else if (isEndPunctuation && currentText.length > 15) {
             shouldBreak = true; // Natural break at end of sentence
+        } else if (gap >= 0.2 && currentText.length >= maxCharsPerLine) {
+            shouldBreak = true; // Minor pause and we already have a full line of text
         } else if (isComma && currentText.length >= maxCharsPerLine * 0.8) {
             shouldBreak = true; // Natural break at comma
         }
