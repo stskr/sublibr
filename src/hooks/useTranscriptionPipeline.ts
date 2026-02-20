@@ -151,7 +151,6 @@ export function useTranscriptionPipeline({
             merged = enforceSubtitleQuality(merged, settings.screenSize);
 
             let finalLanguage = settings.language;
-            let displayLanguage = settings.autoDetectLanguage ? 'Auto-Detect' : settings.language;
 
             if (settings.autoDetectLanguage && merged.length > 0) {
                 try {
@@ -163,12 +162,25 @@ export function useTranscriptionPipeline({
                     const cleanLang = langResponse.text.trim().replace(/[^a-zA-Z]/g, '');
                     if (cleanLang.length > 0 && cleanLang.length < 20) {
                         finalLanguage = cleanLang;
-                        displayLanguage = `Auto-Detected ${cleanLang}`;
                     }
                 } catch (err) {
                     console.warn('Failed to detect language from text output', err);
                 }
             }
+
+            const versionNumber = versions.length + 1;
+            const isAuto = settings.autoDetectLanguage;
+            let displaySourceLang = finalLanguage;
+            if (isAuto && finalLanguage) {
+                // E.g. "Hebrew"
+                displaySourceLang = finalLanguage;
+            } else if (!isAuto) {
+                displaySourceLang = settings.language;
+            }
+
+            const labelStr = isAuto
+                ? `Version ${versionNumber} - ${displaySourceLang} - Auto, ${activeConfig.model}`
+                : `Version ${versionNumber} - ${displaySourceLang}, ${activeConfig.model}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
@@ -178,7 +190,7 @@ export function useTranscriptionPipeline({
                 model: activeConfig.model,
                 language: finalLanguage,
                 subtitles: merged,
-                label: `${displayLanguage} (${activeConfig.model})`,
+                label: labelStr,
             };
 
             addVersion(newVersion);
@@ -204,7 +216,7 @@ export function useTranscriptionPipeline({
                 error: error instanceof Error ? error.message : 'Transcription failed',
             });
         }
-    }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles, addVersion, setShowGenerator]);
+    }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles, addVersion, setShowGenerator, versions.length]);
 
     const handleTranslate = useCallback(async () => {
         const activeConfig = settings.providers[settings.activeProvider];
@@ -243,6 +255,11 @@ export function useTranscriptionPipeline({
 
             addTokenUsage(result.tokenUsage);
 
+            const versionNumber = versions.length + 1;
+            const labelStr = isAutoDetect
+                ? `Version ${versionNumber} - Org.: ${sourceLanguage} - Auto - Tran.: ${translateTargetLang}, ${activeConfig.model}`
+                : `Version ${versionNumber} - Org.: ${sourceLanguage} - Tran.: ${translateTargetLang}, ${activeConfig.model}`;
+
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
                 id: versionId,
@@ -251,7 +268,7 @@ export function useTranscriptionPipeline({
                 model: activeConfig.model,
                 language: translateTargetLang,
                 subtitles: result.subtitles,
-                label: `Translated to ${translateTargetLang} (${activeConfig.model})`,
+                label: labelStr,
             };
 
             addVersion(newVersion);

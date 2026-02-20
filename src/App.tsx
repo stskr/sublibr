@@ -416,18 +416,6 @@ function App() {
                     </button>
                   )}
 
-                  <LanguageSelector
-                    language={settings.language}
-                    autoDetect={settings.autoDetectLanguage}
-                    onLanguageChange={(language, autoDetect) => {
-                      const updated = { ...settings, language, autoDetectLanguage: autoDetect };
-                      setSettings(updated);
-                      if (window.electronAPI) {
-                        window.electronAPI.setStoreValue('settings', updated);
-                      }
-                    }}
-                  />
-
                   <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
                     <label className="sidebar-label">Screen Format</label>
                     <CustomSelect
@@ -445,7 +433,24 @@ function App() {
                         }
                       }}
                     />
+                    <p className="sidebar-hint" style={{ marginTop: '0.25rem' }}>
+                      {settings.screenSize === 'wide' && 'Max 40 chars per line, up to 2 lines'}
+                      {settings.screenSize === 'square' && 'Max 25 chars per line, up to 2 lines'}
+                      {settings.screenSize === 'vertical' && 'Max 15 chars per line, up to 2 lines'}
+                    </p>
                   </div>
+
+                  <LanguageSelector
+                    language={settings.language}
+                    autoDetect={settings.autoDetectLanguage}
+                    onLanguageChange={(language, autoDetect) => {
+                      const updated = { ...settings, language, autoDetectLanguage: autoDetect };
+                      setSettings(updated);
+                      if (window.electronAPI) {
+                        window.electronAPI.setStoreValue('settings', updated);
+                      }
+                    }}
+                  />
 
                   <button
                     className="btn-primary sidebar-action-btn"
