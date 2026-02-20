@@ -2670,37 +2670,36 @@ a:hover {
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 300px;
-  text-align: center;
-  position: relative;
-  /* Optional: center it when short */
-  display: flex;
-  justify-content: center;
+  container-type: inline-size;
+  overflow: hidden;
 }
 
 .player-track-name-inner {
-  display: inline-block;
-}
-
-.player-track-name:hover {
-  text-overflow: clip;
-  justify-content: flex-start;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .player-track-name:hover .player-track-name-inner {
-  padding-left: 100%;
-  animation: track-name-marquee 8s linear infinite;
+  max-width: none;
+  overflow: visible;
+  animation: track-name-marquee 6s linear infinite alternate;
 }
 
 @keyframes track-name-marquee {
-  0% {
+
+  0%,
+  15% {
     transform: translateX(0);
   }
 
+  85%,
   100% {
-    transform: translateX(-100%);
+    transform: translateX(min(0px, calc(100cqw - 100%)));
   }
 }
