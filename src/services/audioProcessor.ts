@@ -1,8 +1,9 @@
 import type { AudioChunk, SilenceSegment } from '../types';
 
-const TARGET_CHUNK_DURATION = 210; // 3.5 minutes
-const MIN_CHUNK_DURATION = 180; // 3 mins
-const MAX_CHUNK_DURATION = 240; // 4 mins
+// Reduced durations to give Whisper an easier time digesting audio
+const TARGET_CHUNK_DURATION = 90; // 1.5 minutes
+const MIN_CHUNK_DURATION = 60; // 1 min
+const MAX_CHUNK_DURATION = 120; // 2 mins
 const OVERLAP_DURATION = 20; // 20s overlap
 
 export async function createAudioChunks(
