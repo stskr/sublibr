@@ -2670,6 +2670,7 @@ a:hover {
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-secondary);
+  width: 100%;
   max-width: 300px;
   container-type: inline-size;
   overflow: hidden;
