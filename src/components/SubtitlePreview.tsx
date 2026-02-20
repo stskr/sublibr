@@ -24,7 +24,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
     const [isPaused, setIsPaused] = useState(true);
     const [editingSubtitleId, setEditingSubtitleId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
-    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, color: '', size: '' });
+    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, size: '' });
 
     // Find active subtitle at current time
     const activeSub = subtitles.find(
@@ -131,10 +131,6 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
         if (tag === 'b') editor.execCommand('bold');
         else if (tag === 'i') editor.execCommand('italic');
         else if (tag === 'u') editor.execCommand('underline');
-        else if (tag === 'font') {
-            const color = window.prompt("Enter color (e.g. red, #ff0000):", "red") || "red";
-            editor.execCommand('foreColor', color);
-        }
     }, [editingSubtitleId]);
 
     // Handle keydown in textarea

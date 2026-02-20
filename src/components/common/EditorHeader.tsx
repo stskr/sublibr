@@ -1,4 +1,3 @@
-import React from 'react';
 
 export interface EditorHeaderProps {
     showSearch?: boolean;
@@ -11,12 +10,8 @@ export interface EditorHeaderProps {
     onUndo?: () => void;
     onRedo?: () => void;
 
-    activeStyles: { bold: boolean, italic: boolean, underline: boolean, color: string, size: string };
+    activeStyles: { bold: boolean, italic: boolean, underline: boolean, size: string };
     onApplyStyle: (tag: string) => void;
-
-    colorInputRef?: React.RefObject<HTMLInputElement | null>;
-    onColorClick?: () => void;
-    onColorChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
     entryCount: number;
 
@@ -37,9 +32,6 @@ export function EditorHeader({
     onRedo,
     activeStyles,
     onApplyStyle,
-    colorInputRef,
-    onColorClick,
-    onColorChange,
     entryCount,
     hideSearch = false,
     hideAutoScroll = false,
@@ -117,37 +109,6 @@ export function EditorHeader({
                     >
                         <span className="icon icon-sm">format_underlined</span>
                     </button>
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <button
-                            className="btn-tool-small"
-                            onMouseDown={(e) => { e.preventDefault(); onApplyStyle('font'); }}
-                            title="Color"
-                            disabled={disableFormatting}
-                        >
-                            <span className="icon icon-sm">palette</span>
-                        </button>
-                        {colorInputRef && (
-                            <input
-                                type="color"
-                                ref={colorInputRef}
-                                style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: '100%',
-                                    opacity: 0,
-                                    cursor: disableFormatting ? 'default' : 'pointer'
-                                }}
-                                onMouseDown={(e) => {
-                                    if (disableFormatting) e.preventDefault();
-                                    else if (onColorClick) onColorClick();
-                                }}
-                                onChange={onColorChange}
-                                disabled={disableFormatting}
-                            />
-                        )}
-                    </div>
                 </div>
 
                 <span className="subtitle-count">{entryCount} entries</span>

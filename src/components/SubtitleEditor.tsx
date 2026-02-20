@@ -23,8 +23,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
     const editorRefs = useRef<{ [key: string]: RichTextEditorRef | null }>({});
-    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, color: '', size: '' });
-    const colorInputRef = useRef<HTMLInputElement>(null);
+    const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, size: '' });
 
     // Search State
     const [showSearch, setShowSearch] = useState(false);
@@ -250,29 +249,11 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
         if (tag === 'b') editor.execCommand('bold');
         else if (tag === 'i') editor.execCommand('italic');
         else if (tag === 'u') editor.execCommand('underline');
-        else if (tag === 'font') {
-            // Trigger color input
-            colorInputRef.current?.click();
-        } else if (tag === 'size') {
+        else if (tag === 'size') {
             // Safe fallback for now - maybe cycle sizes later
             // const size = window.prompt("Enter size (1-7):", "3") || "3";
             // editor.execCommand('fontSize', size);
         }
-    }, [editingId]);
-
-    const handleColorClick = useCallback(() => {
-        if (!editingId) return;
-        const editor = editorRefs.current[editingId];
-        if (editor) editor.saveSelection();
-    }, [editingId]);
-
-    const handleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!editingId) return;
-        const editor = editorRefs.current[editingId];
-        if (!editor) return;
-
-        editor.restoreSelection();
-        editor.execCommand('foreColor', e.target.value);
     }, [editingId]);
 
     // Global keyboard shortcuts for styling when editing
@@ -310,9 +291,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                 onRedo={onRedo}
                 activeStyles={activeStyles}
                 onApplyStyle={applyStyle}
-                colorInputRef={colorInputRef}
-                onColorClick={handleColorClick}
-                onColorChange={handleColorChange}
                 entryCount={subtitles.length}
             />
 
@@ -448,13 +426,6 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         value={sub.text}
                                         onChange={(text) => handleTextChange(sub.id, text)}
                                         onBlur={(e) => {
-                                            // Don't effectively blur if we're clicking the color picker
-                                            // The color picker input handles focus restoration
-                                            if (e.relatedTarget && (e.relatedTarget as HTMLElement).getAttribute('type') === 'color') {
-                                                return;
-                                            }
-                                            // Also check if we're clicking inside the color picker container
-                                            // Sometimes the click target might be the wrapper
                                             if (e.relatedTarget && (e.relatedTarget as HTMLElement).closest('.editor-styling-toolbar')) {
                                                 return;
                                             }
