@@ -549,6 +549,25 @@ function App() {
       return;
     }
 
+    const currentVersion = activeVersionId ? versions.find(v => v.id === activeVersionId) : null;
+    const sourceLanguage = currentVersion ? currentVersion.language : settings.language;
+    const isAutoDetect = currentVersion
+      ? currentVersion.label?.includes('Auto-Detect')
+      : settings.autoDetectLanguage;
+
+    if (sourceLanguage === translateTargetLang && !isAutoDetect) {
+      if (window.electronAPI) {
+        await window.electronAPI.showMessageBox({
+          type: 'warning',
+          title: 'Translation Error',
+          message: `You are trying to translate to the same language (${translateTargetLang}).`,
+          detail: 'Please select a different target language for translation.',
+          buttons: ['OK']
+        });
+      }
+      return;
+    }
+
     setProcessing({ status: 'transcribing', progress: 0 });
 
     try {
@@ -604,7 +623,7 @@ function App() {
         error: error instanceof Error ? error.message : 'Translation failed',
       });
     }
-  }, [subtitles, translateTargetLang, settings, mediaFile, addTokenUsage, addToRecents, setSubtitles, persistVersions]);
+  }, [subtitles, translateTargetLang, settings, mediaFile, addTokenUsage, addToRecents, setSubtitles, persistVersions, activeVersionId, versions]);
 
 
   // Handle Version Switching

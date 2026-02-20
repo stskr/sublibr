@@ -55,12 +55,13 @@ Transcribe the audio clip now:`;
  */
 export function getTranslationPrompt(targetLanguage: string): string {
     return `You are a professional subtitle translator. Translate the following text into ${targetLanguage}.
+CRITICAL INSTRUCTION: If the input text is ALREADY in ${targetLanguage}, do NOT translate it into English or any other language. Simply return the exact same text.
 
 The input is a JSON array of subtitle objects:
 [{ "id": "1", "text": "Hello world" }]
 
 Return ONLY a perfectly formed JSON array containing the exact same "id" values but with the "text" field translated into ${targetLanguage}. Do not add any markdown formatting like \`\`\`json around the output. Do not merge or split the items. Keep the structure identical.
 
-Translate the following subtitles:
+Translate the following subtitles into ${targetLanguage}:
 `;
 }
