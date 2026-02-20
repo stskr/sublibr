@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { formatSrtTime, parseSrtTime, generateId, detectDirection } from '../utils';
 import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
+import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle } from '../types';
 
@@ -298,100 +299,22 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
 
     return (
         <div className="subtitle-editor">
-            <div className="editor-header">
-                <div className="editor-header-actions">
-                    <button
-                        className={`btn-icon ${showSearch ? 'active' : ''}`}
-                        onClick={() => setShowSearch(!showSearch)}
-                        title="Search and Replace (Cmd/Ctrl+F)"
-                    >
-                        <span className="icon icon-sm">search</span>
-                    </button>
-                    <label className="auto-scroll-toggle" title="Auto-scroll to active subtitle">
-                        <input
-                            type="checkbox"
-                            checked={autoScroll}
-                            onChange={(e) => setAutoScroll(e.target.checked)}
-                        />
-                        <span className="icon icon-sm">swap_vert</span>
-                        Auto-scroll
-                    </label>
-                </div>
-
-                <div className="editor-toolbars">
-                    <div className="editor-history-toolbar">
-                        <button
-                            className="btn-tool-small"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => onUndo && onUndo()}
-                            title="Undo (Ctrl+Z)"
-                            disabled={!canUndo}
-                        >
-                            <span className="icon icon-sm">undo</span>
-                        </button>
-                        <button
-                            className="btn-tool-small"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => onRedo && onRedo()}
-                            title="Redo (Ctrl+Shift+Z)"
-                            disabled={!canRedo}
-                        >
-                            <span className="icon icon-sm">redo</span>
-                        </button>
-                    </div>
-
-                    <div className="editor-styling-toolbar">
-                        <button
-                            className={`btn-tool-small ${activeStyles.bold ? 'active' : ''}`}
-                            onMouseDown={(e) => { e.preventDefault(); applyStyle('b'); }}
-                            title="Bold (Ctrl+B)"
-                        >
-                            <span className="icon icon-sm">format_bold</span>
-                        </button>
-                        <button
-                            className={`btn-tool-small ${activeStyles.italic ? 'active' : ''}`}
-                            onMouseDown={(e) => { e.preventDefault(); applyStyle('i'); }}
-                            title="Italic (Ctrl+I)"
-                        >
-                            <span className="icon icon-sm">format_italic</span>
-                        </button>
-                        <button
-                            className={`btn-tool-small ${activeStyles.underline ? 'active' : ''}`}
-                            onMouseDown={(e) => { e.preventDefault(); applyStyle('u'); }}
-                            title="Underline (Ctrl+U)"
-                        >
-                            <span className="icon icon-sm">format_underlined</span>
-                        </button>
-                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                            <button
-                                className="btn-tool-small"
-                                onMouseDown={(e) => { e.preventDefault(); }}
-                                title="Color"
-                            >
-                                <span className="icon icon-sm">palette</span>
-                            </button>
-                            <input
-                                type="color"
-                                ref={colorInputRef}
-                                style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: '100%',
-                                    opacity: 0,
-                                    cursor: 'pointer'
-                                }}
-                                onMouseDown={handleColorClick}
-                                onChange={handleColorChange}
-                            />
-                        </div>
-
-                    </div>
-
-                    <span className="subtitle-count">{subtitles.length} entries</span>
-                </div>
-            </div>
+            <EditorHeader
+                showSearch={showSearch}
+                onToggleSearch={() => setShowSearch(!showSearch)}
+                autoScroll={autoScroll}
+                onToggleAutoScroll={setAutoScroll}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={onUndo}
+                onRedo={onRedo}
+                activeStyles={activeStyles}
+                onApplyStyle={applyStyle}
+                colorInputRef={colorInputRef}
+                onColorClick={handleColorClick}
+                onColorChange={handleColorChange}
+                entryCount={subtitles.length}
+            />
 
             {showSearch && (
                 <div className="search-bar">

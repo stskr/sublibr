@@ -402,6 +402,7 @@ All components are **functional React components** using hooks. No class compone
 | `FileUpload` | [FileUpload.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/FileUpload.tsx) | Drag-and-drop + file selection |
 | `SubtitleEditor` | [SubtitleEditor.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitleEditor.tsx) | Timeline-based subtitle editor |
 | `SubtitlePreview` | [SubtitlePreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitlePreview.tsx) | Inline preview (video or cinema screen with subtitles) |
+| `EditorHeader` | [EditorHeader.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/common/EditorHeader.tsx) | Shared toolbar header for editor and preview |
 | `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
 | `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
 | `CustomSelect` | [CustomSelect.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/CustomSelect.tsx) | Reusable custom dropdown select |
@@ -491,11 +492,17 @@ interface SubtitleEditorProps {
   subtitles: Subtitle[];
   onSubtitlesChange: (subtitles: Subtitle[]) => void;
   currentTime: number;
-  onSeek: (time: number) => void; // Required
+  mediaDuration?: number;
+  onSeek: (time: number) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 ```
 
 **Features**:
+- Uses **EditorHeader** for shared styling and history controls
 - Scrollable subtitle list
 - Inline editing (text, start/end times)
 - Click to seek (if player connected)
@@ -525,10 +532,15 @@ interface SubtitlePreviewProps {
   currentTime: number;
   mediaFile: MediaFile;
   onSubtitleChange?: (id: string, text: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 ```
 
 **Features**:
+- Uses **EditorHeader** for styling and history, mirroring the Subtitle Editor
 - Inline preview that renders inside the editor-main area (not a modal)
 - Toggle between "Subtitles" view and "Preview" view via tab bar
 - **Video files**: Muted `<video>` element synced to the audio player's currentTime, with subtitle overlay at bottom

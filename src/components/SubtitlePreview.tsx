@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { detectDirection } from '../utils';
 import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
+import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle, MediaFile } from '../types';
 
@@ -154,70 +155,6 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
 
     // No auto-resize needed for contenteditable as it grows with content
 
-    // Render toolbar
-    const renderToolbar = () => (
-        <div className="preview-subtitle-toolbar" style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 20,
-            opacity: 1, // Always visible
-            display: 'flex',
-            gap: '4px',
-            background: 'rgba(0,0,0,0.6)',
-            padding: '8px',
-            borderRadius: '8px'
-        }}>
-            <button
-                onMouseDown={(e) => { e.preventDefault(); if (onUndo) onUndo(); }}
-                title="Undo (Ctrl+Z)"
-                disabled={!canUndo}
-            >
-                <span className="icon icon-sm">undo</span>
-            </button>
-            <button
-                onMouseDown={(e) => { e.preventDefault(); if (onRedo) onRedo(); }}
-                title="Redo (Ctrl+Shift+Z)"
-                disabled={!canRedo}
-            >
-                <span className="icon icon-sm">redo</span>
-            </button>
-            <div className="toolbar-divider" style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-            <button
-                className={activeStyles.bold ? 'active' : ''}
-                onMouseDown={(e) => { e.preventDefault(); applyStyle('b'); }}
-                title="Bold (Ctrl+B)"
-                disabled={!editingSubtitleId}
-            >
-                <span className="icon icon-sm">format_bold</span>
-            </button>
-            <button
-                className={activeStyles.italic ? 'active' : ''}
-                onMouseDown={(e) => { e.preventDefault(); applyStyle('i'); }}
-                title="Italic (Ctrl+I)"
-                disabled={!editingSubtitleId}
-            >
-                <span className="icon icon-sm">format_italic</span>
-            </button>
-            <button
-                className={activeStyles.underline ? 'active' : ''}
-                onMouseDown={(e) => { e.preventDefault(); applyStyle('u'); }}
-                title="Underline (Ctrl+U)"
-                disabled={!editingSubtitleId}
-            >
-                <span className="icon icon-sm">format_underlined</span>
-            </button>
-            <button
-                onMouseDown={(e) => { e.preventDefault(); applyStyle('font'); }}
-                title="Color"
-                disabled={!editingSubtitleId}
-            >
-                <span className="icon icon-sm">palette</span>
-            </button>
-        </div>
-    );
-
     // Render subtitle content (text or textarea)
     const renderSubtitleContent = () => {
         const isEditing = editingSubtitleId === activeSub?.id;
@@ -225,7 +162,6 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
         if (isEditing) {
             return (
                 <div className="preview-subtitle-editor-container">
-                    {/* Toolbar is now rendered globally */}
                     <RichTextEditor
                         ref={textareaRef}
                         className="preview-subtitle-textarea"
@@ -259,9 +195,21 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
         );
     };
 
-    if (mediaFile.isVideo) {
-        return (
-            <div className="subtitle-preview">
+    return (
+        <div className="subtitle-preview">
+            <EditorHeader
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={onUndo}
+                onRedo={onRedo}
+                activeStyles={activeStyles}
+                onApplyStyle={applyStyle}
+                entryCount={subtitles.length}
+                hideSearch
+                hideAutoScroll
+                disableFormatting={!editingSubtitleId}
+            />
+            {mediaFile.isVideo ? (
                 <div className="preview-video-wrapper">
                     <video
                         ref={videoRef}
@@ -269,26 +217,19 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
                         playsInline
                     />
                     {renderSubtitleContent()}
-                    {renderToolbar()}
                 </div>
-            </div>
-        );
-    }
-
-    // Audio file: cinema screen
-    return (
-        <div className="subtitle-preview">
-            <div className={`preview-cinema${mediaFile.isVideo ? '' : ' audio-mode'}`}>
-                {renderToolbar()}
-                {subtitleText || editingSubtitleId ? (
-                    renderSubtitleContent()
-                ) : (
-                    <div className="preview-cinema-idle">
-                        <span className="icon icon-xl">subtitles</span>
-                        <p>No subtitle at current time</p>
-                    </div>
-                )}
-            </div>
+            ) : (
+                <div className={`preview-cinema${mediaFile.isVideo ? '' : ' audio-mode'}`}>
+                    {subtitleText || editingSubtitleId ? (
+                        renderSubtitleContent()
+                    ) : (
+                        <div className="preview-cinema-idle">
+                            <span className="icon icon-xl">subtitles</span>
+                            <p>No subtitle at current time</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
