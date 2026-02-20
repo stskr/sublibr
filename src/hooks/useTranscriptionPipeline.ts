@@ -100,29 +100,50 @@ export function useTranscriptionPipeline({
             let previousTranscript = '';
 
             for (let i = 0; i < chunks.length; i++) {
+                const baseProgress = 30 + ((i / totalChunks) * 60);
+                const nextProgress = 30 + (((i + 1) / totalChunks) * 60);
+                const targetSimulatedProgress = baseProgress + (nextProgress - baseProgress) * 0.85;
+
                 setProcessing({
                     status: 'transcribing',
-                    progress: 30 + ((i / totalChunks) * 60),
+                    progress: baseProgress,
                     currentChunk: i + 1,
                     totalChunks,
                 });
 
-                const result = await transcribeChunk(
-                    chunks[i],
-                    provider,
-                    apiKey,
-                    model,
-                    settings.language,
-                    settings.autoDetectLanguage,
-                    'standard',
-                    previousTranscript
-                );
-                allSubtitles.push(result.subtitles);
-                addTokenUsage(result.tokenUsage);
+                let simulatedProgress = baseProgress;
+                const progressInterval = setInterval(() => {
+                    simulatedProgress += (targetSimulatedProgress - simulatedProgress) * 0.05;
+                    // Cap it just below the target to avoid rounding floating point issues overshooting
+                    if (simulatedProgress > targetSimulatedProgress - 0.5) {
+                        simulatedProgress = targetSimulatedProgress;
+                    }
+                    setProcessing(prev => {
+                        if (prev.status !== 'transcribing' || prev.currentChunk !== i + 1) return prev;
+                        return { ...prev, progress: simulatedProgress };
+                    });
+                }, 500);
 
-                // Keep the last ~1000 characters to provide as context for the next chunk
-                const chunkText = result.subtitles.map(s => s.text).join(' ');
-                previousTranscript = chunkText.slice(-1000);
+                try {
+                    const result = await transcribeChunk(
+                        chunks[i],
+                        provider,
+                        apiKey,
+                        model,
+                        settings.language,
+                        settings.autoDetectLanguage,
+                        'standard',
+                        previousTranscript
+                    );
+                    allSubtitles.push(result.subtitles);
+                    addTokenUsage(result.tokenUsage);
+
+                    // Keep the last ~1000 characters to provide as context for the next chunk
+                    const chunkText = result.subtitles.map(s => s.text).join(' ');
+                    previousTranscript = chunkText.slice(-1000);
+                } finally {
+                    clearInterval(progressInterval);
+                }
             }
 
             setProcessing({ status: 'merging', progress: 90 });

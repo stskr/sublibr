@@ -517,13 +517,26 @@ export async function translateSubtitles(
     const totalChunks = subtitleChunks.length;
 
     for (let i = 0; i < totalChunks; i++) {
+        const baseProgress = (i / totalChunks) * 100;
+        const nextProgress = ((i + 1) / totalChunks) * 100;
+        const targetSimulatedProgress = baseProgress + (nextProgress - baseProgress) * 0.85;
+
         if (onProgress) {
-            onProgress(i / totalChunks * 100);
+            onProgress(baseProgress);
         }
 
         const chunk = subtitleChunks[i];
         const inputText = JSON.stringify(chunk.map(s => ({ id: s.id, text: s.text })));
         const prompt = `${promptBase}\n\n${inputText}`;
+
+        let simulatedProgress = baseProgress;
+        const progressInterval = onProgress ? setInterval(() => {
+            simulatedProgress += (targetSimulatedProgress - simulatedProgress) * 0.05;
+            if (simulatedProgress > targetSimulatedProgress - 0.5) {
+                simulatedProgress = targetSimulatedProgress;
+            }
+            onProgress(simulatedProgress);
+        }, 500) : undefined;
 
         try {
             const response = await callTextProvider(provider, apiKey, model, prompt);
@@ -558,6 +571,8 @@ export async function translateSubtitles(
             console.error('Translation chunk failed, falling back to original:', error);
             // Fallback to original
             translatedSubtitles.push(...chunk);
+        } finally {
+            if (progressInterval) clearInterval(progressInterval);
         }
     }
 
