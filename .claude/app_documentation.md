@@ -602,6 +602,7 @@ interface AudioPlayerProps {
 - Clickable progress bar
 - Volume slider
 - Time display: `[00:00]  [Filename]  [05:35]` — start time left-aligned, filename centered, end time right-aligned
+- Horizontal auto-scroll animation on the title when hovered
 - Loads audio via custom `media://` protocol for efficient streaming
 
 **UX Details**:

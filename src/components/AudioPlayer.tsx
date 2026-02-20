@@ -196,17 +196,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
                     <div className="player-time left">{formatDisplayTime(currentTime)}</div>
                     {/* Filename centered between times */}
                     {filename && (
-                        <div className="player-track-name" style={{
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            color: 'var(--color-text-secondary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '300px',
-                            textAlign: 'center'
-                        }}>
-                            {filename}
+                        <div className="player-track-name" title={filename}>
+                            <div className="player-track-name-inner">
+                                {filename}
+                            </div>
                         </div>
                     )}
                     <div className="player-time right">{formatDisplayTime(duration)}</div>
