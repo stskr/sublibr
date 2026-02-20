@@ -26,8 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // AI API proxy (calls go through main process — keys never exposed in renderer)
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
-    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string, language?: string | null) =>
-        ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat, language),
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string, language?: string | null, previousTranscript?: string) =>
+        ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript),
     callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) =>
         ipcRenderer.invoke('ai:callTextProvider', provider, apiKey, model, prompt),
 

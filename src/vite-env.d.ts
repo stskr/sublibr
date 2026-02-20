@@ -20,7 +20,7 @@ export interface ElectronAPI {
 
     // AI API proxy
     testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>;
-    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string) => Promise<{
+    callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string, language?: string | null, previousTranscript?: string) => Promise<{
         text: string;
         tokenUsage: {
             inputTokens: number;

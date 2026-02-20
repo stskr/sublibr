@@ -73,9 +73,11 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
     return subtitles;
 }
 
-import { getStandardTranscriptionPrompt } from '../prompts/transcription';
-import { getHealingTranscriptionPrompt } from '../prompts/healing';
-import { getTranslationPrompt } from '../prompts/translation';
+import { getStandardTranscriptionPrompt as getGeminiTranscriptionPrompt } from '../prompts/gemini/transcription';
+import { getHealingTranscriptionPrompt as getGeminiHealingPrompt } from '../prompts/gemini/healing';
+import { getOpenAITranscriptionPrompt } from '../prompts/openai/transcription';
+import { getOpenAIHealingPrompt } from '../prompts/openai/healing';
+import { getTranslationPrompt } from '../prompts/shared/translation';
 import { getIsoLanguage } from '../utils';
 
 // ... (existing imports and code)
@@ -87,7 +89,8 @@ export async function transcribeChunk(
     model: string,
     language: string,
     autoDetect: boolean,
-    mode: 'standard' | 'healing' = 'standard'
+    mode: 'standard' | 'healing' = 'standard',
+    previousTranscript?: string
 ): Promise<TranscriptionResult> {
     // Read and encode audio
     const audioBase64 = await audioToBase64(chunk.filePath);
@@ -96,9 +99,16 @@ export async function transcribeChunk(
         ? 'Auto-detect the language of the audio.'
         : `The audio is in ${language}.`;
 
-    const prompt = mode === 'healing'
-        ? getHealingTranscriptionPrompt(languageInstruction)
-        : getStandardTranscriptionPrompt(languageInstruction);
+    let prompt = '';
+    if (provider === 'gemini') {
+        prompt = mode === 'healing'
+            ? getGeminiHealingPrompt(languageInstruction)
+            : getGeminiTranscriptionPrompt(languageInstruction);
+    } else {
+        prompt = mode === 'healing'
+            ? getOpenAIHealingPrompt(languageInstruction)
+            : getOpenAITranscriptionPrompt(languageInstruction);
+    }
 
     // Infer format from extension
     const ext = chunk.filePath.split('.').pop()?.toLowerCase() || 'flac';
@@ -106,7 +116,7 @@ export async function transcribeChunk(
 
     const languageIso = getIsoLanguage(language, autoDetect);
 
-    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, languageIso);
+    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, languageIso, previousTranscript);
     const text = providerResponse.text;
 
     let subtitles = parseTranscription(text, chunk.startTime);

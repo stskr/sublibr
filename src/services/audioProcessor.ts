@@ -1,16 +1,17 @@
-import type { AudioChunk, SilenceSegment } from '../types';
-
-// Reduced durations to give Whisper an easier time digesting audio
-const TARGET_CHUNK_DURATION = 90; // 1.5 minutes
-const MIN_CHUNK_DURATION = 60; // 1 min
-const MAX_CHUNK_DURATION = 120; // 2 mins
-const OVERLAP_DURATION = 20; // 20s overlap
+import type { AudioChunk, SilenceSegment, AIProvider } from '../types';
 
 export async function createAudioChunks(
     audioPath: string,
     tempDir: string,
-    format: 'flac' | 'mp3' = 'flac'
+    format: 'flac' | 'mp3' = 'flac',
+    provider: AIProvider = 'gemini'
 ): Promise<{ chunks: AudioChunk[], silences: SilenceSegment[] }> {
+    // OpenAI Whisper works best with 10-20 min chunks. Gemini prefers shorter chunks due to context limits.
+    const TARGET_CHUNK_DURATION = provider === 'openai' ? 900 : 90; // 15 mins vs 1.5 mins
+    const MIN_CHUNK_DURATION = provider === 'openai' ? 600 : 60; // 10 mins vs 1 min
+    const MAX_CHUNK_DURATION = provider === 'openai' ? 1200 : 120; // 20 mins vs 2 mins
+    const OVERLAP_DURATION = provider === 'openai' ? 10 : 20; // 10s overlap for Whisper, 20s for Gemini
+
     // Get total duration
     const duration = await window.electronAPI.getDuration(audioPath);
 

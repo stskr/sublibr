@@ -93,10 +93,11 @@ export function useTranscriptionPipeline({
             }
 
             setProcessing({ status: 'detecting-silences', progress: 15 });
-            const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat);
+            const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat, provider);
 
             const allSubtitles: Subtitle[][] = [];
             const totalChunks = chunks.length;
+            let previousTranscript = '';
 
             for (let i = 0; i < chunks.length; i++) {
                 setProcessing({
@@ -112,10 +113,16 @@ export function useTranscriptionPipeline({
                     apiKey,
                     model,
                     settings.language,
-                    settings.autoDetectLanguage
+                    settings.autoDetectLanguage,
+                    'standard',
+                    previousTranscript
                 );
                 allSubtitles.push(result.subtitles);
                 addTokenUsage(result.tokenUsage);
+
+                // Keep the last ~1000 characters to provide as context for the next chunk
+                const chunkText = result.subtitles.map(s => s.text).join(' ');
+                previousTranscript = chunkText.slice(-1000);
             }
 
             setProcessing({ status: 'merging', progress: 90 });
