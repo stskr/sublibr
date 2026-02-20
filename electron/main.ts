@@ -825,3 +825,86 @@ ipcMain.handle('ai:callProvider', async (
     }
   }
 });
+
+ipcMain.handle('ai:callTextProvider', async (
+  _event,
+  provider: AIProvider,
+  apiKey: string,
+  model: string,
+  prompt: string,
+) => {
+  switch (provider) {
+    case 'gemini': {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiModel = genAI.getGenerativeModel({ model });
+
+      const result = await geminiModel.generateContent(prompt);
+      const response = await result.response;
+      const usage = response.usageMetadata;
+
+      return {
+        text: response.text(),
+        tokenUsage: {
+          inputTokens: usage?.promptTokenCount ?? 0,
+          outputTokens: usage?.candidatesTokenCount ?? 0,
+          provider: 'gemini',
+          model,
+          timestamp: Date.now(),
+        },
+      };
+    }
+
+    case 'openai': {
+      // For text-only parsing, we can just use the standard chat completions endpoint
+      // gpt-4o, gpt-4o-mini, etc.
+
+      let mappedModel = model;
+      // We don't need audio-preview models for text-to-text
+      if (model === 'gpt-4o-audio-preview') mappedModel = 'gpt-4o';
+      if (model === 'gpt-4o-mini-audio-preview') mappedModel = 'gpt-4o-mini';
+
+      const messages = [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ];
+
+      const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: mappedModel,
+          messages: messages,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
+        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
+      }
+
+      const data = await res.json() as {
+        choices: { message: { content: string } }[];
+        usage?: { prompt_tokens: number; completion_tokens: number };
+      };
+
+      const text = data.choices[0]?.message?.content || '';
+
+      return {
+        text,
+        tokenUsage: {
+          inputTokens: data.usage?.prompt_tokens || 0,
+          outputTokens: data.usage?.completion_tokens || 0,
+          provider: 'openai',
+          model,
+          timestamp: Date.now(),
+        },
+      };
+    }
+  }
+});

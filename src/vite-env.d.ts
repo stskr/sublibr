@@ -30,6 +30,16 @@ export interface ElectronAPI {
             timestamp: number;
         };
     }>;
+    callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) => Promise<{
+        text: string;
+        tokenUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            provider: 'gemini' | 'openai';
+            model: string;
+            timestamp: number;
+        };
+    }>;
     extractAudio: (inputPath: string, outputPath: string, format?: string) => Promise<string>;
     getDuration: (filePath: string) => Promise<number>;
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;

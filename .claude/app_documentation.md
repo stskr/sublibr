@@ -248,10 +248,11 @@ Four core services handle subtitle processing:
 - Splits audio files using FFmpeg
 
 #### **transcriber.ts**
-- Sends audio chunks to Gemini AI
+- Sends audio chunks to Gemini AI / OpenAI
 - Parses SRT-formatted responses
 - Merges subtitles with "smart stitching" (handles chunk boundaries)
 - Enforces subtitle quality standards (min/max duration, reading speed)
+- **Translates subtitles** via text-to-text API calls preserving exactly matching timestamps.
 
 #### **healer.ts**
 - Identifies gaps in subtitle coverage

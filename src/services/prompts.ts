@@ -47,3 +47,20 @@ ${BASE_TRANSCRIPTION_RULES}
 
 Transcribe the audio clip now:`;
 }
+
+/**
+ * Prompt for translating subtitles.
+ * Takes a JSON string consisting of subtitle elements [{id, text}]
+ * Returns the exact same JSON format with text translated to the target language.
+ */
+export function getTranslationPrompt(targetLanguage: string): string {
+    return `You are a professional subtitle translator. Translate the following text into ${targetLanguage}.
+
+The input is a JSON array of subtitle objects:
+[{ "id": "1", "text": "Hello world" }]
+
+Return ONLY a perfectly formed JSON array containing the exact same "id" values but with the "text" field translated into ${targetLanguage}. Do not add any markdown formatting like \`\`\`json around the output. Do not merge or split the items. Keep the structure identical.
+
+Translate the following subtitles:
+`;
+}

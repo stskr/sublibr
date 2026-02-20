@@ -11,7 +11,7 @@ import { ProgressIndicator } from './components/ProgressIndicator';
 import { LanguageSelector } from './components/LanguageSelector';
 import { CustomSelect } from './components/CustomSelect';
 import { createAudioChunks } from './services/audioProcessor';
-import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss } from './services/transcriber';
+import { transcribeChunk, mergeSubtitles, enforceSubtitleQuality, generateSrt, generateWebVtt, generateAss, translateSubtitles } from './services/transcriber';
 import { healSubtitles } from './services/healer';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { useUndoRedo } from './hooks/useUndoRedo';
@@ -57,6 +57,8 @@ function App() {
   const [versions, setVersions] = useState<SubtitleVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [showGenerator, setShowGenerator] = useState(false);
+  const [showTranslator, setShowTranslator] = useState(false);
+  const [translateTargetLang, setTranslateTargetLang] = useState('Spanish');
   const [highlightedRecentIndex, setHighlightedRecentIndex] = useState<number | null>(null);
   const [activeTool, setActiveTool] = useState<'select' | 'scissors' | 'trim'>('select');
 
@@ -538,6 +540,72 @@ function App() {
     setShowGenerator(true);
   }, [activeVersionId, subtitles, versions, settings, persistVersions]);
 
+  // Handle Translate Click
+  const handleTranslate = useCallback(async () => {
+    const activeConfig = settings.providers[settings.activeProvider];
+    if (!activeConfig.apiKey) {
+      setShowSettings(true);
+      return;
+    }
+
+    setProcessing({ status: 'transcribing', progress: 0 });
+
+    try {
+      const result = await translateSubtitles(
+        subtitles,
+        translateTargetLang,
+        settings.activeProvider,
+        activeConfig.apiKey,
+        activeConfig.model,
+        (progress) => setProcessing({ status: 'transcribing', progress })
+      );
+
+      addTokenUsage(result.tokenUsage);
+
+      const versionId = generateId();
+      const newVersion: SubtitleVersion = {
+        id: versionId,
+        timestamp: Date.now(),
+        provider: settings.activeProvider,
+        model: activeConfig.model,
+        language: translateTargetLang,
+        subtitles: result.subtitles,
+        label: `Translated to ${translateTargetLang}`,
+      };
+
+      setVersions(prev => {
+        const updated = [...prev, newVersion];
+        persistVersions(updated);
+        return updated;
+      });
+      setActiveVersionId(versionId);
+      setSubtitles(result.subtitles);
+      setProcessing({ status: 'done', progress: 100 });
+      setShowTranslator(false);
+
+      if (mediaFile) {
+        addToRecents(mediaFile, 'generated', result.subtitles.length);
+        if (window.electronAPI) {
+          const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
+          cache[mediaFile.path] = result.subtitles;
+          window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => { });
+        }
+      }
+
+      setTimeout(() => {
+        setProcessing({ status: 'idle', progress: 0 });
+      }, DONE_STATUS_DELAY_MS);
+
+    } catch (error) {
+      setProcessing({
+        status: 'error',
+        progress: 0,
+        error: error instanceof Error ? error.message : 'Translation failed',
+      });
+    }
+  }, [subtitles, translateTargetLang, settings, mediaFile, addTokenUsage, addToRecents, setSubtitles, persistVersions]);
+
+
   // Handle Version Switching
   const handleVersionSelect = useCallback((versionId: string) => {
     let updatedVersions = versions;
@@ -789,6 +857,7 @@ function App() {
     setShowSettings(false);
     setShowShortcuts(false);
     setShowGenerator(false);
+    setShowTranslator(false);
 
     // 3. Clear recent files highlight
     setHighlightedRecentIndex(null);
@@ -829,6 +898,7 @@ function App() {
                 setVersions([]);
                 setActiveVersionId(null);
                 setShowGenerator(true);
+                setShowTranslator(false);
                 setCurrentTime(0);
                 setDuration(0);
                 setProcessing({ status: 'idle', progress: 0 });
@@ -877,7 +947,7 @@ function App() {
                 </div>
               </div>
 
-              {!isProcessing && (showGenerator || subtitles.length === 0) && (
+              {!isProcessing && (showGenerator || subtitles.length === 0) && !showTranslator && (
                 <div className="sidebar-section">
                   {versions.length > 0 && (
                     <button
@@ -925,7 +995,32 @@ function App() {
                 </div>
               )}
 
-              {!isProcessing && !showGenerator && subtitles.length > 0 && (
+              {!isProcessing && showTranslator && (
+                <div className="sidebar-section">
+                  <button
+                    className="btn-secondary sidebar-action-btn"
+                    onClick={() => setShowTranslator(false)}
+                  >
+                    <span className="icon icon-sm">chevron_left</span>
+                    Cancel
+                  </button>
+
+                  <LanguageSelector
+                    language={translateTargetLang}
+                    autoDetect={false}
+                    onLanguageChange={(language) => setTranslateTargetLang(language)}
+                  />
+
+                  <button
+                    className="btn-primary sidebar-action-btn"
+                    onClick={handleTranslate}
+                  >
+                    <span className="icon icon-sm">translate</span> Start Translation
+                  </button>
+                </div>
+              )}
+
+              {!isProcessing && !showGenerator && !showTranslator && subtitles.length > 0 && (
                 <div className="sidebar-section">
                   {/* Version Selector */}
                   {versions.length > 0 && (
@@ -942,6 +1037,13 @@ function App() {
                     </div>
                   )}
 
+                  <button
+                    className="btn-secondary sidebar-action-btn"
+                    onClick={() => setShowTranslator(true)}
+                    style={{ marginBottom: '0.5rem', width: '100%' }}
+                  >
+                    <span className="icon icon-sm">translate</span> Translate
+                  </button>
                   <button
                     className="btn-secondary sidebar-action-btn"
                     onClick={handleRegenerate}

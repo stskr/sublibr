@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
     callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string) =>
         ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat),
+    callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) =>
+        ipcRenderer.invoke('ai:callTextProvider', provider, apiKey, model, prompt),
 
     // FFmpeg operations
     extractAudio: (inputPath: string, outputPath: string, format?: string) => ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath, format),

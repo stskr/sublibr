@@ -447,3 +447,103 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     return header + events;
 }
+
+// Translate subtitles via text-only AI model
+import { getTranslationPrompt } from './prompts';
+import { callTextProvider } from './providers';
+
+export async function translateSubtitles(
+    subtitles: Subtitle[],
+    targetLanguage: string,
+    provider: AIProvider,
+    apiKey: string,
+    model: string,
+    onProgress?: (progress: number) => void
+): Promise<TranscriptionResult> {
+    if (subtitles.length === 0) return { subtitles: [], tokenUsage: { inputTokens: 0, outputTokens: 0, provider, model, timestamp: Date.now() } };
+
+    const promptBase = getTranslationPrompt(targetLanguage);
+
+    // Group subtitles into chunks (approx 1000 tokens ~ 3000 chars)
+    const MAX_CHARS_PER_CHUNK = 3000;
+    const subtitleChunks: Subtitle[][] = [];
+    let currentChunk: Subtitle[] = [];
+    let currentLen = 0;
+
+    for (const sub of subtitles) {
+        currentChunk.push(sub);
+        currentLen += sub.text.length;
+
+        if (currentLen > MAX_CHARS_PER_CHUNK) {
+            subtitleChunks.push(currentChunk);
+            currentChunk = [];
+            currentLen = 0;
+        }
+    }
+    if (currentChunk.length > 0) {
+        subtitleChunks.push(currentChunk);
+    }
+
+    const translatedSubtitles: Subtitle[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    const totalChunks = subtitleChunks.length;
+
+    for (let i = 0; i < totalChunks; i++) {
+        if (onProgress) {
+            onProgress(i / totalChunks * 100);
+        }
+
+        const chunk = subtitleChunks[i];
+        const inputText = JSON.stringify(chunk.map(s => ({ id: s.id, text: s.text })));
+        const prompt = `${promptBase}\n\n${inputText}`;
+
+        try {
+            const response = await callTextProvider(provider, apiKey, model, prompt);
+            totalInputTokens += response.tokenUsage.inputTokens;
+            totalOutputTokens += response.tokenUsage.outputTokens;
+
+            let resultText = response.text.trim();
+            // Remove markdown code blocks if the AI ignored instructions
+            if (resultText.startsWith('```')) {
+                resultText = resultText.replace(/^```[a-z]*\n/, '').replace(/\n```$/, '');
+            }
+
+            const parsed = JSON.parse(resultText) as { id: string; text: string }[];
+
+            // Map translated text back to the original subtitle metadata
+            for (const sub of chunk) {
+                const translated = parsed.find(p => p.id === sub.id);
+                if (translated) {
+                    translatedSubtitles.push({
+                        ...sub,
+                        text: translated.text
+                    });
+                } else {
+                    // Fallback to original text if ID is missing (should be rare)
+                    translatedSubtitles.push(sub);
+                }
+            }
+        } catch (error) {
+            console.error('Translation chunk failed, falling back to original:', error);
+            // Fallback to original
+            translatedSubtitles.push(...chunk);
+        }
+    }
+
+    if (onProgress) {
+        onProgress(100);
+    }
+
+    return {
+        subtitles: translatedSubtitles.sort((a, b) => a.startTime - b.startTime),
+        tokenUsage: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            provider,
+            model,
+            timestamp: Date.now()
+        }
+    };
+}

@@ -74,3 +74,16 @@ export async function callProvider(
         tokenUsage: { ...result.tokenUsage, provider } as TokenUsage,
     };
 }
+
+export async function callTextProvider(
+    provider: AIProvider,
+    apiKey: string,
+    model: string,
+    prompt: string,
+): Promise<ProviderResponse> {
+    const result = await window.electronAPI.callTextProvider(provider, apiKey, model, prompt);
+    return {
+        ...result,
+        tokenUsage: { ...result.tokenUsage, provider } as TokenUsage,
+    };
+}
