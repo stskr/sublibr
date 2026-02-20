@@ -69,8 +69,9 @@ export async function callProvider(
     prompt: string,
     audioBase64: string,
     audioFormat: string = 'flac', // Default to flac
+    language?: string | null,
 ): Promise<ProviderResponse> {
-    const result = await window.electronAPI.callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat);
+    const result = await window.electronAPI.callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, language);
     return {
         ...result,
         tokenUsage: { ...result.tokenUsage, provider } as TokenUsage,

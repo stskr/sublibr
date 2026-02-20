@@ -660,6 +660,7 @@ ipcMain.handle('ai:callProvider', async (
   prompt: string,
   audioBase64: string,
   audioFormat: string = 'flac', // Default to flac
+  language?: string | null,
 ) => {
   const mimeType = `audio/${audioFormat}`;
 
@@ -775,8 +776,17 @@ ipcMain.handle('ai:callProvider', async (
         formData.append('file', blob, `audio.${audioFormat}`);
         formData.append('model', 'whisper-1');
         formData.append('response_format', 'verbose_json');
+
+        if (language) {
+          formData.append('language', language);
+        }
+
         // We can't pass the full complex prompt to Whisper in the same way, 
         // but we can pass a "prompt" for context/style. 
+        // By passing properly punctuated sentences, we strongly coerce Whisper 
+        // to return punctuated sentences instead of long unpunctuated blocks.
+        formData.append('prompt', 'Please transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?');
+
         // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
         // and format it ourselves to match what the app expects ([MM:SS] Text).
 

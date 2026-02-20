@@ -74,6 +74,7 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
 }
 
 import { getStandardTranscriptionPrompt, getHealingTranscriptionPrompt } from './prompts';
+import { getIsoLanguage } from '../utils';
 
 // ... (existing imports and code)
 
@@ -101,7 +102,9 @@ export async function transcribeChunk(
     const ext = chunk.filePath.split('.').pop()?.toLowerCase() || 'flac';
     const audioFormat = ext === 'mp3' ? 'mp3' : 'flac';
 
-    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat);
+    const languageIso = getIsoLanguage(language, autoDetect);
+
+    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, languageIso);
     const text = providerResponse.text;
 
     let subtitles = parseTranscription(text, chunk.startTime);
