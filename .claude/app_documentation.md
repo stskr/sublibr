@@ -730,8 +730,7 @@ interface RecentFilesProps {
 - Shows filename, date (relative time), and last action (Generated/Opened)
 - Shows cached subtitle count indicator when subtitles are cached
 - Click to instantly reload file and restore cached subtitles
-- **Clear List**: Removes all items from recents list
-- **Clear Cache**: Deletes cached subtitles (does not affect exported files on disk)
+- **Clear List**: Removes all items from recents list and deletes cached subtitles for those files (does not affect exported files on disk)
 - Persistent storage via `electron-store`
 
 ---
@@ -1510,7 +1509,7 @@ npm run build:electron
 - [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
 - [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
 - [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
-- [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List / Clear Cache actions in recents UI
+- [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List action in recents UI also clears subtitle cache
 - [x] **Accessibility** — Comprehensive ARIA support: dialog roles with focus traps, combobox/listbox on custom selects, slider on progress bar, keyboard navigation, live regions, alert roles
 - [x] **Model Labels Update** — Updated UI model labels to rate Gemini Pro as best for foreign languages and Whisper-1 as Standard.
 - [x] **Simulated Progress** — Added simulated progress animation during long translation API requests to prevent the progress bar from appearing frozen.

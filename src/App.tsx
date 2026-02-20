@@ -100,7 +100,6 @@ function App() {
     setHighlightedRecentIndex,
     addToRecents,
     handleClearRecents,
-    handleClearCache,
     processFile: coreProcessFile,
     handleFileSelect: coreFileSelect,
     handleLoadRecent: coreLoadRecent,
@@ -388,7 +387,6 @@ function App() {
             recentFiles={recentFiles}
             onLoadRecent={wrappedLoadRecent}
             onClearRecents={handleClearRecents}
-            onClearCache={handleClearCache}
             highlightedRecentIndex={highlightedRecentIndex}
             onProcessFile={wrappedProcessFile}
             isAnalyzing={isAnalyzing}

@@ -6,11 +6,10 @@ interface RecentFilesProps {
     files: RecentFile[];
     onLoadRecent: (file: RecentFile) => void;
     onClearRecents: () => void;
-    onClearCache: () => void;
     highlightedIndex: number | null;
 }
 
-export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache, highlightedIndex }: RecentFilesProps) {
+export function RecentFiles({ files, onLoadRecent, onClearRecents, highlightedIndex }: RecentFilesProps) {
     if (files.length === 0) return null;
 
     return (
@@ -20,9 +19,6 @@ export function RecentFiles({ files, onLoadRecent, onClearRecents, onClearCache,
                 <div className="recent-files-actions">
                     <button className="recent-clear-btn" onClick={onClearRecents} title="Remove all items from the recents list" aria-label="Clear recent files list">
                         Clear List
-                    </button>
-                    <button className="recent-clear-btn" onClick={onClearCache} title="Delete cached subtitles (does not affect exported files)" aria-label="Clear subtitle cache">
-                        Clear Cache
                     </button>
                 </div>
             </div>

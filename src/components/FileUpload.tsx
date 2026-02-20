@@ -8,7 +8,6 @@ interface FileUploadProps {
     recentFiles: RecentFile[];
     onLoadRecent: (file: RecentFile) => void;
     onClearRecents: () => void;
-    onClearCache: () => void;
     highlightedRecentIndex: number | null;
     onProcessFile: (path: string) => Promise<void>;
     isAnalyzing: boolean;
@@ -21,7 +20,6 @@ export function FileUpload({
     recentFiles,
     onLoadRecent,
     onClearRecents,
-    onClearCache,
     highlightedRecentIndex,
     onProcessFile,
     isAnalyzing,
@@ -180,7 +178,6 @@ export function FileUpload({
                 files={recentFiles}
                 onLoadRecent={onLoadRecent}
                 onClearRecents={onClearRecents}
-                onClearCache={onClearCache}
                 highlightedIndex={highlightedRecentIndex}
             />
         </div>

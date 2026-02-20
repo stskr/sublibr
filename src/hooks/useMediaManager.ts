@@ -47,25 +47,9 @@ export function useMediaManager() {
         setRecentFiles([]);
         if (window.electronAPI) {
             await window.electronAPI.setStoreValue('recent-files', []);
-        }
-    }, []);
-
-    const handleClearCache = useCallback(async () => {
-        if (window.electronAPI) {
             await window.electronAPI.deleteStoreValue('subtitle-cache');
             await window.electronAPI.deleteStoreValue('subtitle-versions');
         }
-        setRecentFiles(prev => {
-            const updated = prev.map(f => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { subtitleCount: _, ...rest } = f;
-                return rest;
-            });
-            if (window.electronAPI) {
-                window.electronAPI.setStoreValue('recent-files', updated).catch(() => { });
-            }
-            return updated;
-        });
     }, []);
 
     const handleLoadRecent = useCallback(async (recent: RecentFile) => {
@@ -215,7 +199,6 @@ export function useMediaManager() {
         setHighlightedRecentIndex,
         addToRecents,
         handleClearRecents,
-        handleClearCache,
         handleLoadRecent,
         processFile,
         handleFileSelect,
