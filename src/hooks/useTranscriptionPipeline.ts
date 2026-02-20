@@ -179,8 +179,8 @@ export function useTranscriptionPipeline({
             }
 
             const labelStr = isAuto
-                ? `V${versionNumber} - ${displaySourceLang} - Auto, ${activeConfig.model}`
-                : `V${versionNumber} - ${displaySourceLang}, ${activeConfig.model}`;
+                ? `V${versionNumber}-${displaySourceLang}_Auto`
+                : `V${versionNumber}-${displaySourceLang}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
@@ -257,8 +257,8 @@ export function useTranscriptionPipeline({
 
             const versionNumber = versions.length + 1;
             const labelStr = isAutoDetect
-                ? `V${versionNumber} - Org.: ${sourceLanguage} - Auto - Tran.: ${translateTargetLang}, ${activeConfig.model}`
-                : `V${versionNumber} - Org.: ${sourceLanguage} - Tran.: ${translateTargetLang}, ${activeConfig.model}`;
+                ? `V${versionNumber}-${sourceLanguage}_Auto-${translateTargetLang}`
+                : `V${versionNumber}-${sourceLanguage}-${translateTargetLang}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
