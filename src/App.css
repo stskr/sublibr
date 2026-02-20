@@ -532,6 +532,7 @@ a:hover {
   justify-content: center;
   flex: 1;
   padding: var(--space-2xl);
+  overflow-y: auto;
 }
 
 .drop-zone {
@@ -547,6 +548,7 @@ a:hover {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-lg);
   transition: all var(--transition-normal);
+  flex-shrink: 0;
 }
 
 .drop-zone.drag-over {
