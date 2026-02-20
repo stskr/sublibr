@@ -18,7 +18,7 @@ import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { generateId, formatDisplayTime, isVideoFile, isSupportedFile, formatFileSize } from './utils';
 import type { Subtitle, MediaFile, AppSettings, ProcessingState, RecentFile, TokenUsage, SessionTokenStats, SubtitleVersion } from './types';
-import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
+import { PROVIDER_LABELS, MODEL_OPTIONS, callTextProvider } from './services/providers';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { UpdateNotification } from './components/UpdateNotification';
 
@@ -452,15 +452,36 @@ function App() {
       // Step 5: Enforce subtitle quality (min duration, merge short subs, punctuation)
       merged = enforceSubtitleQuality(merged);
 
+      let finalLanguage = settings.language;
+      let displayLanguage = settings.autoDetectLanguage ? 'Auto-Detect' : settings.language;
+
+      if (settings.autoDetectLanguage && merged.length > 0) {
+        try {
+          // Fast heuristic: ask the AI what language the first few subtitles are in
+          const sampleText = merged.slice(0, 10).map(s => s.text).join(' ');
+          const prompt = `What language is this text? Reply with ONLY the exact English name of the language (e.g., 'Spanish', 'French', 'Hebrew', 'English'). TEXT: ${sampleText}`;
+          const langResponse = await callTextProvider(provider, apiKey, model, prompt);
+          addTokenUsage(langResponse.tokenUsage);
+
+          const cleanLang = langResponse.text.trim().replace(/[^a-zA-Z]/g, '');
+          if (cleanLang.length > 0 && cleanLang.length < 20) {
+            finalLanguage = cleanLang;
+            displayLanguage = `Auto-Detected ${cleanLang}`;
+          }
+        } catch (err) {
+          console.warn('Failed to detect language from text output', err);
+        }
+      }
+
       const versionId = generateId();
       const newVersion: SubtitleVersion = {
         id: versionId,
         timestamp: Date.now(),
         provider: settings.activeProvider,
         model: activeConfig.model,
-        language: settings.language,
+        language: finalLanguage,
         subtitles: merged,
-        label: `${settings.autoDetectLanguage ? 'Auto-Detect' : settings.language} (${activeConfig.model})`,
+        label: `${displayLanguage} (${activeConfig.model})`,
       };
 
       setVersions(prev => {
