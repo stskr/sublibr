@@ -777,10 +777,7 @@ ipcMain.handle('ai:callProvider', async (
         const formData = new FormData();
         formData.append('file', blob, `audio.${audioFormat}`);
         formData.append('model', 'whisper-1');
-        formData.append('response_format', 'verbose_json');
-
-        // Add word-level timestamp request
-        formData.append('timestamp_granularities[]', 'word');
+        formData.append('response_format', 'srt');
 
         if (language) {
           formData.append('language', language);
@@ -811,79 +808,10 @@ ipcMain.handle('ai:callProvider', async (
           const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
           throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
         }
-
-        const data = await res.json() as {
-          text: string;
-          words?: { word: string; start: number; end: number }[];
-          segments?: { start: number; end: number; text: string }[];
-        };
-
-        // Custom "Smart Chunker" to rebuild subtitles from word-level timestamps
-        let formattedText = '';
-        if (data.words && data.words.length > 0) {
-          const MAX_CHARS_PER_LINE = 40;
-          const IDEAL_DURATION = 3.5; // ~3.5 seconds per subtitle block ideally
-
-          let currentSubWords: { word: string; start: number; end: number }[] = [];
-          const outputBlocks: string[] = [];
-
-          const finalizeBlock = (wordsToBuild: { word: string; start: number; end: number }[]) => {
-            if (wordsToBuild.length === 0) return;
-            const start = wordsToBuild[0].start;
-            const text = wordsToBuild.map(w => w.word.trim()).join(' ');
-
-            const minutes = Math.floor(start / 60).toString().padStart(2, '0');
-            const seconds = Math.floor(start % 60).toString().padStart(2, '0');
-            outputBlocks.push(`[${minutes}:${seconds}] ${text}`);
-          };
-
-          for (let i = 0; i < data.words.length; i++) {
-            const currentWord = data.words[i];
-            const cleanWordGroup = currentSubWords.map(w => w.word.trim()).join(' ');
-
-            // Check splitting conditions if we already have words queued
-            if (currentSubWords.length > 0) {
-              const currentDuration = currentWord.end - currentSubWords[0].start;
-              const currentChars = cleanWordGroup.length + currentWord.word.length + 1;
-              const lastWord = currentSubWords[currentSubWords.length - 1];
-              const gapFromLastWord = currentWord.start - lastWord.end;
-              const isPunctuation = /[.!?]$/.test(lastWord.word.trim());
-
-              const isTooLongDuration = currentDuration > IDEAL_DURATION;
-              const isTooManyChars = currentChars > (MAX_CHARS_PER_LINE * 2); // Strict 2 lines max
-              const isNaturalPause = isPunctuation && currentDuration > 1.5; // Has some meat to it, cut at punctuation
-              const isLongGap = gapFromLastWord > 0.8; // Silence gap of almost 1 second
-
-              if (isTooLongDuration || isTooManyChars || isNaturalPause || isLongGap) {
-                finalizeBlock(currentSubWords);
-                currentSubWords = []; // Reset queue
-              }
-            }
-
-            currentSubWords.push(currentWord);
-          }
-
-          // Catch any straggling words
-          if (currentSubWords.length > 0) {
-            finalizeBlock(currentSubWords);
-          }
-
-          formattedText = outputBlocks.join('\n\n');
-
-        } else if (data.segments) {
-          // Fallback if 'words' granularity failed for some reason, use standard segments
-          formattedText = data.segments.map(seg => {
-            const minutes = Math.floor(seg.start / 60).toString().padStart(2, '0');
-            const seconds = Math.floor(seg.start % 60).toString().padStart(2, '0');
-            return `[${minutes}:${seconds}] ${seg.text.trim()}`;
-          }).join('\n\n');
-        } else {
-          // Fallback if no segments (shouldn't happen with verbose_json)
-          formattedText = `[00:00] ${data.text}`;
-        }
+        const srtText = await res.text();
 
         return {
-          text: formattedText,
+          text: srtText,
           tokenUsage: {
             inputTokens: 0,
             outputTokens: 0,

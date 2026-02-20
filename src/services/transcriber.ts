@@ -1,6 +1,6 @@
 import type { Subtitle, AudioChunk, AIProvider, TokenUsage } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
-import { callProvider } from './providers';
+import { callProvider, callTextProvider } from './providers';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -73,14 +73,13 @@ function parseTranscription(text: string, startOffset: number): Subtitle[] {
     return subtitles;
 }
 
+
 import { getStandardTranscriptionPrompt as getGeminiTranscriptionPrompt } from '../prompts/gemini/transcription';
 import { getHealingTranscriptionPrompt as getGeminiHealingPrompt } from '../prompts/gemini/healing';
 import { getOpenAITranscriptionPrompt } from '../prompts/openai/transcription';
 import { getOpenAIHealingPrompt } from '../prompts/openai/healing';
-import { getTranslationPrompt } from '../prompts/shared/translation';
 import { getIsoLanguage } from '../utils';
-
-// ... (existing imports and code)
+import { parseSrt } from './subtitleParser';
 
 export async function transcribeChunk(
     chunk: AudioChunk,
@@ -119,7 +118,21 @@ export async function transcribeChunk(
     const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, languageIso, previousTranscript);
     const text = providerResponse.text;
 
-    let subtitles = parseTranscription(text, chunk.startTime);
+    let subtitles: Subtitle[] = [];
+    if (provider === 'openai') {
+        // OpenAI Whisper is now natively returning fully-formatted SRT strings
+        subtitles = parseSrt(text);
+
+        // Adjust chunk offsets securely since Whisper creates SRT from 00:00:00 internally
+        subtitles = subtitles.map(s => ({
+            ...s,
+            startTime: chunk.startTime + s.startTime,
+            endTime: chunk.startTime + s.endTime,
+        }));
+    } else {
+        // Gemini returns our custom [MM:SS] format
+        subtitles = parseTranscription(text, chunk.startTime);
+    }
 
     // Post-processing: Split long subtitles (Safety Net)
     // Max chars per subtitle line is usually ~42. Two lines ~84.
@@ -464,9 +477,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 }
 
 // Translate subtitles via text-only AI model
-// ... 
-import { callTextProvider } from './providers';
-
+import { getTranslationPrompt } from '../prompts/shared/translation';
 export async function translateSubtitles(
     subtitles: Subtitle[],
     targetLanguage: string,
