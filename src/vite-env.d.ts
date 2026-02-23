@@ -45,7 +45,7 @@ export interface ElectronAPI {
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;
     splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[], format?: string) => Promise<string[]>;
     getVideoInfo: (filePath: string) => Promise<{ duration: number; width: number | null; height: number | null }>;
-    burnSubtitles: (inputPath: string, srtContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null) => Promise<string>;
+    burnSubtitles: (inputPath: string, subtitleContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null, subtitleFormat?: 'srt' | 'ass') => Promise<string>;
     onBurnSubtitlesProgress: (callback: (progress: { percent: number }) => void) => () => void;
     // App updates
     getVersion: () => Promise<string>;

@@ -21,7 +21,9 @@ import { useTranscriptionPipeline } from './hooks/useTranscriptionPipeline';
 
 import { generateId } from './utils';
 import type { Subtitle, AppSettings, MediaFile, RecentFile, ScreenSize } from './types';
+import { DEFAULT_SUBTITLE_STYLE } from './types';
 import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
+import { SubtitleStylePanel } from './components/SubtitleStylePanel';
 
 import './App.css';
 import logoWhite from './assets/Logo/logo-white.svg';
@@ -35,6 +37,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'English',
   autoDetectLanguage: false,
   screenSize: 'wide',
+  subtitleStyle: DEFAULT_SUBTITLE_STYLE,
 };
 
 const DEFAULT_SUBTITLE_DURATION = 2; // seconds
@@ -43,6 +46,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showStylePanel, setShowStylePanel] = useState(false);
 
   const [subtitles, setSubtitles, undoSubtitles, redoSubtitles, canUndo, canRedo, resetSubtitles] = useUndoRedo<Subtitle[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
@@ -323,6 +327,7 @@ function App() {
     setShowShortcuts(false);
     setShowGenerator(false);
     setShowTranslator(false);
+    setShowStylePanel(false);
     setHighlightedRecentIndex(null);
   }, [setHighlightedRecentIndex, setShowGenerator, setShowTranslator]);
 
@@ -479,6 +484,18 @@ function App() {
                 </div>
               )}
 
+              {!isProcessing && showStylePanel && subtitles.length > 0 && (
+                <SubtitleStylePanel
+                  style={settings.subtitleStyle}
+                  onChange={(newStyle) => {
+                    const updated = { ...settings, subtitleStyle: newStyle };
+                    setSettings(updated);
+                    if (window.electronAPI) window.electronAPI.setStoreValue('settings', updated);
+                  }}
+                  onBack={() => setShowStylePanel(false)}
+                />
+              )}
+
               {!isProcessing && showTranslator && (
                 <div className="sidebar-section">
                   <button
@@ -505,7 +522,7 @@ function App() {
                 </div>
               )}
 
-              {!isProcessing && !showGenerator && !showTranslator && subtitles.length > 0 && (
+              {!isProcessing && !showGenerator && !showTranslator && !showStylePanel && subtitles.length > 0 && (
                 <div className="sidebar-section">
                   {/* Version Selector */}
                   {versions.length > 0 && (
@@ -532,9 +549,16 @@ function App() {
                   <button
                     className="btn-secondary sidebar-action-btn"
                     onClick={handleRegenerate}
-                    style={{ marginBottom: '1.5rem', width: '100%' }}
+                    style={{ marginBottom: '0.5rem', width: '100%' }}
                   >
                     <span className="icon icon-sm">refresh</span> Regenerate
+                  </button>
+                  <button
+                    className="btn-secondary sidebar-action-btn"
+                    onClick={() => setShowStylePanel(true)}
+                    style={{ marginBottom: '1.5rem', width: '100%' }}
+                  >
+                    <span className="icon icon-sm">palette</span> Global Style
                   </button>
 
                   <div className="sidebar-divider"></div>
@@ -628,6 +652,7 @@ function App() {
                     subtitles={subtitles}
                     currentTime={currentTime}
                     mediaFile={mediaFile}
+                    subtitleStyle={settings.subtitleStyle}
                     onSubtitleChange={handleSubtitleLineChange}
                     onUndo={handleUndo}
                     onRedo={handleRedo}

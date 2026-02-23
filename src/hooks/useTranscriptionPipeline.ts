@@ -382,7 +382,8 @@ export function useTranscriptionPipeline({
     const handleRenderVideo = useCallback(async () => {
         if (!subtitles.length || !mediaFile || !window.electronAPI) return;
 
-        const srtContent = generateSrt(subtitles);
+        // Always use styled ASS for burning — richer quality than plain SRT
+        const assContent = generateAss(subtitles, settings.subtitleStyle);
         const defaultName = mediaFile.name.replace(/\.[^.]+$/, '_subtitles.mp4');
 
         const savePath = await window.electronAPI.saveFileDialog(defaultName, 'Video File', ['mp4', 'mkv', 'mov']);
@@ -397,7 +398,7 @@ export function useTranscriptionPipeline({
         const target = getRenderTarget(renderResolution);
 
         try {
-            await window.electronAPI.burnSubtitles(mediaFile.path, srtContent, savePath, target?.width ?? null, target?.height ?? null);
+            await window.electronAPI.burnSubtitles(mediaFile.path, assContent, savePath, target?.width ?? null, target?.height ?? null, 'ass');
             unsubscribe();
             setProcessing({ status: 'done', progress: 100 });
             setTimeout(() => setProcessing({ status: 'idle', progress: 0 }), 3000);
@@ -409,7 +410,7 @@ export function useTranscriptionPipeline({
                 error: err instanceof Error ? err.message : 'Video render failed',
             });
         }
-    }, [subtitles, mediaFile, renderResolution, setProcessing]);
+    }, [subtitles, mediaFile, settings, renderResolution, setProcessing]);
 
     const handleDownload = useCallback(async () => {
         if (subtitles.length === 0) return;
@@ -424,7 +425,7 @@ export function useTranscriptionPipeline({
                 break;
             case 'ass':
                 ext = '.ass';
-                content = generateAss(subtitles);
+                content = generateAss(subtitles, settings.subtitleStyle);
                 break;
             case 'srt':
             default:

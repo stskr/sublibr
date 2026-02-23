@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectSilences: (filePath: string, threshold: number, minDuration: number) => ipcRenderer.invoke('ffmpeg:detectSilences', filePath, threshold, minDuration),
     splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[], format?: string) => ipcRenderer.invoke('ffmpeg:splitAudio', inputPath, chunks, format),
     getVideoInfo: (filePath: string) => ipcRenderer.invoke('ffmpeg:getVideoInfo', filePath),
-    burnSubtitles: (inputPath: string, srtContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null) => ipcRenderer.invoke('ffmpeg:burnSubtitles', inputPath, srtContent, outputPath, targetWidth, targetHeight),
+    burnSubtitles: (inputPath: string, subtitleContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null, subtitleFormat?: 'srt' | 'ass') => ipcRenderer.invoke('ffmpeg:burnSubtitles', inputPath, subtitleContent, outputPath, targetWidth, targetHeight, subtitleFormat ?? 'ass'),
     onBurnSubtitlesProgress: (callback: (progress: { percent: number }) => void) => {
         const listener = (_event: Electron.IpcRendererEvent, progress: { percent: number }) => callback(progress);
         ipcRenderer.on('ffmpeg:burnSubtitlesProgress', listener);

@@ -1,4 +1,5 @@
-import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize } from '../types';
+import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize, SubtitleStyle } from '../types';
+import { DEFAULT_SUBTITLE_STYLE } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
 import { callProvider, callTextProvider } from './providers';
 
@@ -552,8 +553,37 @@ export function generateWebVtt(subtitles: Subtitle[]): string {
     }).join('\n'); // Exactly one blank line between cues
 }
 
+// Convert hex color (#RRGGBB) to ASS &HAABBGGRR format (alpha 0=opaque, 255=transparent)
+function hexToAssColor(hex: string, alpha = 0): string {
+    const h = hex.replace('#', '').toUpperCase().padEnd(6, '0');
+    const r = h.slice(0, 2);
+    const g = h.slice(2, 4);
+    const b = h.slice(4, 6);
+    const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+        .toString(16).padStart(2, '0').toUpperCase();
+    return `&H${a}${b}${g}${r}`;
+}
+
 // Generate ASS file content
-export function generateAss(subtitles: Subtitle[]): string {
+export function generateAss(subtitles: Subtitle[], style: SubtitleStyle = DEFAULT_SUBTITLE_STYLE): string {
+    const primaryColor  = hexToAssColor(style.textColor);
+    const outlineColor  = hexToAssColor(style.outlineColor);
+    const shadowDepth   = Math.max(style.shadowOffsetX, style.shadowOffsetY);
+
+    const outline = (style.outlineMode === 'outline' || style.outlineMode === 'both')
+        ? style.outlineWidth.toFixed(1) : '0.0';
+    const shadow  = (style.outlineMode === 'shadow'  || style.outlineMode === 'both')
+        ? shadowDepth.toFixed(1) : '0.0';
+
+    // BorderStyle 3 = opaque background box; 1 = outline+shadow
+    const borderStyle = style.backgroundEnabled ? 3 : 1;
+    const backColor = style.backgroundEnabled
+        ? hexToAssColor(style.backgroundColor, 1 - style.backgroundOpacity)
+        : hexToAssColor('#000000');
+
+    // Strip quotes from font-family if present (e.g. "'Courier New'" → "Courier New")
+    const fontName = style.fontFamily.replace(/^'|'$/g, '');
+
     const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: 1920
@@ -563,7 +593,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,50,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Default,${fontName},50,${primaryColor},&H000000FF,${outlineColor},${backColor},0,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,10,10,10,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

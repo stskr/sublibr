@@ -1,15 +1,17 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { detectDirection } from '../utils';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { detectDirection, buildSubtitleTextShadow, hexToRgba } from '../utils';
 import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
 import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
-import type { Subtitle, MediaFile } from '../types';
+import type { Subtitle, MediaFile, SubtitleStyle } from '../types';
+import { DEFAULT_SUBTITLE_STYLE as DEFAULT_STYLE } from '../types';
 
 interface SubtitlePreviewProps {
     subtitles: Subtitle[];
     currentTime: number;
     mediaFile: MediaFile;
+    subtitleStyle?: SubtitleStyle;
     onSubtitleChange?: (id: string, text: string) => void;
     onUndo?: () => void;
     onRedo?: () => void;
@@ -17,7 +19,8 @@ interface SubtitlePreviewProps {
     canRedo?: boolean;
 }
 
-export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleChange, onUndo, onRedo, canUndo, canRedo }: SubtitlePreviewProps) {
+export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleStyle, onSubtitleChange, onUndo, onRedo, canUndo, canRedo }: SubtitlePreviewProps) {
+    const style = subtitleStyle ?? DEFAULT_STYLE;
     const videoRef = useRef<HTMLVideoElement>(null);
     const textareaRef = useRef<RichTextEditorRef>(null);
     const [videoReady, setVideoReady] = useState(false);
@@ -173,15 +176,24 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, onSubtitleC
 
         if (!subtitleText) return null;
 
+        const overlayStyle: React.CSSProperties = {
+            direction,
+            cursor: isPaused && onSubtitleChange ? 'pointer' : 'default',
+            border: isPaused && onSubtitleChange ? '1px dashed transparent' : 'none',
+            // Global subtitle style (per-word <font color> tags override via CSS cascade)
+            color: style.textColor,
+            fontFamily: style.fontFamily,
+            textShadow: buildSubtitleTextShadow(style),
+            background: style.backgroundEnabled
+                ? hexToRgba(style.backgroundColor, style.backgroundOpacity)
+                : 'transparent',
+        };
+
         return (
             <div
                 className={`preview-subtitle${mediaFile.isVideo ? '' : ' cinema-subtitle'}`}
                 dir={direction}
-                style={{
-                    direction,
-                    cursor: isPaused && onSubtitleChange ? 'pointer' : 'default',
-                    border: isPaused && onSubtitleChange ? '1px dashed transparent' : 'none'
-                }}
+                style={overlayStyle}
                 onClick={handleSubtitleClick}
                 title={isPaused ? "Click to edit" : undefined}
                 aria-live="polite"

@@ -182,3 +182,39 @@ export function formatTimeAgo(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString();
 }
 
+// ─── Subtitle style helpers ───────────────────────────────────────────────────
+
+import type { SubtitleStyle } from './types';
+
+/** Convert hex color + alpha (0–1) to CSS rgba() string. */
+export function hexToRgba(hex: string, alpha: number): string {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Compute the CSS `text-shadow` value for a SubtitleStyle.
+ * Outline = 4-directional stroke; shadow = drop shadow.
+ * Both can be combined; per-word inline styles remain unaffected.
+ */
+export function buildSubtitleTextShadow(style: SubtitleStyle): string {
+    const parts: string[] = [];
+    if (style.outlineMode === 'outline' || style.outlineMode === 'both') {
+        const w = style.outlineWidth;
+        const c = style.outlineColor;
+        parts.push(
+            `-${w}px -${w}px 0 ${c}`,
+            `${w}px -${w}px 0 ${c}`,
+            `-${w}px ${w}px 0 ${c}`,
+            `${w}px ${w}px 0 ${c}`,
+        );
+    }
+    if (style.outlineMode === 'shadow' || style.outlineMode === 'both') {
+        parts.push(`${style.shadowOffsetX}px ${style.shadowOffsetY}px ${style.shadowBlur}px ${style.shadowColor}`);
+    }
+    return parts.length ? parts.join(', ') : 'none';
+}
+

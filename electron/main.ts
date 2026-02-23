@@ -592,13 +592,13 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
 });
 
 // FFmpeg: Burn subtitles into video
-ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, srtContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null) => {
+ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, subtitleContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null, subtitleFormat: 'srt' | 'ass' = 'ass') => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const safeOutput = validatePath(outputPath, ...getAllowedDirs());
 
   const tempDir = app.getPath('temp');
-  const tempSrtPath = path.join(tempDir, 'sublibr_subs_burn.srt');
-  await fs.promises.writeFile(tempSrtPath, srtContent, 'utf-8');
+  const tempSrtPath = path.join(tempDir, `sublibr_subs_burn.${subtitleFormat}`);
+  await fs.promises.writeFile(tempSrtPath, subtitleContent, 'utf-8');
 
   // Escape the SRT path for use inside an FFmpeg filter expression
   let escapedSrtPath: string;

@@ -465,12 +465,12 @@ ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks, format = "
   }
   return results;
 });
-ipcMain.handle("ffmpeg:burnSubtitles", async (_event, inputPath, srtContent, outputPath, targetWidth, targetHeight) => {
+ipcMain.handle("ffmpeg:burnSubtitles", async (_event, inputPath, subtitleContent, outputPath, targetWidth, targetHeight, subtitleFormat = "ass") => {
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const safeOutput = validatePath(outputPath, ...getAllowedDirs());
   const tempDir = app.getPath("temp");
-  const tempSrtPath = path.join(tempDir, "sublibr_subs_burn.srt");
-  await fs.promises.writeFile(tempSrtPath, srtContent, "utf-8");
+  const tempSrtPath = path.join(tempDir, `sublibr_subs_burn.${subtitleFormat}`);
+  await fs.promises.writeFile(tempSrtPath, subtitleContent, "utf-8");
   let escapedSrtPath;
   if (process.platform === "win32") {
     escapedSrtPath = tempSrtPath.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
