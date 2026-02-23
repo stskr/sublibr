@@ -58,7 +58,18 @@ export function useMediaManager() {
         try {
             await window.electronAPI.registerPath(recent.path);
             const info = await window.electronAPI.getFileInfo(recent.path);
-            const fileDuration = await window.electronAPI.getDuration(recent.path);
+
+            let fileDuration: number;
+            let videoWidth: number | undefined;
+            let videoHeight: number | undefined;
+            if (isVideoFile(info.ext)) {
+                const videoInfo = await window.electronAPI.getVideoInfo(info.path);
+                fileDuration = videoInfo.duration;
+                videoWidth = videoInfo.width ?? undefined;
+                videoHeight = videoInfo.height ?? undefined;
+            } else {
+                fileDuration = await window.electronAPI.getDuration(info.path);
+            }
 
             const file: MediaFile = {
                 path: info.path,
@@ -67,6 +78,8 @@ export function useMediaManager() {
                 size: info.size,
                 duration: fileDuration,
                 isVideo: isVideoFile(info.ext),
+                width: videoWidth,
+                height: videoHeight,
             };
 
             setMediaFile(file);
@@ -101,7 +114,18 @@ export function useMediaManager() {
             throw new Error(`File too large. Maximum size is 3GB. Your file: ${formatFileSize(info.size)}`);
         }
 
-        const fileDuration = await window.electronAPI.getDuration(filePath);
+        let fileDuration: number;
+        let videoWidth: number | undefined;
+        let videoHeight: number | undefined;
+        if (isVideoFile(info.ext)) {
+            const videoInfo = await window.electronAPI.getVideoInfo(info.path);
+            fileDuration = videoInfo.duration;
+            videoWidth = videoInfo.width ?? undefined;
+            videoHeight = videoInfo.height ?? undefined;
+        } else {
+            fileDuration = await window.electronAPI.getDuration(info.path);
+        }
+
         const file: MediaFile = {
             path: info.path,
             name: info.name,
@@ -109,6 +133,8 @@ export function useMediaManager() {
             size: info.size,
             duration: fileDuration,
             isVideo: isVideoFile(info.ext),
+            width: videoWidth,
+            height: videoHeight,
         };
 
         setMediaFile(file);

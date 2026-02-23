@@ -35,6 +35,7 @@ export type ProcessingStatus =
     | 'transcribing'
     | 'merging'
     | 'healing'
+    | 'rendering'
     | 'done'
     | 'error';
 
@@ -56,7 +57,7 @@ export interface ProviderConfig {
 }
 
 // Screen constraint options for generating subtitles
-export type ScreenSize = 'wide' | 'square' | 'vertical';
+export type ScreenSize = 'wide' | 'square' | 'vertical' | 'original';
 
 // Settings
 export interface AppSettings {
@@ -75,6 +76,8 @@ export interface MediaFile {
     size: number;
     duration: number;
     isVideo: boolean;
+    width?: number;
+    height?: number;
 }
 
 export interface SilenceSegment {

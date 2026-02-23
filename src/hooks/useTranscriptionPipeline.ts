@@ -6,7 +6,8 @@ import type {
     Subtitle,
     MediaFile,
     AppSettings,
-    SubtitleVersion
+    SubtitleVersion,
+    ScreenSize
 } from '../types';
 import { createAudioChunks } from '../services/audioProcessor';
 import {
@@ -24,6 +25,26 @@ import { callTextProvider } from '../services/providers';
 import { generateId, formatDisplayTime } from '../utils';
 
 const DONE_STATUS_DELAY_MS = 2000;
+
+// Maps a video's pixel aspect ratio to the nearest subtitle preset.
+// Used when screenSize is 'original' so service functions get concrete char limits.
+function inferEffectiveScreenSize(width: number, height: number): 'wide' | 'square' | 'vertical' {
+    const ratio = width / height;
+    if (ratio >= 1.5) return 'wide';
+    if (ratio >= 0.75) return 'square';
+    return 'vertical';
+}
+
+// Returns target render dimensions for a given screen size.
+// 'original' → null (no scaling; keep the source resolution).
+function getRenderTarget(screenSize: string): { width: number; height: number } | null {
+    switch (screenSize) {
+        case 'wide':     return { width: 1920, height: 1080 };
+        case 'square':   return { width: 1080, height: 1080 };
+        case 'vertical': return { width: 1080, height: 1920 };
+        default:         return null; // 'original' or unknown → no scaling
+    }
+}
 
 interface UseTranscriptionPipelineProps {
     settings: AppSettings;
@@ -52,6 +73,7 @@ export function useTranscriptionPipeline({
     const [showTranslator, setShowTranslator] = useState(false);
     const [translateTargetLang, setTranslateTargetLang] = useState('Spanish');
     const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
+    const [renderResolution, setRenderResolution] = useState<ScreenSize>(settings.screenSize);
     const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
         totalInputTokens: 0,
         totalOutputTokens: 0,
@@ -95,6 +117,12 @@ export function useTranscriptionPipeline({
             setProcessing({ status: 'detecting-silences', progress: 15 });
             const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat, provider);
 
+            // 'original' is a render-time concept; resolve to the nearest preset for
+            // subtitle generation so service functions receive a concrete char limit.
+            const effectiveScreenSize = settings.screenSize === 'original' && mediaFile.width && mediaFile.height
+                ? inferEffectiveScreenSize(mediaFile.width, mediaFile.height)
+                : (settings.screenSize as 'wide' | 'square' | 'vertical');
+
             const allSubtitles: Subtitle[][] = [];
             const totalChunks = chunks.length;
             let previousTranscript = '';
@@ -116,7 +144,7 @@ export function useTranscriptionPipeline({
                     settings.autoDetectLanguage,
                     'standard',
                     previousTranscript,
-                    settings.screenSize
+                    effectiveScreenSize
                 );
                 allSubtitles.push(result.subtitles);
                 addTokenUsage(result.tokenUsage);
@@ -140,7 +168,7 @@ export function useTranscriptionPipeline({
                     model,
                     settings.language,
                     settings.autoDetectLanguage,
-                    settings.screenSize
+                    effectiveScreenSize
                 );
                 merged = healResult.subtitles;
                 healResult.tokenUsages.forEach(addTokenUsage);
@@ -148,7 +176,7 @@ export function useTranscriptionPipeline({
                 console.error('Healing failed:', err);
             }
 
-            merged = enforceSubtitleQuality(merged, settings.screenSize);
+            merged = enforceSubtitleQuality(merged, effectiveScreenSize);
 
             let finalLanguage = settings.language;
 
@@ -179,8 +207,8 @@ export function useTranscriptionPipeline({
             }
 
             const labelStr = isAuto
-                ? `V${versionNumber}-${displaySourceLang}_Auto`
-                : `V${versionNumber}-${displaySourceLang}`;
+                ? `V${versionNumber}-${displaySourceLang}_Auto, ${activeConfig.model}`
+                : `V${versionNumber}-${displaySourceLang}, ${activeConfig.model}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
@@ -257,8 +285,8 @@ export function useTranscriptionPipeline({
 
             const versionNumber = versions.length + 1;
             const labelStr = isAutoDetect
-                ? `V${versionNumber}-${sourceLanguage}_Auto-${translateTargetLang}`
-                : `V${versionNumber}-${sourceLanguage}-${translateTargetLang}`;
+                ? `V${versionNumber}-${sourceLanguage}_Auto-${translateTargetLang}, ${activeConfig.model}`
+                : `V${versionNumber}-${sourceLanguage}-${translateTargetLang}, ${activeConfig.model}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
@@ -351,6 +379,38 @@ export function useTranscriptionPipeline({
         }
     }, [setSubtitles, mediaFile, addToRecents]);
 
+    const handleRenderVideo = useCallback(async () => {
+        if (!subtitles.length || !mediaFile || !window.electronAPI) return;
+
+        const srtContent = generateSrt(subtitles);
+        const defaultName = mediaFile.name.replace(/\.[^.]+$/, '_subtitles.mp4');
+
+        const savePath = await window.electronAPI.saveFileDialog(defaultName, 'Video File', ['mp4', 'mkv', 'mov']);
+        if (!savePath) return;
+
+        setProcessing({ status: 'rendering', progress: 0 });
+
+        const unsubscribe = window.electronAPI.onBurnSubtitlesProgress(({ percent }) => {
+            setProcessing({ status: 'rendering', progress: percent });
+        });
+
+        const target = getRenderTarget(renderResolution);
+
+        try {
+            await window.electronAPI.burnSubtitles(mediaFile.path, srtContent, savePath, target?.width ?? null, target?.height ?? null);
+            unsubscribe();
+            setProcessing({ status: 'done', progress: 100 });
+            setTimeout(() => setProcessing({ status: 'idle', progress: 0 }), 3000);
+        } catch (err) {
+            unsubscribe();
+            setProcessing({
+                status: 'error',
+                progress: 0,
+                error: err instanceof Error ? err.message : 'Video render failed',
+            });
+        }
+    }, [subtitles, mediaFile, renderResolution, setProcessing]);
+
     const handleDownload = useCallback(async () => {
         if (subtitles.length === 0) return;
 
@@ -396,10 +456,13 @@ export function useTranscriptionPipeline({
         setTranslateTargetLang,
         exportFormat,
         setExportFormat,
+        renderResolution,
+        setRenderResolution,
         tokenStats,
         handleGenerate,
         handleTranslate,
         handleLoadSubtitles,
-        handleDownload
+        handleDownload,
+        handleRenderVideo
     };
 }

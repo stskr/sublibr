@@ -508,6 +508,24 @@ ipcMain.handle('ffmpeg:getDuration', async (_event, filePath: string) => {
   });
 });
 
+// FFmpeg: Get video info (duration + dimensions)
+ipcMain.handle('ffmpeg:getVideoInfo', async (_event, filePath: string) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(safePath, (err, data) => {
+      if (err) reject(err.message);
+      else {
+        const videoStream = data.streams.find(s => s.codec_type === 'video');
+        resolve({
+          duration: data.format.duration || 0,
+          width: videoStream?.width ?? null,
+          height: videoStream?.height ?? null,
+        });
+      }
+    });
+  });
+});
+
 // FFmpeg: Detect silences
 ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, threshold: number, minDuration: number) => {
   const safePath = validatePath(filePath, ...getAllowedDirs());
@@ -571,6 +589,51 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
   }
 
   return results;
+});
+
+// FFmpeg: Burn subtitles into video
+ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, srtContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+
+  const tempDir = app.getPath('temp');
+  const tempSrtPath = path.join(tempDir, 'sublibr_subs_burn.srt');
+  await fs.promises.writeFile(tempSrtPath, srtContent, 'utf-8');
+
+  // Escape the SRT path for use inside an FFmpeg filter expression
+  let escapedSrtPath: string;
+  if (process.platform === 'win32') {
+    escapedSrtPath = tempSrtPath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '$1\\:');
+  } else {
+    escapedSrtPath = tempSrtPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
+  }
+
+  // Build video filter: scale+letterbox to target resolution, then burn subtitles.
+  // If no target is specified, burn subtitles at the source resolution unchanged.
+  const videoFilter = (targetWidth && targetHeight)
+    ? `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:black,subtitles='${escapedSrtPath}'`
+    : `subtitles='${escapedSrtPath}'`;
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(safeInput)
+      .videoFilters(videoFilter)
+      .outputOptions(['-c:a', 'copy'])
+      .on('progress', (progress) => {
+        mainWindow?.webContents.send('ffmpeg:burnSubtitlesProgress', {
+          percent: Math.min(99, Math.round(progress.percent || 0)),
+        });
+      })
+      .on('end', async () => {
+        await fs.promises.unlink(tempSrtPath).catch(() => {});
+        mainWindow?.webContents.send('ffmpeg:burnSubtitlesProgress', { percent: 100 });
+        resolve(safeOutput);
+      })
+      .on('error', async (err) => {
+        await fs.promises.unlink(tempSrtPath).catch(() => {});
+        reject(err.message);
+      })
+      .save(safeOutput);
+  });
 });
 
 // ============== App Update IPC ==============

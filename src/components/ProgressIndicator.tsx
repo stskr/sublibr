@@ -15,6 +15,7 @@ const STATUS_ICONS: Record<string, string> = {
     'transcribing': 'translate',
     'merging': 'merge',
     'healing': 'healing',
+    'rendering': 'movie',
     'done': 'check_circle',
     'error': 'error',
 };
@@ -27,6 +28,7 @@ const STATUS_MESSAGES: Record<string, string> = {
     'transcribing': 'Transcribing...',
     'merging': 'Merging subtitles...',
     'healing': 'Healing gaps...',
+    'rendering': 'Burning subtitles into video...',
     'done': 'Complete!',
     'error': 'Error occurred',
 };

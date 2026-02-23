@@ -197,11 +197,14 @@ function App() {
     setTranslateTargetLang,
     exportFormat,
     setExportFormat,
+    renderResolution,
+    setRenderResolution,
     tokenStats,
     handleGenerate,
     handleTranslate,
     handleLoadSubtitles,
-    handleDownload
+    handleDownload,
+    handleRenderVideo
   } = pipeline;
 
   // Global Editor/Player handlers
@@ -417,12 +420,12 @@ function App() {
                   )}
 
                   <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
-                    <label className="sidebar-label">Screen Format</label>
+                    <label className="sidebar-label">Subtitle Format</label>
                     <CustomSelect
                       options={[
                         { value: 'wide', label: 'Wide-screen (16:9)' },
                         { value: 'square', label: 'Square (1:1)' },
-                        { value: 'vertical', label: 'Vertical (9:16)' }
+                        { value: 'vertical', label: 'Vertical (9:16)' },
                       ]}
                       value={settings.screenSize}
                       onChange={(value) => {
@@ -555,6 +558,31 @@ function App() {
                       <span className="icon icon-sm">download</span> Download
                     </button>
                   </div>
+                  {mediaFile && ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts', '.mts', '.m2ts'].includes(mediaFile.ext) && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <label className="sidebar-label">Render Resolution</label>
+                      <CustomSelect
+                        options={[
+                          { value: 'wide', label: 'Wide-screen (16:9) — 1920×1080' },
+                          { value: 'square', label: 'Square (1:1) — 1080×1080' },
+                          { value: 'vertical', label: 'Vertical (9:16) — 1080×1920' },
+                          ...(mediaFile.width && mediaFile.height
+                            ? [{ value: 'original', label: `Original — ${mediaFile.width}×${mediaFile.height}` }]
+                            : [{ value: 'original', label: 'Original — source size' }])
+                        ]}
+                        value={renderResolution}
+                        onChange={(v) => setRenderResolution(v as ScreenSize)}
+                      />
+                      <button
+                        className="btn-secondary sidebar-action-btn"
+                        onClick={handleRenderVideo}
+                        style={{ marginTop: '0.5rem', width: '100%' }}
+                        title="Burn subtitles into the video using FFmpeg"
+                      >
+                        <span className="icon icon-sm">movie</span> Render Video
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

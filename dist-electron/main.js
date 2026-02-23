@@ -1,73 +1,94 @@
-import { protocol as U, app as m, BrowserWindow as j, ipcMain as s, dialog as F, net as x, shell as D, safeStorage as I } from "electron";
-import L from "http";
-import u from "path";
-import _ from "fs";
-import { fileURLToPath as N } from "url";
-import W from "electron-store";
-import T from "fluent-ffmpeg";
-import { createRequire as V } from "module";
-import B from "electron-updater";
-const z = "Transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?", { autoUpdater: y } = B, R = u.dirname(N(import.meta.url));
-U.registerSchemesAsPrivileged([
+import { protocol, app, BrowserWindow, ipcMain, dialog, net, shell, safeStorage } from "electron";
+import http from "http";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import Store from "electron-store";
+import ffmpeg from "fluent-ffmpeg";
+import { createRequire } from "module";
+import pkg from "electron-updater";
+const WHISPER_PUNCTUATION_PROMPT = "Transcribe accurately. Use proper punctuation. For example: Hello, world! How are you doing today?";
+const { autoUpdater } = pkg;
+const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
+protocol.registerSchemesAsPrivileged([
   {
     scheme: "media",
     privileges: {
-      secure: !0,
-      supportFetchAPI: !0,
-      bypassCSP: !0,
-      stream: !0
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
     }
   }
 ]);
-const A = /* @__PURE__ */ new Set();
-function b(o, ...t) {
-  if (typeof o != "string") throw new Error("Invalid path: must be a string");
-  const e = u.resolve(o);
-  if (A.has(e)) return e;
-  for (const a of t) {
-    const n = u.resolve(a);
-    if (e === n || e.startsWith(n + u.sep))
-      return e;
+const allowedPaths = /* @__PURE__ */ new Set();
+function validatePath(filePath, ...allowedDirs) {
+  if (typeof filePath !== "string") throw new Error("Invalid path: must be a string");
+  const resolved = path.resolve(filePath);
+  if (allowedPaths.has(resolved)) return resolved;
+  for (const dir of allowedDirs) {
+    const resolvedDir = path.resolve(dir);
+    if (resolved === resolvedDir || resolved.startsWith(resolvedDir + path.sep)) {
+      return resolved;
+    }
   }
-  throw new Error("Access denied: path is outside allowed directories");
+  throw new Error(`Access denied: path is outside allowed directories`);
 }
-function P() {
+function getAllowedDirs() {
   return [
-    m.getPath("temp"),
-    m.getPath("userData")
+    app.getPath("temp"),
+    app.getPath("userData")
   ];
 }
-const $ = ["settings", "recent-files", "subtitle-cache", "subtitle-versions"];
-if (m.isPackaged) {
-  const o = process.platform === "win32" ? ".exe" : "";
-  T.setFfmpegPath(u.join(process.resourcesPath, "ffmpeg", "ffmpeg" + o)), T.setFfprobePath(u.join(process.resourcesPath, "ffprobe", "ffprobe" + o));
+const ALLOWED_STORE_KEYS = ["settings", "recent-files", "subtitle-cache", "subtitle-versions"];
+if (app.isPackaged) {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  ffmpeg.setFfmpegPath(path.join(process.resourcesPath, "ffmpeg", "ffmpeg" + ext));
+  ffmpeg.setFfprobePath(path.join(process.resourcesPath, "ffprobe", "ffprobe" + ext));
 } else {
-  const o = V(import.meta.url);
-  T.setFfmpegPath(o("@ffmpeg-installer/ffmpeg").path), T.setFfprobePath(o("@ffprobe-installer/ffprobe").path);
+  const _require = createRequire(import.meta.url);
+  ffmpeg.setFfmpegPath(_require("@ffmpeg-installer/ffmpeg").path);
+  ffmpeg.setFfprobePath(_require("@ffprobe-installer/ffprobe").path);
 }
-const C = new W();
-let v = null;
-function H() {
-  v = new j({
+const store = new Store();
+let mainWindow = null;
+function createWindow() {
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: u.join(R, "preload.js"),
-      contextIsolation: !0,
-      nodeIntegration: !1,
-      sandbox: !0
+      preload: path.join(__dirname$1, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     },
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0a0a0f"
-  }), v.webContents.setWindowOpenHandler(({ url: o }) => ((o.startsWith("http://") || o.startsWith("https://")) && D.openExternal(o), { action: "deny" })), v.webContents.on("will-navigate", (o, t) => {
-    const e = process.env.VITE_DEV_SERVER_URL || "file://";
-    t.startsWith(e) || (o.preventDefault(), D.openExternal(t));
-  }), process.env.VITE_DEV_SERVER_URL ? (v.loadURL(process.env.VITE_DEV_SERVER_URL), v.webContents.openDevTools()) : v.loadFile(u.join(R, "../dist/index.html"));
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const appUrl = process.env.VITE_DEV_SERVER_URL || "file://";
+    if (!url.startsWith(appUrl)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
+  }
 }
-function K(o) {
-  return {
+function getMimeType(ext) {
+  const map = {
     ".mp3": "audio/mpeg",
     ".wav": "audio/wav",
     ".ogg": "audio/ogg",
@@ -85,195 +106,265 @@ function K(o) {
     ".ts": "video/mp2t",
     ".mts": "video/mp2t",
     ".m2ts": "video/mp2t"
-  }[o.toLowerCase()] || "";
+  };
+  return map[ext.toLowerCase()] || "";
 }
-let E = 0;
-function G() {
-  const o = L.createServer(async (t, e) => {
+let mediaServerPort = 0;
+function startMediaServer() {
+  const server = http.createServer(async (req, res) => {
     try {
-      if (e.setHeader("Access-Control-Allow-Origin", "*"), e.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS"), e.setHeader("Access-Control-Allow-Headers", "Range"), t.method === "OPTIONS") {
-        e.writeHead(200), e.end();
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Range");
+      if (req.method === "OPTIONS") {
+        res.writeHead(200);
+        res.end();
         return;
       }
-      const a = new URL(t.url || "", `http://localhost:${E}`);
-      if (a.pathname !== "/stream") {
-        e.writeHead(404), e.end("Not Found");
+      const url = new URL(req.url || "", `http://localhost:${mediaServerPort}`);
+      if (url.pathname !== "/stream") {
+        res.writeHead(404);
+        res.end("Not Found");
         return;
       }
-      const n = a.searchParams.get("file");
-      if (!n) {
-        e.writeHead(400), e.end("Missing file parameter");
+      const fileParam = url.searchParams.get("file");
+      if (!fileParam) {
+        res.writeHead(400);
+        res.end("Missing file parameter");
         return;
       }
-      const r = decodeURIComponent(n), p = b(r, ...P()), i = (await _.promises.stat(p)).size, l = t.headers.range, f = K(u.extname(p));
-      if (l) {
-        const d = l.replace(/bytes=/, "").split("-"), k = parseInt(d[0], 10), h = d[1] ? parseInt(d[1], 10) : i - 1, g = h - k + 1, w = _.createReadStream(p, { start: k, end: h }), S = {
-          "Content-Range": `bytes ${k}-${h}/${i}`,
+      const decodedPath = decodeURIComponent(fileParam);
+      const safePath = validatePath(decodedPath, ...getAllowedDirs());
+      const stat = await fs.promises.stat(safePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+      const mimeType = getMimeType(path.extname(safePath));
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = end - start + 1;
+        const file = fs.createReadStream(safePath, { start, end });
+        const head = {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
           "Accept-Ranges": "bytes",
-          "Content-Length": g,
-          "Content-Type": f
+          "Content-Length": chunksize,
+          "Content-Type": mimeType
         };
-        e.writeHead(206, S), w.pipe(e);
+        res.writeHead(206, head);
+        file.pipe(res);
       } else {
-        const d = {
-          "Content-Length": i,
-          "Content-Type": f
+        const head = {
+          "Content-Length": fileSize,
+          "Content-Type": mimeType
         };
-        e.writeHead(200, d), _.createReadStream(p).pipe(e);
+        res.writeHead(200, head);
+        fs.createReadStream(safePath).pipe(res);
       }
-    } catch (a) {
-      console.error("Media server error:", a), e.headersSent || (e.writeHead(500), e.end("Internal Server Error"));
+    } catch (error) {
+      console.error("Media server error:", error);
+      if (!res.headersSent) {
+        res.writeHead(500);
+        res.end("Internal Server Error");
+      }
     }
   });
-  o.listen(0, "127.0.0.1", () => {
-    const t = o.address();
-    t && typeof t != "string" && (E = t.port, console.log(`Media server listening on port ${E}`));
+  server.listen(0, "127.0.0.1", () => {
+    const address = server.address();
+    if (address && typeof address !== "string") {
+      mediaServerPort = address.port;
+      console.log(`Media server listening on port ${mediaServerPort}`);
+    }
   });
 }
-m.whenReady().then(() => {
-  G(), U.handle("media", (o) => {
-    const t = o.url.replace("media://", "");
+app.whenReady().then(() => {
+  startMediaServer();
+  protocol.handle("media", (request) => {
+    const url = request.url.replace("media://", "");
     try {
-      const e = `http://localhost:${E}/stream?file=${t}`;
+      const redirectUrl = `http://localhost:${mediaServerPort}/stream?file=${url}`;
       return new Response(null, {
         status: 302,
         headers: {
-          Location: e
+          "Location": redirectUrl
         }
       });
-    } catch (e) {
-      return console.error("Media protocol error:", e), new Response("Error", { status: 500 });
+    } catch (error) {
+      console.error("Media protocol error:", error);
+      return new Response("Error", { status: 500 });
     }
-  }), H();
+  });
+  createWindow();
 });
-m.on("window-all-closed", () => {
-  process.platform !== "darwin" && m.quit();
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
-m.on("before-quit", () => {
+app.on("before-quit", () => {
   try {
-    const o = m.getPath("temp"), t = _.readdirSync(o);
-    for (const e of t)
-      /^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(e) && _.unlinkSync(u.join(o, e));
+    const tempDir = app.getPath("temp");
+    const entries = fs.readdirSync(tempDir);
+    for (const entry of entries) {
+      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(entry)) {
+        fs.unlinkSync(path.join(tempDir, entry));
+      }
+    }
   } catch {
   }
 });
-m.on("activate", () => {
-  j.getAllWindows().length === 0 && H();
-});
-m.isPackaged && (y.autoDownload = !1, y.autoInstallOnAppQuit = !0, m.whenReady().then(() => {
-  setTimeout(() => {
-    y.checkForUpdates().catch(() => {
-    });
-  }, 5e3);
-}), y.on("update-available", (o) => {
-  v?.webContents.send("update-available", {
-    version: o.version,
-    releaseNotes: o.releaseNotes,
-    releaseDate: o.releaseDate
-  });
-}), y.on("download-progress", (o) => {
-  v?.webContents.send("update-download-progress", {
-    percent: Math.round(o.percent),
-    transferred: o.transferred,
-    total: o.total
-  });
-}), y.on("update-downloaded", (o) => {
-  v?.webContents.send("update-downloaded", {
-    version: o.version
-  });
-}), y.on("error", (o) => {
-  v?.webContents.send("update-error", o.message);
-}));
-const O = "enc:";
-function q(o) {
-  if (!I.isEncryptionAvailable()) return o;
-  const t = o.providers;
-  if (!t) return o;
-  const e = { ...o, providers: { ...t } };
-  for (const a of Object.keys(e.providers)) {
-    const n = { ...e.providers[a] };
-    typeof n.apiKey == "string" && n.apiKey && !n.apiKey.startsWith(O) && (n.apiKey = O + I.encryptString(n.apiKey).toString("base64")), e.providers[a] = n;
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
   }
-  return e;
+});
+if (app.isPackaged) {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  app.whenReady().then(() => {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => {
+      });
+    }, 5e3);
+  });
+  autoUpdater.on("update-available", (info) => {
+    mainWindow?.webContents.send("update-available", {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+      releaseDate: info.releaseDate
+    });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    mainWindow?.webContents.send("update-download-progress", {
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total
+    });
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    mainWindow?.webContents.send("update-downloaded", {
+      version: info.version
+    });
+  });
+  autoUpdater.on("error", (err) => {
+    mainWindow?.webContents.send("update-error", err.message);
+  });
 }
-function J(o) {
-  if (!I.isEncryptionAvailable()) return o;
-  const t = o.providers;
-  if (!t) return o;
-  const e = { ...o, providers: { ...t } };
-  for (const a of Object.keys(e.providers)) {
-    const n = { ...e.providers[a] };
-    if (typeof n.apiKey == "string" && n.apiKey.startsWith(O))
+const ENC_PREFIX = "enc:";
+function encryptApiKeys(settings) {
+  if (!safeStorage.isEncryptionAvailable()) return settings;
+  const providers = settings.providers;
+  if (!providers) return settings;
+  const encrypted = { ...settings, providers: { ...providers } };
+  for (const name of Object.keys(encrypted.providers)) {
+    const provider = { ...encrypted.providers[name] };
+    if (typeof provider.apiKey === "string" && provider.apiKey && !provider.apiKey.startsWith(ENC_PREFIX)) {
+      provider.apiKey = ENC_PREFIX + safeStorage.encryptString(provider.apiKey).toString("base64");
+    }
+    encrypted.providers[name] = provider;
+  }
+  return encrypted;
+}
+function decryptApiKeys(settings) {
+  if (!safeStorage.isEncryptionAvailable()) return settings;
+  const providers = settings.providers;
+  if (!providers) return settings;
+  const decrypted = { ...settings, providers: { ...providers } };
+  for (const name of Object.keys(decrypted.providers)) {
+    const provider = { ...decrypted.providers[name] };
+    if (typeof provider.apiKey === "string" && provider.apiKey.startsWith(ENC_PREFIX)) {
       try {
-        const r = Buffer.from(n.apiKey.slice(O.length), "base64");
-        n.apiKey = I.decryptString(r);
+        const buf = Buffer.from(provider.apiKey.slice(ENC_PREFIX.length), "base64");
+        provider.apiKey = safeStorage.decryptString(buf);
       } catch {
       }
-    e.providers[a] = n;
+    }
+    decrypted.providers[name] = provider;
   }
-  return e;
+  return decrypted;
 }
-s.handle("store:get", (o, t) => {
-  if (typeof t != "string" || !$.includes(t))
-    throw new Error(`Invalid store key: ${t}`);
-  const e = C.get(t);
-  return t === "settings" && e && typeof e == "object" ? J(e) : e;
+ipcMain.handle("store:get", (_event, key) => {
+  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  const value = store.get(key);
+  if (key === "settings" && value && typeof value === "object") {
+    return decryptApiKeys(value);
+  }
+  return value;
 });
-s.handle("store:set", (o, t, e) => {
-  if (typeof t != "string" || !$.includes(t))
-    throw new Error(`Invalid store key: ${t}`);
-  t === "settings" && e && typeof e == "object" ? C.set(t, q(e)) : C.set(t, e);
+ipcMain.handle("store:set", (_event, key, value) => {
+  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  if (key === "settings" && value && typeof value === "object") {
+    store.set(key, encryptApiKeys(value));
+  } else {
+    store.set(key, value);
+  }
 });
-s.handle("store:delete", (o, t) => {
-  if (typeof t != "string" || !$.includes(t))
-    throw new Error(`Invalid store key: ${t}`);
-  C.delete(t);
+ipcMain.handle("store:delete", (_event, key) => {
+  if (typeof key !== "string" || !ALLOWED_STORE_KEYS.includes(key)) {
+    throw new Error(`Invalid store key: ${key}`);
+  }
+  store.delete(key);
 });
-s.handle("dialog:openFile", async () => {
-  const t = (await F.showOpenDialog(v, {
+ipcMain.handle("dialog:openFile", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
     filters: [
       { name: "Media Files", extensions: ["mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "aac", "m4a", "ogg", "flac"] }
     ]
-  })).filePaths[0] || null;
-  return t && A.add(u.resolve(t)), t;
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-s.handle("dialog:openSubtitleFile", async () => {
-  const t = (await F.showOpenDialog(v, {
+ipcMain.handle("dialog:openSubtitleFile", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
     filters: [
       { name: "Subtitle Files", extensions: ["srt", "vtt", "ass", "ssa"] }
     ]
-  })).filePaths[0] || null;
-  return t && A.add(u.resolve(t)), t;
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-s.handle("dialog:saveFile", async (o, t, e, a) => {
-  const r = (await F.showSaveDialog(v, {
-    defaultPath: t,
-    filters: [{ name: e || "Subtitle File", extensions: a || [t.split(".").pop() || "srt"] }]
-  })).filePath || null;
-  return r && A.add(u.resolve(r)), r;
+ipcMain.handle("dialog:saveFile", async (_event, defaultName, filterName, filterExtensions) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultName,
+    filters: [{ name: filterName || "Subtitle File", extensions: filterExtensions || [defaultName.split(".").pop() || "srt"] }]
+  });
+  const filePath = result.filePath || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
 });
-s.handle("dialog:showMessageBox", async (o, t) => F.showMessageBox(v, t));
-s.handle("file:read", async (o, t) => {
-  const e = b(t, ...P());
-  return _.promises.readFile(e);
+ipcMain.handle("dialog:showMessageBox", async (_event, options) => {
+  return dialog.showMessageBox(mainWindow, options);
 });
-s.handle("file:write", async (o, t, e) => {
-  const a = b(t, ...P());
-  await _.promises.writeFile(a, e, "utf-8");
+ipcMain.handle("file:read", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return fs.promises.readFile(safePath);
 });
-s.handle("file:getInfo", async (o, t) => {
-  const e = b(t, ...P());
+ipcMain.handle("file:write", async (_event, filePath, data) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  await fs.promises.writeFile(safePath, data, "utf-8");
+});
+ipcMain.handle("file:getInfo", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  const stats = await fs.promises.stat(safePath);
   return {
-    size: (await _.promises.stat(e)).size,
-    path: e,
-    name: u.basename(e),
-    ext: u.extname(e).toLowerCase()
+    size: stats.size,
+    path: safePath,
+    name: path.basename(safePath),
+    ext: path.extname(safePath).toLowerCase()
   };
 });
-s.handle("file:getTempPath", () => m.getPath("temp"));
-const X = /* @__PURE__ */ new Set([
+ipcMain.handle("file:getTempPath", () => {
+  return app.getPath("temp");
+});
+const ALLOWED_MEDIA_EXTENSIONS = /* @__PURE__ */ new Set([
   ".mp4",
   ".mkv",
   ".avi",
@@ -292,87 +383,157 @@ const X = /* @__PURE__ */ new Set([
   ".alac",
   ".aiff"
 ]);
-s.handle("file:registerPath", (o, t) => {
-  if (typeof t != "string") return;
-  const e = u.resolve(t), a = u.extname(e).toLowerCase();
-  if (!X.has(a))
+ipcMain.handle("file:registerPath", (_event, filePath) => {
+  if (typeof filePath !== "string") return;
+  const resolved = path.resolve(filePath);
+  const ext = path.extname(resolved).toLowerCase();
+  if (!ALLOWED_MEDIA_EXTENSIONS.has(ext)) {
     throw new Error("Only media files can be registered");
-  A.add(e);
+  }
+  allowedPaths.add(resolved);
 });
-s.handle("ffmpeg:extractAudio", async (o, t, e, a = "flac") => {
-  const n = b(t, ...P()), r = b(e, ...P()), p = a === "mp3" ? "libmp3lame" : "flac";
-  return new Promise((c, i) => {
-    T(n).audioCodec(p).toFormat(a).on("end", () => c(r)).on("error", (l) => i(l.message)).save(r);
+ipcMain.handle("ffmpeg:extractAudio", async (_event, inputPath, outputPath, format = "flac") => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+  const codec = format === "mp3" ? "libmp3lame" : "flac";
+  return new Promise((resolve, reject) => {
+    ffmpeg(safeInput).audioCodec(codec).toFormat(format).on("end", () => resolve(safeOutput)).on("error", (err) => reject(err.message)).save(safeOutput);
   });
 });
-s.handle("ffmpeg:getDuration", async (o, t) => {
-  const e = b(t, ...P());
-  return new Promise((a, n) => {
-    T.ffprobe(e, (r, p) => {
-      r ? n(r.message) : a(p.format.duration || 0);
+ipcMain.handle("ffmpeg:getDuration", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(safePath, (err, data) => {
+      if (err) reject(err.message);
+      else resolve(data.format.duration || 0);
     });
   });
 });
-s.handle("ffmpeg:detectSilences", async (o, t, e, a) => {
-  const n = b(t, ...P());
-  if (!Number.isFinite(e) || e < -100 || e > 0)
+ipcMain.handle("ffmpeg:getVideoInfo", async (_event, filePath) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(safePath, (err, data) => {
+      if (err) reject(err.message);
+      else {
+        const videoStream = data.streams.find((s) => s.codec_type === "video");
+        resolve({
+          duration: data.format.duration || 0,
+          width: videoStream?.width ?? null,
+          height: videoStream?.height ?? null
+        });
+      }
+    });
+  });
+});
+ipcMain.handle("ffmpeg:detectSilences", async (_event, filePath, threshold, minDuration) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  if (!Number.isFinite(threshold) || threshold < -100 || threshold > 0) {
     throw new Error("Invalid threshold: must be between -100 and 0");
-  if (!Number.isFinite(a) || a < 0.1 || a > 60)
+  }
+  if (!Number.isFinite(minDuration) || minDuration < 0.1 || minDuration > 60) {
     throw new Error("Invalid minDuration: must be between 0.1 and 60");
-  return new Promise((r, p) => {
-    const c = [];
-    let i = null;
-    T(n).audioFilters(`silencedetect=noise=${e}dB:d=${a}`).format("null").on("stderr", (l) => {
-      const f = l.match(/silence_start:\s*([\d.]+)/);
-      f && (i = { start: parseFloat(f[1]) });
-      const d = l.match(/silence_end:\s*([\d.]+)/);
-      d && i && (i.end = parseFloat(d[1]), c.push(i), i = null);
-    }).on("end", () => r(c)).on("error", (l) => p(l.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
+  }
+  return new Promise((resolve, reject) => {
+    const silences = [];
+    let currentSilence = null;
+    ffmpeg(safePath).audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`).format("null").on("stderr", (line) => {
+      const startMatch = line.match(/silence_start:\s*([\d.]+)/);
+      if (startMatch) {
+        currentSilence = { start: parseFloat(startMatch[1]) };
+      }
+      const endMatch = line.match(/silence_end:\s*([\d.]+)/);
+      if (endMatch && currentSilence) {
+        currentSilence.end = parseFloat(endMatch[1]);
+        silences.push(currentSilence);
+        currentSilence = null;
+      }
+    }).on("end", () => resolve(silences)).on("error", (err) => reject(err.message)).output(process.platform === "win32" ? "NUL" : "/dev/null").run();
   });
 });
-s.handle("ffmpeg:splitAudio", async (o, t, e, a = "flac") => {
-  const n = b(t, ...P()), r = [], p = a === "mp3" ? "libmp3lame" : "flac";
-  for (const c of e) {
-    const i = b(c.outputPath, ...P());
-    await new Promise((l, f) => {
-      T(n).setStartTime(c.start).setDuration(c.end - c.start).audioCodec(p).toFormat(a).on("end", () => {
-        r.push(i), l();
-      }).on("error", (d) => f(d.message)).save(i);
+ipcMain.handle("ffmpeg:splitAudio", async (_event, inputPath, chunks, format = "flac") => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const results = [];
+  const codec = format === "mp3" ? "libmp3lame" : "flac";
+  for (const chunk of chunks) {
+    const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
+    await new Promise((resolve, reject) => {
+      ffmpeg(safeInput).setStartTime(chunk.start).setDuration(chunk.end - chunk.start).audioCodec(codec).toFormat(format).on("end", () => {
+        results.push(safeOutput);
+        resolve();
+      }).on("error", (err) => reject(err.message)).save(safeOutput);
     });
   }
-  return r;
+  return results;
 });
-s.handle("app:getVersion", () => m.getVersion());
-s.handle("app:checkForUpdates", async () => {
-  if (!m.isPackaged) return { updateAvailable: !1 };
+ipcMain.handle("ffmpeg:burnSubtitles", async (_event, inputPath, srtContent, outputPath, targetWidth, targetHeight) => {
+  const safeInput = validatePath(inputPath, ...getAllowedDirs());
+  const safeOutput = validatePath(outputPath, ...getAllowedDirs());
+  const tempDir = app.getPath("temp");
+  const tempSrtPath = path.join(tempDir, "sublibr_subs_burn.srt");
+  await fs.promises.writeFile(tempSrtPath, srtContent, "utf-8");
+  let escapedSrtPath;
+  if (process.platform === "win32") {
+    escapedSrtPath = tempSrtPath.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
+  } else {
+    escapedSrtPath = tempSrtPath.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
+  }
+  const videoFilter = targetWidth && targetHeight ? `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:black,subtitles='${escapedSrtPath}'` : `subtitles='${escapedSrtPath}'`;
+  return new Promise((resolve, reject) => {
+    ffmpeg(safeInput).videoFilters(videoFilter).outputOptions(["-c:a", "copy"]).on("progress", (progress) => {
+      mainWindow?.webContents.send("ffmpeg:burnSubtitlesProgress", {
+        percent: Math.min(99, Math.round(progress.percent || 0))
+      });
+    }).on("end", async () => {
+      await fs.promises.unlink(tempSrtPath).catch(() => {
+      });
+      mainWindow?.webContents.send("ffmpeg:burnSubtitlesProgress", { percent: 100 });
+      resolve(safeOutput);
+    }).on("error", async (err) => {
+      await fs.promises.unlink(tempSrtPath).catch(() => {
+      });
+      reject(err.message);
+    }).save(safeOutput);
+  });
+});
+ipcMain.handle("app:getVersion", () => {
+  return app.getVersion();
+});
+ipcMain.handle("app:checkForUpdates", async () => {
+  if (!app.isPackaged) return { updateAvailable: false };
   try {
-    return { updateAvailable: !!(await y.checkForUpdates())?.updateInfo };
+    const result = await autoUpdater.checkForUpdates();
+    return { updateAvailable: !!result?.updateInfo };
   } catch {
-    return { updateAvailable: !1 };
+    return { updateAvailable: false };
   }
 });
-s.handle("app:downloadUpdate", async () => {
-  m.isPackaged && await y.downloadUpdate();
+ipcMain.handle("app:downloadUpdate", async () => {
+  if (!app.isPackaged) return;
+  await autoUpdater.downloadUpdate();
 });
-s.handle("app:installUpdate", () => {
-  y.quitAndInstall(!1, !0);
+ipcMain.handle("app:installUpdate", () => {
+  autoUpdater.quitAndInstall(false, true);
 });
-s.handle("ai:testApiKey", async (o, t, e) => {
+ipcMain.handle("ai:testApiKey", async (_event, provider, apiKey) => {
   try {
-    switch (t) {
+    switch (provider) {
       case "gemini": {
-        const a = await x.fetch(
+        const res = await net.fetch(
           "https://generativelanguage.googleapis.com/v1beta/models",
-          { headers: { "x-goog-api-key": e } }
+          { headers: { "x-goog-api-key": apiKey } }
         );
-        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
       }
       case "anthropic": {
-        const a = await x.fetch("https://api.anthropic.com/v1/messages", {
+        const res = await net.fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": e,
+            "x-api-key": apiKey,
             "anthropic-version": "2023-06-01"
           },
           body: JSON.stringify({
@@ -381,111 +542,143 @@ s.handle("ai:testApiKey", async (o, t, e) => {
             messages: [{ role: "user", content: "ping" }]
           })
         });
-        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
       }
       case "openai": {
-        const a = await x.fetch("https://api.openai.com/v1/models", {
-          headers: { Authorization: `Bearer ${e}` }
+        const res = await net.fetch("https://api.openai.com/v1/models", {
+          headers: { "Authorization": `Bearer ${apiKey}` }
         });
-        return a.ok ? { ok: !0 } : { ok: !1, error: (await a.json().catch(() => ({}))).error?.message || `HTTP ${a.status}` };
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
       }
     }
-  } catch (a) {
-    return { ok: !1, error: a instanceof Error ? a.message : "Network error" };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Network error" };
   }
 });
-s.handle("ai:callProvider", async (o, t, e, a, n, r, p = "flac", c, i) => {
-  const l = `audio/${p}`;
-  switch (t) {
+ipcMain.handle("ai:callProvider", async (_event, provider, apiKey, model, prompt, audioBase64, audioFormat = "flac", language, previousTranscript) => {
+  const mimeType = `audio/${audioFormat}`;
+  switch (provider) {
     case "gemini": {
-      const { GoogleGenerativeAI: f } = await import("./index-C45_meK_.js"), g = await (await new f(e).getGenerativeModel({ model: a }).generateContent([
-        n,
+      const { GoogleGenerativeAI } = await import("./index-B6HwN2S4.js");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiModel = genAI.getGenerativeModel({ model });
+      const result = await geminiModel.generateContent([
+        prompt,
         {
           inlineData: {
-            mimeType: l,
-            data: r
+            mimeType,
+            data: audioBase64
           }
         }
-      ])).response, w = g.usageMetadata;
+      ]);
+      const response = await result.response;
+      const usage = response.usageMetadata;
       return {
-        text: g.text(),
+        text: response.text(),
         tokenUsage: {
-          inputTokens: w?.promptTokenCount ?? 0,
-          outputTokens: w?.candidatesTokenCount ?? 0,
+          inputTokens: usage?.promptTokenCount ?? 0,
+          outputTokens: usage?.candidatesTokenCount ?? 0,
           provider: "gemini",
-          model: a,
+          model,
           timestamp: Date.now()
         }
       };
     }
-    case "openai":
-      if (a.startsWith("gpt-4o")) {
-        let d = a;
-        a === "gpt-4o" ? d = "gpt-4o-audio-preview" : a === "gpt-4o-mini" && (d = "gpt-4o-mini-audio-preview");
-        const h = [
+    case "openai": {
+      const isChatModel = model.startsWith("gpt-4o");
+      if (isChatModel) {
+        let mappedModel = model;
+        if (model === "gpt-4o") {
+          mappedModel = "gpt-4o-audio-preview";
+        } else if (model === "gpt-4o-mini") {
+          mappedModel = "gpt-4o-mini-audio-preview";
+        }
+        const formatOption = audioFormat === "mp3" ? "mp3" : "wav";
+        const messages = [
           {
             role: "user",
             content: [
-              { type: "text", text: n },
+              { type: "text", text: prompt },
               {
                 type: "input_audio",
                 input_audio: {
-                  data: r,
-                  format: p === "mp3" ? "mp3" : "wav"
+                  data: audioBase64,
+                  format: formatOption
                   // OpenAI supports wav, mp3. 
                 }
               }
             ]
           }
-        ], g = await x.fetch("https://api.openai.com/v1/chat/completions", {
+        ];
+        const res = await net.fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${e}`,
+            "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: d,
+            model: mappedModel,
             modalities: ["text"],
             // We only want text back
-            messages: h
+            messages
           })
         });
-        if (!g.ok) {
-          const M = await g.json().catch(() => ({ error: { message: g.statusText } }));
-          throw new Error(`OpenAI API error: ${M.error?.message || g.statusText}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
         }
-        const w = await g.json();
+        const data = await res.json();
+        const text = data.choices[0]?.message?.content || "";
         return {
-          text: w.choices[0]?.message?.content || "",
+          text,
           tokenUsage: {
-            inputTokens: w.usage?.prompt_tokens || 0,
-            outputTokens: w.usage?.completion_tokens || 0,
+            inputTokens: data.usage?.prompt_tokens || 0,
+            outputTokens: data.usage?.completion_tokens || 0,
             provider: "openai",
-            model: a,
+            model,
             timestamp: Date.now()
           }
         };
       } else {
-        const d = Buffer.from(r, "base64"), k = new Blob([d], { type: l }), h = new FormData();
-        h.append("file", k, `audio.${p}`), h.append("model", "whisper-1"), h.append("response_format", "verbose_json"), h.append("timestamp_granularities[]", "word"), c && h.append("language", c);
-        let g = z;
-        i && (g = `${i}
+        const buffer = Buffer.from(audioBase64, "base64");
+        const blob = new Blob([buffer], { type: mimeType });
+        const formData = new FormData();
+        formData.append("file", blob, `audio.${audioFormat}`);
+        formData.append("model", "whisper-1");
+        formData.append("response_format", "verbose_json");
+        formData.append("timestamp_granularities[]", "word");
+        if (language) {
+          formData.append("language", language);
+        }
+        let finalPrompt = WHISPER_PUNCTUATION_PROMPT;
+        if (previousTranscript) {
+          finalPrompt = `${previousTranscript}
 
-${g}`), h.append("prompt", g);
-        const w = await x.fetch("https://api.openai.com/v1/audio/transcriptions", {
+${finalPrompt}`;
+        }
+        formData.append("prompt", finalPrompt);
+        const res = await net.fetch("https://api.openai.com/v1/audio/transcriptions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${e}`
+            "Authorization": `Bearer ${apiKey}`
           },
-          body: h
+          body: formData
         });
-        if (!w.ok) {
-          const M = await w.json().catch(() => ({ error: { message: w.statusText } }));
-          throw new Error(`OpenAI API error: ${M.error?.message || w.statusText}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
         }
-        const S = await w.json();
+        const data = await res.json();
         return {
-          text: JSON.stringify(S),
+          text: JSON.stringify(data),
           tokenUsage: {
             inputTokens: 0,
             outputTokens: 0,
@@ -495,54 +688,64 @@ ${g}`), h.append("prompt", g);
           }
         };
       }
+    }
   }
 });
-s.handle("ai:callTextProvider", async (o, t, e, a, n) => {
-  switch (t) {
+ipcMain.handle("ai:callTextProvider", async (_event, provider, apiKey, model, prompt) => {
+  switch (provider) {
     case "gemini": {
-      const { GoogleGenerativeAI: r } = await import("./index-C45_meK_.js"), l = await (await new r(e).getGenerativeModel({ model: a }).generateContent(n)).response, f = l.usageMetadata;
+      const { GoogleGenerativeAI } = await import("./index-B6HwN2S4.js");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiModel = genAI.getGenerativeModel({ model });
+      const result = await geminiModel.generateContent(prompt);
+      const response = await result.response;
+      const usage = response.usageMetadata;
       return {
-        text: l.text(),
+        text: response.text(),
         tokenUsage: {
-          inputTokens: f?.promptTokenCount ?? 0,
-          outputTokens: f?.candidatesTokenCount ?? 0,
+          inputTokens: usage?.promptTokenCount ?? 0,
+          outputTokens: usage?.candidatesTokenCount ?? 0,
           provider: "gemini",
-          model: a,
+          model,
           timestamp: Date.now()
         }
       };
     }
     case "openai": {
-      let r = a;
-      a === "gpt-4o-audio-preview" && (r = "gpt-4o"), a === "gpt-4o-mini-audio-preview" && (r = "gpt-4o-mini"), a === "whisper-1" && (r = "gpt-4o-mini");
-      const p = [
+      let mappedModel = model;
+      if (model === "gpt-4o-audio-preview") mappedModel = "gpt-4o";
+      if (model === "gpt-4o-mini-audio-preview") mappedModel = "gpt-4o-mini";
+      if (model === "whisper-1") mappedModel = "gpt-4o-mini";
+      const messages = [
         {
           role: "user",
-          content: n
+          content: prompt
         }
-      ], c = await x.fetch("https://api.openai.com/v1/chat/completions", {
+      ];
+      const res = await net.fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${e}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: r,
-          messages: p
+          model: mappedModel,
+          messages
         })
       });
-      if (!c.ok) {
-        const f = await c.json().catch(() => ({ error: { message: c.statusText } }));
-        throw new Error(`OpenAI API error: ${f.error?.message || c.statusText}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
       }
-      const i = await c.json();
+      const data = await res.json();
+      const text = data.choices[0]?.message?.content || "";
       return {
-        text: i.choices[0]?.message?.content || "",
+        text,
         tokenUsage: {
-          inputTokens: i.usage?.prompt_tokens || 0,
-          outputTokens: i.usage?.completion_tokens || 0,
+          inputTokens: data.usage?.prompt_tokens || 0,
+          outputTokens: data.usage?.completion_tokens || 0,
           provider: "openai",
-          model: a,
+          model,
           timestamp: Date.now()
         }
       };
