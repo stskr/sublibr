@@ -4,6 +4,15 @@
 
 A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini and OpenAI.
 
+## 📸 Screenshots
+
+| | |
+|---|---|
+| ![Upload video or audio](readme-screenshots/1-Upload%20Video%20Audio.png) | ![API key setup](readme-screenshots/2-Easy%20LLM%20Provider%20API%20Key%20Setup.png) |
+| ![AI subtitles generation](readme-screenshots/3-AI%20Subtitles%20Generation.png) | ![Subtitles editor](readme-screenshots/4-Subtitles%20Editor.png) |
+
+![Preview video](readme-screenshots/5-Preview%20Video.png)
+
 ## ✨ Features
 
 - **🎙️ AI Transcription**: Multi-provider support — Google Gemini and OpenAI — with per-provider API key validation and a unified "Active Model" selector.
