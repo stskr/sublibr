@@ -1,6 +1,6 @@
 # SUBLIBR - Application Documentation
 
-> **Last Updated**: February 20, 2026  
+> **Last Updated**: February 23, 2026
 > **Version**: 1.0.0
 
 ---
@@ -24,20 +24,23 @@
 
 ### Key Features
 
-- **Multi-Provider AI Transcription**: Supports Google Gemini and OpenAI with per-provider API key validation and a unified "Active Model" selector
+- **Multi-Provider AI Transcription**: Google Gemini and OpenAI with per-provider API key validation and a unified "Active Model" selector
 - **Intelligent Audio Processing**: Automatic silence detection and smart chunking (3-4 minute segments with 20s overlap)
-- **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically
-- **Quality Enforcement**: Ensures subtitles meet display standards configured by **Screen Size** format (Wide: 16:9, Square: 1:1, Vertical: 9:16) with proper durations and max limits
-- **Recent Files History**: Tracks the last 10 generated or opened files for quick access, with automatic subtitle caching
-- **Subtitle Caching**: Generated subtitles are persisted to `electron-store` and restored when loading a recent file
+- **Gap Healing**: Detects and re-transcribes missing subtitle segments automatically; surfaces a non-blocking warning if healing fails
+- **Quality Enforcement**: Ensures subtitles meet display standards configured by **Screen Size** format (Wide: 16:9, Square: 1:1, Vertical: 9:16) with proper durations and max line limits
+- **Render Video**: Burns styled subtitles into a video using FFmpeg at any target resolution with real-time progress
+- **Global Subtitle Styling**: Full visual style control — font family, font size (ASS PlayRes units), text color, outline/shadow effects, background box, and X/Y position. Includes per-screen-size font defaults and a Reset button
+- **Accurate Render Preview**: Subtitle font size in the preview scales proportionally to the render canvas width via `ResizeObserver`, faithfully matching the final burned output across all aspect ratios
+- **Recent Files History**: Tracks the last 10 generated or opened files with automatic subtitle caching
 - **Token Usage Tracking**: Real-time session token counter with cost estimates and per-provider breakdown
 - **Multi-Language Support**: 90+ languages with auto-detection capability
-- **Built-in Editor**: Timeline-based subtitle editor with video preview and Search/Replace capabilities
+- **Built-in Rich Text Editor**: WYSIWYG editing with bold, italic, underline, and per-word color markup
+- **Advanced Timeline Editor**: Two-tier timeline (zoomed main track + full-duration minimap) with ruler, grid, Scissors tool, and drag-to-trim handles
 - **Search & Replace**: Global search with highlighting, replacement, and keyboard navigation (Cmd/Ctrl+F)
-- **Inline Preview**: Toggle between subtitle editor and preview mode (video with overlay or cinema screen for audio)
-- **Advanced Timeline Editor**: Two-tier timeline with a zoomed main track and a full-duration minimap for precise navigation and global context.
-- **Media Streaming**: Local HTTP server for efficient playback and seeking of large video files, bypassing Electron protocol limitations
-- **Versioning & Regenerate**: Create multiple subtitle versions for the same file (e.g., different models/prompts) and switch between them instantly
+- **Inline Preview**: Toggle between subtitle editor and video preview (video with overlay or cinema screen for audio)
+- **Media Streaming**: Custom `media://` Electron protocol streams files from disk for efficient playback and seeking without loading into memory
+- **Versioning & Regenerate**: Create multiple subtitle versions for the same file (different models/prompts) and switch between them instantly
+- **Translation**: Translate generated subtitles to another language via text AI while preserving timestamps; creates a new version
 - **Auto-Update**: Built-in update system via GitHub Releases with user-controlled download and install
 
 ### Tech Stack
@@ -49,7 +52,7 @@
 | **TypeScript** | Type-safe development |
 | **Vite** | Build tool and dev server |
 | **Google Gemini / OpenAI** | Speech-to-text transcription (multi-provider) |
-| **FFmpeg** | Audio/video processing (extract audio, detect silences, split chunks) |
+| **FFmpeg** | Audio/video processing (extract audio, detect silences, split chunks, burn subtitles) |
 | **electron-store** | Persistent settings storage |
 | **fluent-ffmpeg** | Node.js wrapper for FFmpeg |
 
@@ -65,8 +68,20 @@ subtitles-gen/
 │
 ├── src/                        # React application source
 │   ├── components/             # React components
+│   │   ├── common/
+│   │   │   ├── EditorHeader.tsx     # Shared toolbar for editor & preview
+│   │   │   ├── RichTextEditor.tsx   # WYSIWYG contenteditable editor
+│   │   │   └── StyledText.tsx       # Read-only styled text renderer
+│   │   ├── Timeline/
+│   │   │   ├── Timeline.tsx         # Main timeline orchestrator
+│   │   │   ├── MainTrack.tsx        # Zoomed detail track (trim, scissors)
+│   │   │   ├── Minimap.tsx          # Full-duration overview + scroll window
+│   │   │   ├── Ruler.tsx            # Time ruler with comb-style ticks
+│   │   │   ├── TimelineGrid.tsx     # Vertical grid lines for alignment
+│   │   │   ├── useTimelineTicks.ts  # Shared tick generation logic
+│   │   │   └── Timeline.css
 │   │   ├── AudioPlayer.tsx
-│   │   ├── CustomSelect.tsx
+│   │   ├── CustomSelect.tsx         # Portal-based custom dropdown
 │   │   ├── FileUpload.tsx
 │   │   ├── LanguageSelector.tsx
 │   │   ├── ProgressIndicator.tsx
@@ -74,28 +89,26 @@ subtitles-gen/
 │   │   ├── Settings.tsx
 │   │   ├── ShortcutsModal.tsx
 │   │   ├── SubtitleEditor.tsx
-│   │   ├── SubtitlePreview.tsx
-│   │   ├── Timeline/
-│   │   │   ├── Timeline.tsx       # Main timeline orchestrator
-│   │   │   ├── Minimap.tsx        # Overview track with zoom slider
-│   │   │   ├── MainTrack.tsx      # Zoomed detail track with Ruler & Grid
-│   │   │   ├── Minimap.tsx        # Overview track with zoom slider
-│   │   │   ├── Ruler.tsx          # Time ruler with comb-style ticks
-│   │   │   ├── TimelineGrid.tsx   # Vertical grid lines for alignment
-│   │   │   ├── useTimelineTicks.ts # Shared tick generation logic
-│   │   │   └── Timeline.css       # Timeline styles
+│   │   ├── SubtitlePreview.tsx      # Video/audio preview with subtitle overlay
+│   │   ├── SubtitleStylePanel.tsx   # Global subtitle style controls
 │   │   ├── TokenUsageDisplay.tsx
 │   │   └── UpdateNotification.tsx
 │   │
+│   ├── hooks/
+│   │   ├── useTranscriptionPipeline.ts  # Full generation/translation/render pipeline
+│   │   ├── useKeyboardShortcuts.ts      # Global keyboard shortcuts
+│   │   └── useUndoRedo.ts               # Undo/redo history (capped at 50 entries)
+│   │
 │   ├── services/               # Core business logic
 │   │   ├── audioProcessor.ts   # Audio chunking & silence detection
-│   │   ├── healer.ts          # Gap detection & healing
-│   │   ├── providers.ts       # Multi-provider dispatch, API key testing
-│   │   └── transcriber.ts     # AI transcription & quality enforcement
+│   │   ├── healer.ts           # Gap detection & healing
+│   │   ├── providers.ts        # Multi-provider dispatch, API key testing
+│   │   └── transcriber.ts      # AI transcription, quality enforcement, export
 │   │
-│   ├── assets/                 # Static assets
-│   │   └── Fonts/
-│   │       └── Signika/       # Custom Signika font
+│   ├── prompts/                # AI prompt templates (per provider)
+│   │
+│   ├── assets/
+│   │   └── Fonts/Signika/      # Custom Signika variable font
 │   │
 │   ├── App.tsx                # Main application component
 │   ├── App.css                # Global styles & design tokens
@@ -103,25 +116,16 @@ subtitles-gen/
 │   ├── utils.ts               # Utility functions
 │   └── main.tsx               # React app entry point
 │
-├── public/                     # Static public assets
+├── public/
 ├── dist/                      # Vite build output
 ├── dist-electron/             # Electron build output
 ├── release/                   # Packaged installers
 │
-├── package.json               # Dependencies & build config
-├── tsconfig.json              # TypeScript configuration
-├── vite.config.ts             # Vite build configuration
-└── README.md                  # Project README
-
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
 ```
-
-### File Counts & Organization
-
-- **React Components**: ~15 files
-- **Services**: 4 core modules
-- **Electron Process Files**: 2 (main + preload)
-- **Total Source Files**: ~15 TypeScript/TSX files
-- **Lines of Code**: ~2,500 (excluding dependencies)
 
 ---
 
@@ -138,13 +142,13 @@ graph TB
     Main[Electron Main Process]
     Services[Service Layer]
     External[External APIs & Tools]
-    
+
     UI -->|IPC Invoke| IPC
     IPC -->|Events| Main
     Main -->|File System & FFmpeg| External
-    Services -->|Gemini API| External
+    Services -->|Gemini / OpenAI API| External
     UI -->|Import| Services
-    
+
     style UI fill:#8075EB
     style Services fill:#75EBBB
     style External fill:#E0EB75
@@ -153,57 +157,62 @@ graph TB
 ### 1. **Renderer Process (React UI)**
 
 - **Framework**: React 19 with TypeScript
-- **State Management**: Local component state using `useState` and `useEffect` hooks
-- **UI Components**: Functional components with hooks pattern
+- **State Management**: Local component state via `useState`/`useEffect` hooks; pipeline logic in `useTranscriptionPipeline`
 - **Styling**: CSS-in-file with design tokens (CSS custom properties)
 
 ### 2. **IPC Communication Layer**
 
-The app uses Electron's IPC (Inter-Process Communication) to bridge the renderer and main processes securely.
+The app uses Electron's IPC to bridge the renderer and main processes securely. All API calls (transcription, key testing) are proxied through the main process — the renderer never makes direct HTTP requests, keeping API keys invisible in DevTools.
 
-**Preload Script** (`electron/preload.ts`) exposes a safe API:
+**Preload Script** (`electron/preload.ts`) exposes the full `ElectronAPI`:
 
 ```typescript
 window.electronAPI = {
   // Settings & Store
-  getStoreValue: (key: string) => ipcRenderer.invoke('store:get', key),
-  setStoreValue: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
-  deleteStoreValue: (key: string) => ipcRenderer.invoke('store:delete', key),
-  
+  getStoreValue(key),
+  setStoreValue(key, value),
+  deleteStoreValue(key),
+
   // File dialogs
-  openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
-  saveFileDialog: (defaultName: string) => ipcRenderer.invoke('dialog:saveFile', defaultName),
-  
+  openFileDialog(),
+  openSubtitleFileDialog(),
+  saveFileDialog(defaultName, filterName?, filterExtensions?),
+  showMessageBox(options),
+
   // File operations
-  readFile: (path: string) => ipcRenderer.invoke('file:read', path),
-  writeFile: (path: string, data: string) => ipcRenderer.invoke('file:write', path, data),
-  getFileInfo: (path: string) => ipcRenderer.invoke('file:getInfo', path),
-  getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
-  
+  readFile(path),
+  writeFile(path, data),
+  getFileInfo(path),
+  getTempPath(),
+  registerPath(path),          // Security: register path before streaming
+  cleanupTempAudio(),          // Remove leftover temp audio files
+  getFilePath(file),
+
+  // AI Provider (proxied through main process)
+  testApiKey(provider, apiKey),
+  callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat?, language?, previousTranscript?),
+  callTextProvider(provider, apiKey, model, prompt),
+
   // FFmpeg operations
-  extractAudio: (inputPath: string, outputPath: string) => 
-    ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath),
-  getDuration: (filePath: string) => 
-    ipcRenderer.invoke('ffmpeg:getDuration', filePath),
-  detectSilences: (filePath: string, threshold: number, minDuration: number) => 
-    ipcRenderer.invoke('ffmpeg:detectSilences', filePath, threshold, minDuration),
-  splitAudio: (inputPath: string, chunks: { start: number; end: number; outputPath: string }[]) => 
-    ipcRenderer.invoke('ffmpeg:splitAudio', inputPath, chunks),
-  
-  // Progress events
-  onProgress: (callback: (progress: number) => void) => {
-    ipcRenderer.on('progress', (_event, progress) => callback(progress));
-  },
+  extractAudio(inputPath, outputPath, format?),
+  getDuration(filePath),
+  detectSilences(filePath, threshold, minDuration),
+  splitAudio(inputPath, chunks, format?),
+  getVideoInfo(filePath),       // Returns { width, height, duration }
+  burnSubtitles(inputPath, subtitleContent, outputPath, targetWidth, targetHeight, subtitleFormat?),
+
+  // Progress events (return cleanup functions)
+  onBurnSubtitlesProgress(callback),
 
   // App updates
-  getVersion: () => ipcRenderer.invoke('app:getVersion'),
-  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
-  downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
-  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
-  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
-  onUpdateProgress: (callback) => ipcRenderer.on('update-download-progress', (_, progress) => callback(progress)),
-  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_, info) => callback(info)),
-  onUpdateError: (callback) => ipcRenderer.on('update-error', (_, message) => callback(message)),
+  getVersion(),
+  checkForUpdates(),
+  downloadUpdate(),
+  installUpdate(),
+  onUpdateAvailable(callback),
+  onUpdateProgress(callback),
+  onUpdateDownloaded(callback),
+  onUpdateError(callback),
 }
 ```
 
@@ -214,67 +223,63 @@ window.electronAPI = {
 Responsibilities:
 - Window management
 - IPC handler registration
-- File system access (with security validation)
-- FFmpeg execution
-- Settings persistence via `electron-store`
-- Subtitle cache persistence (`subtitle-cache` store key)
+- File system access (with security validation — path must be registered via `file:registerPath` and have a media/subtitle extension)
+- FFmpeg execution (audio extraction, silence detection, splitting, subtitle burning)
+- Settings persistence via `electron-store` (keys: `settings`, `subtitle-cache`, `recent-files`, `subtitle-versions`)
+- API proxy: all `callProvider` / `callTextProvider` / `testApiKey` calls go through `net.fetch` in the main process
+- API key encryption via Electron `safeStorage` (OS keychain); falls back to plaintext if unavailable
 
 **Security Features**:
-- Path validation against allowed directories
-- Store key allowlist (`settings`, `recent-files`, `subtitle-cache`)
-- Content Security Policy (CSP)
+- Path validation with extension allowlist for media files (`.mp4`, `.mkv`, `.mov`, `.mp3`, `.wav`, etc.) and subtitles (`.srt`, `.vtt`, `.ass`)
+- Store key allowlist (`settings`, `recent-files`, `subtitle-cache`, `subtitle-versions`)
+- Content Security Policy (CSP) on all windows
 - Sandboxed renderer process
-- **Media Streaming**: Local HTTP server (`http://localhost:*`)
-  - Redirects `media://` requests to local server
-  - Supports standard HTTP Range requests for seeking
-  - Validates paths against allowed directories
-  - Secured via strict CSP and random port assignment
+- **Media Protocol** (`media://`): Custom Electron protocol streams files from disk with Range request support. Validates paths against registered set before serving.
 
-**FFmpeg Integration**:
-```typescript
-// Uses bundled FFmpeg binaries shipped with the app
-// Development: Uses @ffmpeg-installer packages
-// Production: Copies binaries to extraResources
-```
+**Temp File Cleanup**:
+- On `before-quit`: deletes all `chunk_*.{flac,mp3}`, `gap_heal_*.flac`, and `subtitles_gen_audio_*` files from the OS temp directory
+- On generation failure (`catch`): calls `cleanupTempAudio()` IPC to remove leftover files from the failed run
 
 ### 4. **Service Layer**
 
-Four core services handle subtitle processing:
-
 #### **audioProcessor.ts**
 - Chunks audio into 3-4 minute segments
-- Detects silence using FFmpeg filters
+- Detects silence using FFmpeg `silencedetect` filter
 - Adds 20-second overlap between chunks
-- Splits audio files using FFmpeg
+- Sends ~1000 chars of previous transcript as context to the next chunk
 
 #### **transcriber.ts**
 - Sends audio chunks to Gemini AI / OpenAI
-- Parses SRT-formatted responses
-- Merges subtitles with "smart stitching" (handles chunk boundaries)
-- Enforces subtitle quality standards (min/max duration, reading speed)
-- **Translates subtitles** via text-to-text API calls preserving exactly matching timestamps.
+- Parses timestamped responses into `Subtitle[]`
+- Merges subtitles with "smart stitching" (handles chunk boundaries, deduplication, overlap trimming)
+- Enforces subtitle quality standards (min/max duration, reading speed, char limits per screen size)
+- Exports: `generateSrt`, `generateWebVtt`, `generateAss`, `translateSubtitles`
+- `generateAss` accepts `renderResolution: ScreenSize` and `mediaFile` to write the correct `PlayResX/Y` and font size
 
 #### **healer.ts**
-- Identifies gaps in subtitle coverage
-- Filters out intentional silences
-- Re-transcribes missing segments
-- Merges healed subtitles back into timeline
+- Identifies gaps in subtitle coverage (> 2s, not overlapping detected silences)
+- Re-transcribes gap audio segments
+- Merges healed subtitles back into timeline; resolves overlaps (original takes priority)
+
+#### **providers.ts**
+- Dispatches transcription and text requests to the selected provider
+- API key testing via cheapest per-provider endpoints
+- Cost calculation from per-model token pricing
 
 ### 5. **External Dependencies**
 
-| API/Tool | Purpose | Configuration |
-|----------|---------|---------------|
-| **Google Gemini API** | Transcription | API key stored in settings, tested via `GET /v1beta/models` |
-| **OpenAI API** | Transcription | Chat Completions API (`v1/chat/completions`) for GPT-4o with Audio input (Standard models mapped internally to `gpt-4o-audio-preview` and `gpt-4o-mini-audio-preview`). Native Whisper API used when `whisper-1` is selected. |
-| **FFmpeg** | Audio processing | Bundled binaries (platform-specific) |
-| **ffprobe** | Media metadata | Bundled with FFmpeg |
-| **electron-updater** | Auto-updates | GitHub Releases backend, check+prompt UX |
+| API/Tool | Purpose |
+|----------|---------|
+| **Google Gemini API** | Audio transcription + text translation |
+| **OpenAI API** | GPT-4o audio transcription + Whisper native transcription |
+| **FFmpeg** | Audio extraction, silence detection, splitting, subtitle burning |
+| **electron-updater** | Auto-updates via GitHub Releases |
 
 ---
 
 ## Design System
 
-The app uses a **dark theme** with a modern, premium aesthetic built on design tokens defined in [App.css](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/App.css).
+The app uses a **dark theme** with a modern, premium aesthetic built on design tokens in `src/App.css`.
 
 ### Color Palette
 
@@ -288,38 +293,25 @@ The app uses a **dark theme** with a modern, premium aesthetic built on design t
 
 /* Accent Colors */
 --color-accent: #8075EB;          /* Primary purple */
---color-accent-hover: #9990F0;    /* Lighter purple */
---color-accent-dim: rgba(128, 117, 235, 0.15);  /* Transparent purple */
+--color-accent-hover: #9990F0;
+--color-accent-dim: rgba(128, 117, 235, 0.15);
 
 /* Semantic Colors */
---color-success: #75EBBB;         /* Green - success states */
---color-warning: #E0EB75;         /* Yellow - warnings */
---color-error: #EB75A5;           /* Pink - errors */
+--color-success: #75EBBB;
+--color-warning: #E0EB75;
+--color-error: #EB75A5;
 
 /* Text Colors */
---color-text-primary: #f0eef8;    /* Main text */
---color-text-secondary: #9b95b8;  /* Secondary text */
---color-text-muted: #6b6488;      /* Muted text */
+--color-text-primary: #f0eef8;
+--color-text-secondary: #9b95b8;
+--color-text-muted: #6b6488;
 
 /* Borders */
 --color-border: #2d283e;
 --color-border-focus: #8075EB;
 ```
 
-#### Color Usage
-
-| Element Type | Color | Hex |
-|--------------|-------|-----|
-| **App Background** | Deep purple-black | `#0c0a14` |
-| **Cards/Panels** | Dark purple | `#13111e` |
-| **Primary Actions** | Vibrant purple | `#8075EB` |
-| **Success** | Teal green | `#75EBBB` |
-| **Warnings** | Soft yellow | `#E0EB75` |
-| **Errors** | Rose pink | `#EB75A5` |
-
 ### Typography
-
-#### Font Families
 
 ```css
 --font-sans: 'Signika', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -329,91 +321,55 @@ The app uses a **dark theme** with a modern, premium aesthetic built on design t
 
 | Font | Usage | Source |
 |------|-------|--------|
-| **Signika** | Primary UI font | Local file ([Signika-VariableFont_GRAD,wght.ttf](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/assets/Fonts/Signika/Signika-VariableFont_GRAD,wght.ttf)) |
+| **Signika** | Primary UI font | Local variable font file |
 | **JetBrains Mono** | Timecodes, monospaced data | Google Fonts |
 | **Material Icons Round** | Icon system | Google Fonts |
 | **Arial** | Subtitle text display | System font |
 
-#### Typography Scale
-
-- **Body**: 14px / 1.5 line-height
-- **Headers**: 16-18px, weight 600
-- **Small Text**: 12-13px (labels, hints)
-- **Monospaced**: 12px (timecodes)
-
-### Spacing System
+### Spacing & Radius
 
 ```css
---space-xs: 4px;
---space-sm: 8px;
---space-md: 16px;
---space-lg: 24px;
---space-xl: 32px;
---space-2xl: 48px;
+--space-xs: 4px;   --space-sm: 8px;   --space-md: 16px;
+--space-lg: 24px;  --space-xl: 32px;  --space-2xl: 48px;
+
+--radius-sm: 6px;  --radius-md: 10px;  --radius-lg: 16px;  --radius-full: 9999px;
 ```
 
-### Border Radius
+### Design Notes
 
-```css
---radius-sm: 6px;   /* Small elements */
---radius-md: 10px;  /* Buttons, inputs */
---radius-lg: 16px;  /* Cards */
---radius-full: 9999px;  /* Circular */
-```
-
-### Shadows & Elevation
-
-```css
---shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
---shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
---shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-```
-
-### Transitions
-
-```css
---transition-fast: 150ms ease;
---transition-normal: 250ms ease;
-```
-
-### Design Aesthetics
-
-> [!NOTE]
-> The design follows modern web app principles:
-> - **Dark mode first**: Reduces eye strain, premium feel
-> - **Glassmorphism**: Subtle transparency and blur effects
-> - **Micro-animations**: Smooth hover states, transitions
-> - **Generous spacing**: Clean, breathable layout
-> - **Consistent iconography**: Material Icons Round throughout
-> - **Restricted Selection**: Text selection is disabled globally to prevent accidental UI highlighting, but enabled for all text inputs, textareas, and error messages.
+- **Dark mode first**: reduces eye strain, premium feel
+- **Material Icons Round** used consistently throughout
+- **Text selection disabled globally** to prevent accidental UI highlighting; re-enabled for inputs, textareas, and error messages
+- **Transitions**: `--transition-fast: 150ms ease`, `--transition-normal: 250ms ease`
 
 ---
 
 ## Components
 
-### Component Architecture
-
-All components are **functional React components** using hooks. No class components are used.
+All components are **functional React components** using hooks. No class components.
 
 ### Component Overview
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `App` | [App.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/App.tsx) | Root component, orchestrates state |
-| `FileUpload` | [FileUpload.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/FileUpload.tsx) | Drag-and-drop + file selection |
-| `SubtitleEditor` | [SubtitleEditor.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitleEditor.tsx) | Timeline-based subtitle editor |
-| `SubtitlePreview` | [SubtitlePreview.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/SubtitlePreview.tsx) | Inline preview (video or cinema screen with subtitles) |
-| `EditorHeader` | [EditorHeader.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/common/EditorHeader.tsx) | Shared toolbar header for editor and preview |
-| `AudioPlayer` | [AudioPlayer.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/AudioPlayer.tsx) | Audio playback control |
-| `LanguageSelector` | [LanguageSelector.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/LanguageSelector.tsx) | Language picker with autocomplete |
-| `CustomSelect` | [CustomSelect.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/CustomSelect.tsx) | Reusable custom dropdown select |
-| `Settings` | [Settings.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Settings.tsx) | Settings modal (multi-provider, API key testing, active model) |
-| `ShortcutsModal` | [ShortcutsModal.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ShortcutsModal.tsx) | Keyboard shortcuts reference modal |
-| `ProgressIndicator` | [ProgressIndicator.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/ProgressIndicator.tsx) | Processing status display |
-| `RecentFiles` | [RecentFiles.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/RecentFiles.tsx) | List of recently generated/opened files |
-| `Timeline` | [Timeline.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/Timeline/Timeline.tsx) | Two-tier timeline navigation (MainTrack + Minimap) |
-| `TokenUsageDisplay` | [TokenUsageDisplay.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/TokenUsageDisplay.tsx) | Session token usage badge + detailed popup |
-| `UpdateNotification` | [UpdateNotification.tsx](file:///Users/staskrylov/Documents/Websites/subtitles-gen/src/components/UpdateNotification.tsx) | Auto-update banner (available, downloading, ready) |
+| `App` | `App.tsx` | Root component, orchestrates all state |
+| `FileUpload` | `FileUpload.tsx` | Drag-and-drop + file selection + recent files |
+| `SubtitleEditor` | `SubtitleEditor.tsx` | Timeline-based subtitle list editor |
+| `SubtitlePreview` | `SubtitlePreview.tsx` | Video/audio inline preview with subtitle overlay |
+| `SubtitleStylePanel` | `SubtitleStylePanel.tsx` | Global subtitle style controls panel |
+| `EditorHeader` | `common/EditorHeader.tsx` | Shared toolbar (undo/redo/formatting/search/count) |
+| `RichTextEditor` | `common/RichTextEditor.tsx` | WYSIWYG contenteditable subtitle editor |
+| `StyledText` | `common/StyledText.tsx` | Read-only renderer for styled subtitle markup |
+| `AudioPlayer` | `AudioPlayer.tsx` | Custom audio playback controls |
+| `LanguageSelector` | `LanguageSelector.tsx` | Language picker with autocomplete |
+| `CustomSelect` | `CustomSelect.tsx` | Reusable portal-based dropdown |
+| `Settings` | `Settings.tsx` | Settings modal (providers, API keys, model) |
+| `ShortcutsModal` | `ShortcutsModal.tsx` | Keyboard shortcuts reference modal |
+| `ProgressIndicator` | `ProgressIndicator.tsx` | Processing status + progress bar + warning |
+| `RecentFiles` | `RecentFiles.tsx` | Recently generated/opened files list |
+| `Timeline` | `Timeline/Timeline.tsx` | Two-tier timeline navigation |
+| `TokenUsageDisplay` | `TokenUsageDisplay.tsx` | Session token usage badge + popup |
+| `UpdateNotification` | `UpdateNotification.tsx` | Auto-update banner |
 
 ---
 
@@ -421,106 +377,33 @@ All components are **functional React components** using hooks. No class compone
 
 #### **App (Root Component)**
 
-**State Management**:
+**Key State**:
 ```typescript
-const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
-const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
-const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
-const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
-const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
-const [versions, setVersions] = useState<SubtitleVersion[]>([]);
-const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
-const [processingState, setProcessingState] = useState<ProcessingState>({
-  status: 'idle',
-  progress: 0,
-});
+settings: AppSettings          // Provider config, subtitle style, screen size
+mediaFile: MediaFile | null
+subtitles: Subtitle[]
+versions: SubtitleVersion[]    // Full version history (persisted to subtitle-versions store)
+activeVersionId: string | null
+editorView: 'subtitles' | 'preview'
+renderResolution: ScreenSize   // Independent of settings.screenSize (can differ)
+processingState: ProcessingState
+recentFiles: RecentFile[]
+showStylePanel: boolean
 ```
 
 **Responsibilities**:
-- Load/save settings and recent files from electron-store on mount
-- Manage file selection
-- Orchestrate subtitle generation pipeline
-- Cache subtitles on generation, restore from cache when loading recents
-- Handle clearing recents list and subtitle cache
-- Handle errors and processing state
-- Toggle between subtitle editor and inline preview
+- Load/save settings and recent files from `electron-store` on mount
+- Settings migration (v1→v2→v3; v3 resets positionX/Y; fontSize added transparently via spread merge)
+- Auto-detect `screenSize` and `renderResolution` from video aspect ratio on file load
+- Orchestrate subtitle generation, translation, download, and video render via `useTranscriptionPipeline`
+- Persist `versions` to `subtitle-versions` store whenever state changes
+- Cache subtitles per media file path; restore on loading recents
 
 **Views**:
 1. File upload view (no file selected)
-2. Editor view (file selected, with/without subtitles)
-   - Subtitles view (default): subtitle list editor
-   - Preview view: video with subtitle overlay or cinema screen for audio
-
----
-
-#### **FileUpload**
-
-**Props**:
-```typescript
-interface FileUploadProps {
-  settings: AppSettings;
-  onFileSelect: (file: MediaFile) => void;
-  recentFiles: RecentFile[];
-  onLoadRecent: (file: RecentFile) => void;
-  onClearRecents: () => void;
-  onClearCache: () => void;
-}
-```
-
-**Features**:
-- Drag-and-drop zone with instant file path registration
-- Strict file type validation (audio/video)
-- File info display (name, size, duration)
-- API cost estimation
-- Recent Files list (last 10 items)
-- API key warning banner
-
-**UX Details**:
-- Animated spinner during file info loading
-- Drag-over visual feedback
-- Explicit error messages for unsupported file types
-- Auto-handles file access permissions via `registerPath` IPC
-- Supports: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mts`, `.m2ts`, `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`, `.aac`, `.wma`, `.alac`, `.aiff`
-
----
-
-#### **SubtitleEditor**
-
-**Props**:
-```typescript
-interface SubtitleEditorProps {
-  subtitles: Subtitle[];
-  onSubtitlesChange: (subtitles: Subtitle[]) => void;
-  currentTime: number;
-  mediaDuration?: number;
-  onSeek: (time: number) => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
-}
-```
-
-**Features**:
-- Uses **EditorHeader** for shared styling and history controls
-- Scrollable subtitle list
-- Inline editing (text, start/end times)
-- Click to seek (if player connected)
-- Auto-scroll toggle
-- Delete individual entries
-- Subtitle count display
-
-**Entry Layout**:
-```
-[Index] [Start Time → End Time] [Text Content] [Delete]
-```
-
-**UX Details**:
-- Active subtitle highlighted (based on `currentTime`)
-- Monospaced timecode inputs
-- Textarea auto-resize for text
-- Hover states on entries
+2. Editor view (file selected)
+   - Subtitles view (default): subtitle list + timeline
+   - Preview view: video/audio with subtitle overlay
 
 ---
 
@@ -528,11 +411,13 @@ interface SubtitleEditorProps {
 
 **Props**:
 ```typescript
-interface SubtitlePreviewProps {
+{
   subtitles: Subtitle[];
   currentTime: number;
   mediaFile: MediaFile;
-  onSubtitleChange?: (id: string, text: string) => void;
+  subtitleStyle?: SubtitleStyle;
+  renderResolution?: ScreenSize;      // 'wide' | 'square' | 'vertical' | 'original'
+  onSubtitleChange?: (id, text) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
@@ -541,142 +426,116 @@ interface SubtitlePreviewProps {
 ```
 
 **Features**:
-- Uses **EditorHeader** for styling and history, mirroring the Subtitle Editor
-- Inline preview that renders inside the editor-main area (not a modal)
-- Toggle between "Subtitles" view and "Preview" view via tab bar
-- **Video files**: Muted `<video>` element synced to the audio player's currentTime, with subtitle overlay at bottom
-- **Audio files**: Dark cinema screen (app background) with centered subtitle text
-- **Inline Editing**: Click on a subtitle when paused to edit text directly. Auto-saves on blur or Enter.
-- RTL direction detection for Hebrew/Arabic subtitles
-- Syncs play/pause state with the footer audio player
+- **Render canvas**: `<div>` sized to the correct aspect ratio (16/9, 1/1, 9/16, or media native)
+- **Video**: muted `<video>` with `object-fit: contain` inside the canvas, loaded via `media://` protocol
+- **Audio**: dark "cinema" screen with centered subtitle text
+- **Font scaling**: `ResizeObserver` on the canvas div tracks CSS pixel width; `displayFontSize = (style.fontSize / playResX) * canvasPixelWidth` — mirrors the actual ASS render proportions across all aspect ratios
+- **Subtitle box**: `width: max-content; max-width: 90%` so the box expands to fit authored lines without collapsing to word-width
+- **Inline editing**: click subtitle while paused → `RichTextEditor` opens; save on blur/Enter, cancel on Escape
+- **RTL detection**: auto-applies `dir="rtl"` for Hebrew/Arabic
+- **Play/pause sync**: listens to the footer `<audio>` element's play/pause events
 
-**UX Details**:
-- Video loads via data URL (same approach as AudioPlayer)
-- Subtitle text uses same font family (`--font-subtitle`) as VideoPreview
-- Cinema mode shows a muted subtitles icon when no subtitle is active
-- Toggle bar only visible when subtitles exist
-- Textarea appears over subtitle for editing, matching the style of the display
+---
+
+#### **SubtitleStylePanel**
+
+**Props**:
+```typescript
+{
+  style: SubtitleStyle;
+  onChange: (style: SubtitleStyle) => void;
+  onBack: () => void;
+  screenSize?: ScreenSize;    // Used by Reset to pick per-format font default
+}
+```
+
+**Controls** (in order):
+1. **Header row**: Back button + Reset button (both `btn-secondary`)
+2. **Live preview** span (`StylePreview`) — shows "Preview Text" with current style applied
+3. **Font** — `CustomSelect` dropdown (Arial, Helvetica, Verdana, Georgia, Impact, Courier New)
+4. **Font Size** — range slider `20–120` (ASS PlayRes units)
+5. **Text Color** — `<input type="color">` + hex display
+6. **Effect Mode** — segmented button group: None / Outline / Shadow / Both
+7. *(if Outline)* **Outline Color**, **Outline Width** (0.5–5.0 px)
+8. *(if Shadow)* **Shadow Color**, **Offset X** (0–10), **Offset Y** (0–10), **Blur** (0–10)
+9. **Background Box** — On/Off toggle
+10. *(if Background)* **Background Color**, **Opacity** (0–100%)
+11. **Horizontal Position** — 0–100%
+12. **Vertical Position** — 0–100%
+
+**Reset behavior**: calls `onChange({ ...DEFAULT_SUBTITLE_STYLE, fontSize: SCREEN_SIZE_FONT_DEFAULTS[screenSize] })`
+
+Per-screen-size font defaults (`SCREEN_SIZE_FONT_DEFAULTS`):
+| ScreenSize | Default fontSize |
+|-----------|-----------------|
+| wide | 56 |
+| square | 40 |
+| vertical | 36 |
+| original | 56 |
+
+All changes are saved to `electron-store` immediately by the parent `App.tsx`.
+
+---
+
+#### **EditorHeader** (`common/EditorHeader.tsx`)
+
+Shared toolbar used by both `SubtitleEditor` and `SubtitlePreview`.
+
+**Controls**:
+- Left: Search toggle (hidden via `hideSearch`), Auto-scroll checkbox (hidden via `hideAutoScroll`)
+- Center: Undo, Redo, **B** (bold), *I* (italic), U (underline) — formatting disabled via `disableFormatting`
+- Right: Subtitle count ("N entries")
+
+---
+
+#### **RichTextEditor** (`common/RichTextEditor.tsx`)
+
+WYSIWYG editor for subtitle text (`contenteditable` div).
+
+**Features**:
+- Accepts/outputs subtitle markup: `<b>`, `<i>`, `<u>`, `<font color="...">`, `{b}`, `{i}`, `{u}`
+- Keyboard shortcuts: Ctrl/Cmd + B/I/U
+- `execCommand('bold' | 'italic' | 'underline')` via `useImperativeHandle` ref
+- `onStatusChange` reports current selection's bold/italic/underline/size state to `EditorHeader`
+- Auto-detects RTL text direction
+
+---
+
+#### **StyledText** (`common/StyledText.tsx`)
+
+Read-only renderer for subtitle markup in the preview.
+
+**Supported tags**: `<b>`, `{b}`, `<i>`, `{i}`, `<u>`, `{u}`, `<font color="#RRGGBB">`, `<font size="1-7">`
+
+Recursive regex parser that produces safe React elements. Does not execute code.
+
+---
+
+#### **CustomSelect**
+
+Portal-based custom dropdown component.
+
+**Implementation**:
+- Dropdown `<ul>` rendered via `createPortal(…, document.body)` at `position: fixed`
+- Position computed via `triggerRef.getBoundingClientRect()` whenever opened
+- Click-outside handler checks both the trigger ref AND the portal `dropdownRef` to prevent premature closing before `click` fires
+- Keyboard: ArrowUp/ArrowDown cycle options, Enter confirms, Escape closes
+- ARIA: `role="combobox"` trigger, `role="listbox"` + `role="option"` items, `aria-selected`
 
 ---
 
 #### **Timeline**
 
-**Props**:
-```typescript
-interface TimelineProps {
-  subtitles: Subtitle[];
-  currentTime: number;
-  duration: number;
-  mediaDuration?: number;
-  onSeek: (time: number) => void;
-}
-```
+**Files**: `Timeline/` directory (7 files)
 
 **Features**:
 - **Two-Tier System**:
-  - **Main Track**: Zoomed-in view showing subtitles in the selected time range with high precision.
-  - **Minimap**: Full-width track showing the entire duration with a dual-handle slider window.
-- **Zooming**: Drag handles on the minimap window to adjust the zoom level of the main track.
-- **Panning**: Drag the minimap window body to scroll the main track.
-- **Seeking**: Click on either track to seek.
-- **Synchronization**: Playhead stays synced across both tracks.
-- **Ruler & Grid**:
-  - **Comb-Style Ruler**: Precision time ruler with major and minor ticks adapting to zoom level.
-  - **Vertical Grid**: Background grid lines extending from major ticks for visual alignment.
-  - **Compact Design**: Optimized height (approx. 45px main track) for screen efficiency.
-
-**UX Details**:
-- Smooth 60fps interaction using local state for dragging
-- Visual feedback on hover and drag
-- Playhead and subtitle segments are color-coded (Accent Purple)
-- Supports displaying media duration limit line
-
----
-
-#### **AudioPlayer**
-
-**Props**:
-```typescript
-interface AudioPlayerProps {
-  audioPath: string;
-  currentTime: number;
-  duration: number;
-  mediaDuration?: number;
-  onTimeUpdate: (time: number) => void;
-  onDurationChange: (duration: number) => void;
-  filename?: string; // Displayed centered between start/end times
-}
-```
-
-**Features**:
-- HTML5 audio player with custom controls
-- Play/pause toggle
-- Skip forward/backward (5s)
-- Clickable progress bar
-- Volume slider
-- Time display: `[00:00]  [Filename]  [05:35]` — start time left-aligned, filename centered, end time right-aligned
-- Horizontal auto-scroll animation on the title when hovered
-- Loads audio via custom `media://` protocol for efficient streaming
-
-**UX Details**:
-- Material Icons for controls (play_arrow, pause, fast_forward, fast_rewind)
-- Visual progress bar shows playback position
-- Exposes `window.seekAudio()` for external time control
-
----
-
-#### **LanguageSelector**
-
-**Props**:
-```typescript
-interface LanguageSelectorProps {
-  value: string;
-  autoDetect: boolean;
-  onChange: (lang: string, auto: boolean) => void;
-}
-```
-
-**Features**:
-- Toggle: "Auto-detect" vs "Specify language"
-- Autocomplete input (90+ languages)
-- Dropdown with search filtering
-- Keyboard navigation
-- Default: "English"
-
-**Language List**: 92 languages including English, Spanish, French, German, Japanese, Chinese, Arabic, etc.
-
----
-
-#### **Settings**
-
-**Props**:
-```typescript
-interface SettingsProps {
-  settings: AppSettings;
-  onSettingsChange: (settings: AppSettings) => void;
-  onClose: () => void;
-}
-```
-
-**Layout**:
-1. **Active Model Hero** — Always-visible accent-bordered dropdown listing all models from enabled providers (e.g. "Google Gemini — Gemini 2.5 Flash (Fast)"). When no API keys exist, shows an info banner instead: "Toggle the providers you'd like to use below and paste an API key for each one." Disabled when no providers are toggled.
-2. **Provider Sections** — One card per provider (Gemini, OpenAI) with:
-   - Toggle switch to enable/disable
-   - API Key input + **Test** button (validates key via lightweight API call)
-   - Key status indicator: green checkmark (valid), red X + error (invalid), spinner (testing)
-   - Link to get API key from the provider's console
-3. **Save Settings** — Disabled until the active provider's API key is verified. Shows hint: "Test the active provider's API key first" when blocked.
-
-**Key Testing**:
-- Keys matching previously saved values initialize as `valid` (skip re-testing)
-- Changing a key resets status to `idle` and disables Save
-- Test calls are the cheapest possible per provider (free model-list endpoints for Gemini/OpenAI)
-
-**UX**:
-- Modal overlay (backdrop)
-- Close via "X" button
-- Save gated on key verification
-- Links to provider consoles for key creation
+  - **MainTrack**: Zoomed detail view; subtitle blocks with drag handles for trim; click to seek
+  - **Minimap**: Full-duration overview with dual-handle scroll window for zooming and panning
+- **Ruler**: Comb-style time ticks adapting to zoom level
+- **Grid**: Vertical lines extending from major ticks
+- **Tools**: Select (default), Scissors (C key — split at playhead), Trim (drag block edges)
+- **Sync**: Playhead synced across both tracks; `useTimelineTicks` shared logic
 
 ---
 
@@ -684,465 +543,204 @@ interface SettingsProps {
 
 **Props**:
 ```typescript
-interface ProgressIndicatorProps {
+{
   state: ProcessingState;
+  providerLabel?: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
 }
 ```
 
-**Display States**:
-```typescript
-type ProcessingStatus = 
-  | 'idle'                // "Ready"
-  | 'extracting'          // "Extracting audio..."
-  | 'detecting-silences'  // "Detecting silences..."
-  | 'splitting'           // "Splitting audio into chunks..."
-  | 'transcribing'        // "Transcribing with Gemini..." + "Chunk X of Y"
-  | 'merging'             // "Merging subtitles..."
-  | 'healing'             // (No UI mapping - will show default)
-  | 'done'                // "Complete!"
-  | 'error';              // "Error occurred" + error details
-```
+**Display logic**:
+- `status === 'idle'`: hidden
+- `status === 'done' && !warning`: hidden
+- `status === 'done' && warning`: shows yellow warning box (non-fatal, e.g. healing failed)
+- All other statuses: shows progress bar + status message + optional chunk counter
+- `status === 'error'`: shows error message + Retry/Dismiss buttons
+
+**Status messages**:
+| Status | Message |
+|--------|---------|
+| extracting | Extracting audio... |
+| detecting-silences | Detecting silences... |
+| splitting | Splitting audio into chunks... |
+| transcribing | Transcribing with {providerLabel}... |
+| merging | Merging subtitles... |
+| healing | Healing gaps... |
+| rendering | Burning subtitles into video... |
+| done | Complete! |
+| error | Error occurred |
 
 ---
 
-**UI**:
-- Progress bar (0-100%)
-- Status text
-- Error display (if status === 'error')
-- Spinner animation
+#### **AudioPlayer**
 
----
-
-#### **RecentFiles**
-
-**Props**:
-```typescript
-interface RecentFilesProps {
-  files: RecentFile[];
-  onLoadRecent: (file: RecentFile) => void;
-  onClearRecents: () => void;
-  onClearCache: () => void;
-}
-```
+Exposes `seek(time)` and `togglePlay()` via `forwardRef`/`useImperativeHandle`.
 
 **Features**:
-- Lists up to 10 recently accessed files
-- Shows filename, date (relative time), and last action (Generated/Opened)
-- Shows cached subtitle count indicator when subtitles are cached
-- Click to instantly reload file and restore cached subtitles
-- **Clear List**: Removes all items from recents list and deletes cached subtitles for those files (does not affect exported files on disk)
-- Persistent storage via `electron-store`
+- HTML5 `<audio>` loaded via `media://` protocol
+- Custom play/pause, skip ±5s, volume slider, progress bar
+- Filename displayed centered; auto-scroll marquee on hover for long names
+- Time display: `[00:00]  [Filename]  [05:35]`
 
 ---
 
-#### **UpdateNotification**
+#### **Settings**
 
-**Props**: None (self-contained, listens to Electron IPC events internally)
+**Layout**:
+1. **Active Model Hero** — accent-bordered `CustomSelect` listing all models from enabled providers. Shows info banner when no keys are configured.
+2. **Provider Cards** (Gemini, OpenAI) — toggle, API key input, Test button with status indicator (valid/invalid/testing), link to provider console
+3. **Save** — disabled until active provider's key is verified
 
-**Features**:
-- Listens for auto-update events from the main process via `electronAPI`
-- Four states:
-  1. **Available**: Shows version number + "Download" and "Later" buttons
-  2. **Downloading**: Shows progress bar with percentage
-  3. **Ready**: Shows "Restart Now" and "Later" buttons
-  4. **Error**: Shows "Retry" and "Dismiss" buttons
-- Dismissible — user can hide the notification and continue working
-- Non-intrusive banner below the app header
-
-**UX Details**:
-- Uses `electron-updater` via GitHub Releases backend
-- Auto-checks on app startup (5s delay, packaged builds only)
-- Manual check available via IPC
-- No auto-download — user must explicitly click "Download"
-- `autoInstallOnAppQuit` enabled for convenience
-
----
-
-#### **TokenUsageDisplay**
-
-**Props**:
-```typescript
-interface TokenUsageDisplayProps {
-  stats: SessionTokenStats;
-}
-```
-
-**Features**:
-- Displays session token count and estimated cost as a compact badge in the footer
-- Clickable badge opens a detailed popup with:
-  - Input/output token breakdown
-  - Total tokens and cost
-  - Per-provider/model breakdown with pricing info
-- Session-scoped: resets when the app is restarted (in-memory state)
-- Supports Gemini and OpenAI providers
-- Cost calculated using per-model pricing rates
-
-**UX Details**:
-- Only visible when tokens have been used (hidden at 0)
-- Popup closes on outside click
-- Monospaced font for token counts
-- Accent color for totals, green for cost values
+**Key Testing**: uses cheapest per-provider endpoints (`GET /v1beta/models` for Gemini, `GET /v1/models` for OpenAI).
 
 ---
 
 ## Services & Processing
 
-### Core Services
+### providers.ts
 
-#### **1. providers.ts**
+##### `callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat?, language?, previousTranscript?)`
+Proxied through main process. Returns `ProviderResponse` with text and `TokenUsage`.
 
-**Exported Functions**:
-
-##### `callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat)`
-Dispatches transcription requests to the selected AI provider (Gemini or OpenAI). Returns a `ProviderResponse` containing both the text response and `TokenUsage` data (input/output token counts, provider, model, timestamp).
+##### `callTextProvider(provider, apiKey, model, prompt)`
+Text-only call (translation, language detection). Also proxied.
 
 ##### `testApiKey(provider, apiKey)`
-Validates an API key with the cheapest possible call per provider:
-- **Gemini**: `GET /v1beta/models` (free, lists models)
-- **OpenAI**: `GET /v1/models` (free, lists models)
+Returns `{ ok: boolean, error?: string }`.
 
-Returns `{ ok: true }` or `{ ok: false, error: "..." }`.
-
-##### `calculateCost(tokenUsages)`
-Calculates the total estimated cost in USD for an array of `TokenUsage` entries, using per-model pricing rates from `MODEL_PRICING`.
-
-**Exported Constants**:
-- `PROVIDER_LABELS` — Display names for each provider
-- `MODEL_OPTIONS` — Available models per provider
-- `PROVIDER_KEY_URLS` — Links to get API keys
-- `MODEL_PRICING` — Per-model pricing (USD per 1M tokens) for input and output tokens
+**Exports**: `PROVIDER_LABELS`, `MODEL_OPTIONS`, `PROVIDER_KEY_URLS`, `MODEL_PRICING`, `calculateCost(tokenUsages)`
 
 ---
 
-#### **2. audioProcessor.ts**
+### audioProcessor.ts
 
 **Main Function**: `createAudioChunks(audioPath, tempDir, format)`
 
 **Process**:
-1. Get total audio duration via `ffprobe`
-2. Detect silences using FFmpeg `silencedetect` filter
-   - Threshold: `-25dB` (lenient for noisy audio)
-   - Min duration: `0.3s` (catch short pauses)
-3. Calculate chunk boundaries:
-   - **Target**: 210s (3.5 minutes)
-   - **Min**: 180s (3 minutes)
-   - **Max**: 240s (4 minutes)
-   - **Overlap**: 20s between chunks
-4. Split at silence points closest to target
-5. Extract chunks using FFmpeg (FLAC for Gemini, MP3 for OpenAI)
-6. Return `AudioChunk[]` + `SilenceSegment[]`
-
-**Output**:
-```typescript
-{
-  chunks: [
-    { index: 0, startTime: 0, endTime: 210, filePath: '...chunk_000.flac', overlap: 0 },
-    { index: 1, startTime: 190, endTime: 420, filePath: '...chunk_001.flac', overlap: 20 },
-    ...
-  ],
-  silences: [
-    { start: 5.2, end: 5.8 },
-    { start: 42.1, end: 43.0 },
-    ...
-  ]
-}
-```
+1. Get total duration via `ffprobe`
+2. Detect silences (`-25dB` threshold, `0.3s` min duration)
+3. Calculate chunk boundaries (target 210s, min 180s, max 240s, 20s overlap)
+4. Split at silence closest to target boundary
+5. Extract chunks (FLAC for Gemini, MP3 for OpenAI)
 
 ---
 
-#### **3. transcriber.ts**
+### transcriber.ts
 
 **Main Functions**:
 
-##### `transcribeChunk(chunk, apiKey, model, language, autoDetect)`
-
-**Process**:
-1. Convert audio chunk to base64
-2. Get prompt from `prompts.ts` (Standard or Healing mode)
-   ```
-   Transcribe this audio to SRT format.
-   Language: {language} OR Auto-detect
-   
-   Rules:
-   - Max 2 lines per subtitle
-   - Max 8 words per line
-   - Min display time: 1 second
-   - Accurate timestamps
-   - Grammar capitalization
-   ```
-3. Send to Gemini AI with audio attachment
-4. Parse SRT response into `Subtitle[]`
-5. Adjust timestamps by `chunk.startTime` offset
+##### `transcribeChunk(chunk, apiKey, model, language, autoDetect, screenSize, previousTranscript?)`
+- Converts chunk to base64
+- Sends to AI with appropriate prompt template
+- Parses response into `Subtitle[]`
+- Applies `startTime` offset
 
 **Quality Enforcement Constants**:
 ```typescript
-const QUALITY = {
-  MIN_DURATION: 1.0,           // Minimum display time
-  MAX_DURATION: 7.0,           // Maximum display time
-  MIN_READING_SPEED_CPS: 12,   // Characters per second (reading speed)
-  MAX_CHARS_PER_LINE: 42,      // Standard subtitle line width
-  MAX_LINES: 2,
-  MERGE_GAP_LIMIT: 1.0,        // Max gap to merge subtitles
-};
+MIN_DURATION: 1.0s    MAX_DURATION: 7.0s    MIN_READING_SPEED_CPS: 12
+MAX_CHARS_PER_LINE varies by screen size: wide=40, square=25, vertical=15
+MAX_LINES: 2
 ```
 
 ##### `mergeSubtitles(allSubtitles)`
-
-**Smart Stitching Algorithm**:
-1. Process chunks pairwise
-2. Identify boundary subtitles (overlap zone)
-3. **Duplicate detection**:
-   - If text similarity > 80% and overlap > 50%, drop duplicate
-4. **Partial overlap**:
-   - If subtitle spans chunk boundary, keep the one from later chunk
-   - Trim overlapping subtitle from earlier chunk
-5. Enforce minimum gap between subtitles (0.05s)
+Smart stitching: deduplication by text similarity (>80%) in overlap zones; overlap trimming; minimum 0.05s gap enforcement.
 
 ##### `enforceSubtitleQuality(subtitles)`
+Post-processing: merge short subtitles (gap < 1s), extend durations, cap at 7s, remove degenerate entries.
 
-**Post-processing pass**:
-1. **Merge short subtitles**:
-   - If duration < min reading time and gap < 1s, merge with next
-2. **Extend short durations**:
-   - If still too short, extend into available space
-3. **Cap max duration**: Limit to 7s
-4. **Remove degenerate entries**: Empty text or invalid duration
+##### `generateSrt(subtitles)` / `generateWebVtt(subtitles)`
+Standard export with source tag stripping.
 
-##### `generateSrt(subtitles)`
-
-Exports subtitles to standard SRT format:
+##### `generateAss(subtitles, style, renderResolution, mediaFile?)`
+```typescript
+generateAss(
+    subtitles: Subtitle[],
+    style: SubtitleStyle = DEFAULT_SUBTITLE_STYLE,
+    renderResolution: ScreenSize = 'wide',
+    mediaFile?: Pick<MediaFile, 'width' | 'height'>,
+): string
 ```
-1
-00:00:01,200 --> 00:00:03,500
-Hello, welcome to the show.
+- `PlayResX/Y` derived from `getPlayRes(renderResolution, mediaFile.width, mediaFile.height)`
+- `Fontsize` = `style.fontSize` (integer)
+- Position tag: `\an2\pos(posX, posY)` — coordinates as % of PlayResX/Y
+- Colors: hex → `&HAABBGGRR` (ASS BGR format)
+- `BorderStyle 3` (background box) or `1` (outline+shadow)
 
-2
-00:00:03,800 --> 00:00:06,100
-Today we're talking about subtitles.
-```
-
-**Export Formatting Rules**:
-When exporting files, the application applies strict formatting rules automatically:
-- **Source Tags Filtering**: All generated formats have internal processing tags (e.g., `<00:00:01.000>`) automatically stripped to prevent parser crashes.
-- **WebVTT (`.vtt`)**:
-  - Includes the exact `WEBVTT` header followed by exactly one blank line.
-  - Preserves numeric cue identifiers.
-  - Ensures exactly one blank line between subtitle sequences, with no blank lines allowed inside the text payload.
-- **SubRip (`.srt`)**:
-  - Ensures exactly one blank line between sequences to maintain parser integrity.
-- **Advanced SubStation Alpha (`.ass`)**:
-  - Converts internal newline characters to the standard `\N` inline format separator.
-
+##### `translateSubtitles(subtitles, targetLanguage, provider, apiKey, model, onProgress?)`
+Chunked translation (3000 chars/chunk), preserves timestamps, returns new `Subtitle[]` + `TokenUsage`.
 
 ---
 
-#### **5. healer.ts**
+### healer.ts
 
 **Main Function**: `healSubtitles(subtitles, audioPath, silences, ...)`
 
-**Gap Healing Process**:
-
-1. **Identify Gaps**:
-   - Find time gaps between consecutive subtitles
-   - Minimum gap threshold: `2.0s`
-
-2. **Filter Out Silences**:
-   - Check if gap overlaps with detected silence
-   - If silence covers > 80% of gap, ignore it (intentional silence)
-
-3. **Re-transcribe Gaps**:
-   - For each actionable gap:
-     - Extract audio segment (gap ± 0.5s buffer)
-     - Transcribe using `transcribeChunk`
-     - Collect new subtitles
-
-4. **Merge New Subtitles**:
-   - Combine original + healed subtitles
-   - Sort by startTime
-   - Resolve overlaps (prefer original)
-   - Re-index
-
-**Why Healing?**
-- AI may miss segments during chunk boundaries
-- Background noise or music might be skipped
-- Ensures complete coverage of spoken content
+1. Find gaps > 2s not covered by ≥80% silence
+2. Extract gap audio (±0.5s buffer)
+3. Re-transcribe each gap
+4. Merge into original timeline (original takes priority on overlap)
 
 ---
 
 ## User Experience
 
-### Application Language
-
-**Interface Language**: English (hardcoded)
-
-**Supported Subtitle Languages**: 92+ languages via Gemini AI
-
 ### Keyboard Shortcuts
 
-The application supports global keyboard shortcuts for efficient workflow. A reference modal can be opened by clicking the keyboard icon in the header.
-
-### Shortcuts
-- `Cmd+S` / `Ctrl+S`: Save/Download subtitles.
-- `Cmd+Z` / `Ctrl+Z`: Undo.
-- `Cmd+Shift+Z` / `Ctrl+Shift+Z`: Redo.
-- `Space`: Play/Pause media.
-- `Left`/`Right` Arrows: Seek 5s.
-- `Alt+N`: Insert new subtitle at current time.
-- `Alt+Backspace`: Delete selected subtitle.
-- **Homepage:**
-  - `Cmd+O` / `Ctrl+O`: Open file.
-  - `↑`/`↓` Arrows: Navigate recent files.
-  - `Enter`: Select recent file.
+| Shortcut | Action | Context |
+|----------|--------|---------|
+| `Cmd/Ctrl+S` | Download subtitles | Editor |
+| `Cmd/Ctrl+Z` | Undo | Editor |
+| `Cmd/Ctrl+Shift+Z` | Redo | Editor |
+| `Cmd/Ctrl+F` | Toggle search | Editor |
+| `Space` | Play / Pause | Global |
+| `←` / `→` | Seek ±5s | Global |
+| `Alt+N` / `I` | Insert subtitle at current time | Editor |
+| `Alt+Backspace` / `Del` | Delete selected subtitle | Editor |
+| `C` | Scissors tool | Timeline |
+| `V` | Select tool | Timeline |
+| `T` | Trim tool | Timeline |
+| `Cmd/Ctrl+O` | Open file | Home |
+| `↑` / `↓` | Navigate recent files | Home |
+| `Enter` | Select recent file | Home |
+| `Escape` | Close modal / cancel | Global |
 
 ### Accessibility
 
-The application implements comprehensive ARIA accessibility support:
-
-- **Modals** (`Settings`, `ShortcutsModal`): `role="dialog"`, `aria-modal`, `aria-labelledby`, focus trap (Tab cycles within modal), Escape to close, focus restoration on close
-- **Custom Select**: `role="combobox"` trigger with `aria-expanded`/`aria-haspopup`, `role="listbox"` dropdown, `role="option"` items with `aria-selected`, keyboard navigation (Up/Down/Enter/Escape)
-- **Audio Player**: Progress bar as `role="slider"` with `aria-valuenow/min/max`, keyboard seekable (Arrow keys), `aria-label` on all icon-only buttons (Play/Pause, Skip)
-- **File Upload**: Drop zone as `role="button"` with `tabIndex` and Enter/Space keyboard activation, `role="alert"` on warnings/errors
-- **Progress Indicator**: `role="progressbar"` with `aria-valuenow/min/max`, `aria-live="polite"` for status announcements, `role="alert"` on errors
-- **Subtitle Editor**: `role="list"` container, `aria-label` on all time inputs, text areas, and delete buttons with subtitle index context
-- **Subtitle Preview**: `aria-live="polite"` on subtitle text for screen reader announcements
-- **Token Usage**: `aria-expanded` on toggle button, `role="dialog"` on popup
-- **Update Notification**: `role="alert"` with `aria-live="polite"`
-- **All icon-only buttons**: `aria-label` attributes matching their `title` text
+- **Modals**: `role="dialog"`, `aria-modal`, focus trap (Tab cycles within), Escape to close, focus restoration
+- **Custom Select**: `role="combobox"` / `role="listbox"` / `role="option"`, `aria-expanded`, keyboard navigation
+- **Progress Indicator**: `role="progressbar"`, `aria-valuenow/min/max`, `aria-live="polite"`, `role="alert"` on errors and warnings
+- **Audio Player**: progress bar as `role="slider"`, `aria-label` on all icon-only buttons
+- **Subtitle Editor**: `role="list"`, `aria-label` on time inputs and delete buttons
+- **Subtitle Preview**: `aria-live="polite"` on subtitle text
+- **File Upload**: drop zone as `role="button"`, `role="alert"` on errors
 
 ### User Workflow
 
-```mermaid
-graph TD
-    Start([Launch App])
-    Start --> CheckKey{API Key<br/>Configured?}
-    
-    CheckKey -->|No| Settings[Open Settings]
-    Settings --> EnterKey[Enter API Key]
-    EnterKey --> SelectFile
-    
-    CheckKey -->|Yes| SelectFile[Select Audio/Video File]
-    
-    SelectFile --> UploadView[File Upload View]
-    UploadView --> ShowInfo[Display File Info & Cost]
-    ShowInfo --> SelectLang[Select Language<br/>Auto-detect or Specify]
-    SelectLang --> Generate[Click 'Generate']
-    
-    Generate --> Extract[Extract Audio to FLAC]
-    Extract --> DetectSilence[Detect Silences]
-    DetectSilence --> Split[Split into Chunks]
-    Split --> Transcribe[Transcribe Chunks<br/>via Gemini AI]
-    Transcribe --> Merge[Merge & Stitch]
-    Merge --> Enforce[Enforce Quality]
-    Enforce --> Heal[Heal Gaps]
-    Heal --> Display[Display in Editor]
-    
-    Display --> Edit{Edit<br/>Subtitles?}
-    Edit -->|Yes| EditView[Edit Text/Times]
-    EditView --> Display
-    
-    Edit -->|No| Download[Download SRT]
-    Download --> End([Done])
-    
-    style Start fill:#75EBBB
-    style Settings fill:#E0EB75
-    style Generate fill:#8075EB
-    style Download fill:#75EBBB
-    style End fill:#75EBBB
 ```
-
-### Screen States
-
-#### 1. **Initial State (No File)**
-
-- **Header**: Home button (left, if media open) + Keyboard & Settings buttons (right)
-- **Sidebar (Editor)**: Logo and App Title (`SUBLIBR`) at top
-  - Large upload icon
-  - "Drop a file or click to select"
-  - Supported formats hint
-  - API key warning (if not set)
-
-#### 2. **File Selected (Before Generation)**
-
-- **File Info Card**: Name, size, duration
-- **Language Selector**: Inline dropdown
-- **Cost Estimate**: Chunks, tokens, USD
-- **Generate Button**: Primary action (disabled if no API key)
-
-#### 3. **Processing State**
-
-- **Progress Indicator**: Status + progress bar
-- **Current Step**: e.g., "Transcribing chunk 3 of 12..."
-- **Disabled UI**: Prevent actions during processing
-
-#### 4. **Editor State (After Generation)**
-
-**Layout**:
+Launch App
+  → Configure API key (Settings)
+  → Drop or select media file
+  → Choose language + screen format
+  → Generate Subtitles
+      → Extract audio → Detect silences → Split into chunks
+      → Transcribe chunks → Merge & stitch → Enforce quality → Heal gaps
+  → Review in editor / Preview tab
+  → Adjust Global Style (font, size, color, effects, position)
+  → Download (SRT/VTT/ASS) or Render Video
 ```
-┌─────────────────────────────────────────────┐
-│  Header: Title | Shortcuts | Settings       │
-├──────────┬──────────────────────────────────┤
-│          │  [Subtitles] [Preview]  (toggle) │
-│ Sidebar  ├──────────────────────────────────┤
-│          │                                   │
-│ - Back   │  Subtitles view (default):       │
-│          │  ┌─────────────────────────────┐ │
-│ - Lang   │  │ Subtitle List               │ │
-│   Select │  │ [1] 00:01→00:03  Hello...   │ │
-│          │  │ [2] 00:03→00:06  Welcome... │ │
-│ - Export │  └─────────────────────────────┘ │
-│          │                                   │
-│          │  Preview view (toggled):         │
-│          │  ┌─────────────────────────────┐ │
-│          │  │ Video (muted, synced) or    │ │
-│          │  │ Cinema screen with subtitle │ │
-│          │  └─────────────────────────────┘ │
-└──────────┴──────────────────────────────────┘
-```
-
-**Sidebar** (280px wide):
-- Back to home button
-- Language selector (can change and re-generate)
-- Export format + Download button
-
-**Main Area** (with view toggle when subtitles exist):
-- **Subtitles view**: Subtitle list editor with auto-scroll toggle
-- **Preview view**: Inline video preview (muted, synced to audio player) or dark cinema screen for audio files
-
-#### 5. **Settings Modal**
-
-- Overlay modal (dark backdrop)
-- **Active Model Hero**: Accent-bordered dropdown at top — lists models from all enabled providers. Shows info banner when no keys are configured.
-- **Provider Cards** (Gemini, Claude, OpenAI): Toggle + API key input with Test button + status indicators
-- **Save**: Gated — requires active provider's key to be verified
-- Links to each provider's API key console
-
----
-
-### Interaction Patterns
-
-| Action | Trigger | Behavior |
-|--------|---------|----------|
-| **Upload File** | Drag-drop or click | Validates format, loads info, shows cost |
-| **Generate** | Button click | Starts processing pipeline, shows progress |
-| **Edit Subtitle** | Click entry | Inline editing (text + times) |
-| **Seek to Subtitle** | Click entry | Jumps video/audio to that timestamp |
-| **Delete Subtitle** | Delete icon | Removes entry, re-indexes |
-| **Download** | Header button | Opens save dialog, exports SRT |
-| **Change Language** | Sidebar dropdown | Can re-generate with new language |
-| **Settings** | Header gear icon | Opens settings modal |
-
----
 
 ### Error Handling
 
 | Error | Display | Recovery |
 |-------|---------|----------|
-| **Missing API Key** | Yellow warning banner / info banner in settings hero | Directs to settings, prompts to toggle providers and add keys |
-| **Invalid API Key** | Red X icon + error text in settings | Re-enter key and click Test again |
-| **Invalid File** | Red error message | Prompt to select different file |
-| **Transcription Failure** | Error state in progress | Display error message + retry option |
-| **FFmpeg Error** | Error state | Show technical details for debugging |
-| **Network Error** | Error state | Suggest checking connection |
+| Missing API Key | Yellow warning banner | Directs to Settings |
+| Invalid API Key | Red X + error text | Re-enter and Test |
+| Invalid File | Red error message | Select different file |
+| Transcription Failure | Error progress state + Retry button | Retry or dismiss |
+| Healing Failure | Yellow warning on "done" state | Non-blocking; subtitles still available |
+| Render Failure | Error progress state | Dismiss and retry |
+| FFmpeg Error | Technical error message | Shown for debugging |
 
 ---
 
@@ -1152,236 +750,51 @@ graph TD
 
 ```
 Audio/Video File
-  ↓
-Extract Audio (FLAC)
-  ↓
-Detect Silences
-  ↓
-Split into Chunks (3-4 min, 20s overlap)
-  ↓
-Transcribe Each Chunk (Gemini AI)
-  ↓
-Parse SRT → Subtitle Objects
-  ↓
-Merge & Stitch Chunks
-  ↓
-Enforce Quality Standards
-  ↓
-Heal Gaps (re-transcribe missing segments)
-  ↓
-Final Subtitle Set
+  ↓ Extract Audio (FLAC/MP3)
+  ↓ Detect Silences
+  ↓ Split into Chunks (3-4 min, 20s overlap)
+  ↓ Transcribe Each Chunk (Gemini / OpenAI)
+  ↓ Parse → Subtitle Objects
+  ↓ Merge & Stitch Chunks
+  ↓ Enforce Quality Standards
+  ↓ Heal Gaps
+  ↓ Final Subtitle Set → Display in Editor
 ```
 
----
+### Step Details
 
-### Detailed Steps
+**Step 1 — Extract Audio**
+FFmpeg → FLAC (Gemini) or MP3 (OpenAI), mono 16kHz. Temp file cleaned up on success or failure.
 
-#### **Step 1: Extract Audio**
+**Step 2 — Detect Silences**
+`ffmpeg -af silencedetect=noise=-25dB:d=0.3 -f null -` → parses `silence_start`/`silence_end` lines.
 
-```typescript
-// electron/main.ts - IPC handler
-ipcMain.handle('ffmpeg:extractAudio', async (input, output) => {
-  await ffmpeg(input)
-    .toFormat('flac')
-    .audioCodec('flac')
-    .audioChannels(1)  // Mono
-    .audioFrequency(16000)  // 16kHz
-    .save(output);
-});
-```
+**Step 3 — Split**
+Target 210s; split at nearest silence to target; 20s overlap; previous ~1000 chars of transcript sent as context to next chunk.
 
-**Why FLAC?**
-- Lossless compression
-- Smaller than WAV
-- Compatible with Gemini AI
+**Step 4 — Transcribe**
+Audio chunk → base64 → AI provider. Prompt enforces screen-size char/line limits. Offset timestamps by `chunk.startTime`.
 
----
+**Step 5 — Parse**
+SRT blocks (Gemini/GPT), word-level JSON (Whisper), or timestamped text parsed into `Subtitle[]`.
 
-#### **Step 2: Detect Silences**
+**Step 6 — Merge**
+Pairwise stitching with deduplication (text similarity > 80%) and overlap trimming.
 
-```bash
-# FFmpeg command (via fluent-ffmpeg)
-ffmpeg -i audio.flac \
-  -af silencedetect=noise=-25dB:d=0.3 \
-  -f null -
-```
+**Step 7 — Enforce Quality**
+Min 1s duration, max 7s, min reading speed, merge consecutive short subs, extend short into gaps.
 
-**Parameters**:
-- `noise=-25dB`: Threshold (lenient for noisy audio)
-- `d=0.3`: Minimum silence duration (0.3s)
-
-**Output Parsing**:
-```
-[silencedetect @ ...] silence_start: 5.23
-[silencedetect @ ...] silence_end: 5.89
-```
-
-Parsed into:
-```typescript
-{ start: 5.23, end: 5.89 }
-```
-
----
-
-#### **Step 3: Split Audio**
-
-**Smart Chunking**:
-1. Aim for 3.5 minute chunks
-2. Split at silence closest to target
-3. Add 20s overlap to prevent missing words at boundaries
-
-**Example**:
-```
-Total duration: 12 minutes
-
-Chunk 0: 0:00 → 3:30 (no overlap)
-Chunk 1: 3:10 → 6:50 (20s overlap with chunk 0)
-Chunk 2: 6:30 → 10:10 (20s overlap with chunk 1)
-Chunk 3: 9:50 → 12:00 (20s overlap with chunk 2, includes tail)
-```
-
----
-
-#### **Step 4: Transcribe Chunks**
-
-**Gemini AI Prompt** (simplified):
-
-```
-Transcribe this audio to SRT subtitle format.
-
-Language: [English / Auto-detect]
-
-Requirements:
-- Maximum 2 lines per subtitle
-- Maximum 8 words per line
-- Minimum 1 second display time
-- Start index at 1
-- Use proper grammar and capitalization
-- Timestamps accurate to nearest 0.1 second
-
-Format:
-1
-00:00:01,200 --> 00:00:03,500
-Your subtitle text here.
-
-2
-00:00:03,800 --> 00:00:06,100
-Next subtitle text.
-```
-
-**Response**: Raw SRT text
-
----
-
-#### **Step 5: Parse SRT**
-
-```typescript
-function parseTranscription(text: string, startOffset: number): Subtitle[] {
-  // Regex to match SRT blocks
-  const pattern = /(\d+)\s+([\d:,]+)\s+-->\s+([\d:,]+)\s+([\s\S]+?)(?=\n\n|\n*$)/g;
-  
-  // Parse each block
-  // Adjust timestamps by startOffset (chunk.startTime)
-  // Return Subtitle[]
-}
-```
-
----
-
-#### **Step 6: Merge Chunks**
-
-**Challenge**: Overlapping chunks may have duplicate/conflicting subtitles
-
-**Solution**: Smart stitching algorithm
-1. Process chunks pairwise (0+1, result+2, etc.)
-2. Identify boundary subtitles (overlap zone)
-3. **If duplicate** (similar text + time): Keep one
-4. **If partial overlap**: Trim earlier subtitle, keep later
-5. Enforce minimum gap (0.05s)
-
----
-
-#### **Step 7: Enforce Quality**
-
-**Rules**:
-- Subtitles must be readable (12+ chars/sec)
-- Min duration: 1s
-- Max duration: 7s
-- Max 2 lines, 42 chars/line
-- Merge short consecutive subtitles if gap < 1s
-- Extend short subtitles into available space
-
-**Example Fixes**:
-
-Before:
-```
-1. 00:00:01,000 → 00:00:01,500  (0.5s duration - too short!)
-   "Hello"
-
-2. 00:00:01,600 → 00:00:02,100  (0.5s duration - too short!)
-   "there"
-```
-
-After:
-```
-1. 00:00:01,000 → 00:00:02,100  (1.1s duration)
-   "Hello there"
-```
-
----
-
-#### **Step 8: Heal Gaps**
-
-**Scenario**: Gap from 1:23 to 1:30 (7 seconds) not covered by subtitles or silences
-
-**Action**:
-1. Extract audio from 1:22.5 to 1:30.5 (with 0.5s buffer)
-2. Transcribe using Gemini AI
-3. Parse new subtitles
-4. Insert into timeline
-5. Resolve overlaps
-
-**Result**: Complete subtitle coverage
-
----
+**Step 8 — Heal Gaps**
+Any gap > 2s not covered by silence → re-transcribe → insert. Failure surfaced as a non-blocking warning.
 
 ### Processing Time Estimates
 
-| File Duration | Chunks | Transcription Time | Total Time |
-|---------------|--------|-------------------|------------|
-| 5 minutes | 2 | ~30 seconds | ~1 minute |
-| 15 minutes | 5 | ~1.5 minutes | ~2.5 minutes |
-| 30 minutes | 9 | ~3 minutes | ~5 minutes |
-| 60 minutes | 18 | ~6 minutes | ~10 minutes |
-
-*Times vary based on network speed and Gemini API response time*
-
----
-
-### API Cost Estimates
-
-**Pricing** (approximate):
-- **Gemini 2.5 Flash**: $0.30/1M output tokens
-- **Gemini 2.5 Pro**: $5.00/1M output tokens
-
-**Calculation**:
-```typescript
-// ~80 tokens per second of audio output
-// + ~100 tokens for prompt per chunk
-
-chunks = ceil(duration / 75)  // 75s average chunk
-tokens = chunks * (80 * 75 + 100)
-cost = (tokens / 1_000_000) * rate
-```
-
-**Examples**:
-
-| Duration | Model | Estimated Cost |
-|----------|-------|----------------|
-| 10 min | Flash | $0.03 |
-| 10 min | Pro | $0.50 |
-| 60 min | Flash | $0.18 |
-| 60 min | Pro | $3.00 |
+| File Duration | Chunks | Approx. Total Time |
+|---------------|--------|-------------------|
+| 5 min | 2 | ~1 min |
+| 15 min | 5 | ~2.5 min |
+| 30 min | 9 | ~5 min |
+| 60 min | 18 | ~10 min |
 
 ---
 
@@ -1393,156 +806,154 @@ cost = (tokens / 1_000_000) * rate
 // src/types.ts
 
 export interface Subtitle {
-  id: string;
+  id: string;           // crypto.randomUUID()
   index: number;
-  startTime: number;  // seconds
-  endTime: number;    // seconds
-  text: string;
+  startTime: number;    // seconds
+  endTime: number;
+  text: string;         // may include <b>, <i>, <u>, <font color="..."> markup
 }
 
-export interface AudioChunk {
-  index: number;
-  startTime: number;
-  endTime: number;
-  filePath: string;
-  overlap: number;
+export interface SubtitleVersion {
+  id: string;
+  timestamp: number;
+  provider: AIProvider;
+  model: string;
+  language: string;
+  subtitles: Subtitle[];
+  label?: string;       // e.g. "V1-English_Auto, gemini-2.5-flash"
 }
 
 export type ProcessingStatus =
-  | 'idle'
-  | 'extracting'
-  | 'detecting-silences'
-  | 'splitting'
-  | 'transcribing'
-  | 'merging'
-  | 'healing'
-  | 'done'
-  | 'error';
+  | 'idle' | 'extracting' | 'detecting-silences' | 'splitting'
+  | 'transcribing' | 'merging' | 'healing' | 'rendering' | 'done' | 'error';
 
 export interface ProcessingState {
   status: ProcessingStatus;
-  progress: number;  // 0-100
+  progress: number;         // 0–100
   currentChunk?: number;
   totalChunks?: number;
   error?: string;
+  warning?: string;         // Non-fatal (e.g. healing step failed)
 }
 
-export type AIProvider = 'gemini' | 'anthropic' | 'openai';
+export type AIProvider = 'gemini' | 'openai';
 
-export interface ProviderConfig {
-  enabled: boolean;
-  apiKey: string;
-  model: string;
+export type ScreenSize = 'wide' | 'square' | 'vertical' | 'original';
+
+export interface SubtitleStyle {
+  fontFamily: string;       // 'Arial', 'Helvetica', etc.
+  fontSize: number;         // ASS PlayRes units (default 56 at PlayResX=1920)
+  textColor: string;        // '#FFFFFF'
+  outlineMode: 'none' | 'outline' | 'shadow' | 'both';
+  outlineColor: string;
+  outlineWidth: number;     // 0.5–5.0
+  shadowColor: string;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+  shadowBlur: number;
+  backgroundEnabled: boolean;
+  backgroundColor: string;
+  backgroundOpacity: number; // 0–1
+  positionX: number;         // 0–100 (% from left)
+  positionY: number;         // 0–100 (% from top)
 }
+
+export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
+  fontFamily: 'Arial', fontSize: 56, textColor: '#FFFFFF',
+  outlineMode: 'both', outlineColor: '#000000', outlineWidth: 1.0,
+  shadowColor: '#000000', shadowOffsetX: 1, shadowOffsetY: 1, shadowBlur: 0,
+  backgroundEnabled: false, backgroundColor: '#000000', backgroundOpacity: 0.8,
+  positionX: 50, positionY: 85,
+};
+
+export const SCREEN_SIZE_FONT_DEFAULTS: Record<ScreenSize, number> = {
+  wide: 56, square: 40, vertical: 36, original: 56,
+};
+
+// Returns [PlayResX, PlayResY] for ASS and preview font scaling
+export function getPlayRes(screenSize: ScreenSize, mediaWidth?, mediaHeight?): [number, number];
 
 export interface AppSettings {
   activeProvider: AIProvider;
   providers: Record<AIProvider, ProviderConfig>;
   language: string;
   autoDetectLanguage: boolean;
+  screenSize: ScreenSize;
+  subtitleStyle: SubtitleStyle;
+  settingsVersion?: number;   // Migration flag (current: 3)
 }
 
 export interface MediaFile {
-  path: string;
-  name: string;
-  ext: string;
-  size: number;
-  duration: number;
-  isVideo: boolean;
-}
-
-export interface SilenceSegment {
-  start: number;
-  end: number;
-}
-
-export interface RecentFile {
-  path: string;
-  name: string;
-  date: number;       // timestamp
-  lastAction: 'generated' | 'opened';
-  subtitleCount?: number;  // indicates cached subtitles exist
+  path: string; name: string; ext: string;
+  size: number; duration: number; isVideo: boolean;
+  width?: number; height?: number;
 }
 ```
 
----
+### Settings Migration
+
+| Version | Change |
+|---------|--------|
+| 1 | Flat `apiKey` → `providers` object per provider |
+| 2 | Added `screenSize` |
+| 3 | Reset `positionX/Y` to defaults (previous saves had stale values) |
+| — | `fontSize` added transparently via `{ ...DEFAULT_STYLE, ...savedStyle }` spread |
 
 ### Build & Deployment
 
-**Development**:
 ```bash
-npm run dev
-# Starts Vite dev server + Electron
-# Hot reload enabled
+npm run dev              # Dev: Vite + Electron with hot reload
+npm run build:electron   # Production: build + package installers
 ```
 
-**Production Build**:
-```bash
-npm run build:electron
-# Builds React app → dist/
-# Compiles Electron → dist-electron/
-# Packages app → release/
-```
+**Targets**: macOS (DMG), Windows (NSIS x64), Linux (AppImage x64)
 
-**Platform Targets**:
-- **macOS**: DMG installer
-- **Windows**: NSIS installer (x64)
-- **Linux**: AppImage (x64)
-
-**Binary Bundling**:
-- FFmpeg and ffprobe binaries are platform-specific
-- Included via `extraResources` in electron-builder config
-- Paths set dynamically based on `app.isPackaged`
+FFmpeg and ffprobe binaries bundled via `extraResources` in electron-builder config; paths resolved dynamically based on `app.isPackaged`.
 
 ---
 
-### Planned Features
-- [ ] **Dark/light theme toggle**
-- [ ] **Translation**: Option to translate subtitles *after* generation (e.g., Generate English → Translate to Spanish)
-- [ ] **Waveform visualization**: For audio-only files to aid navigation
-- [ ] **Advanced editing**: Split and merge tools (currently missing from editor)
+### Feature Status
 
-### Completed Features
-- [x] **Subtitle export formats** (WebVTT, ASS)
-- [x] **Keyboard shortcuts** (Play/pause, seek, insert/delete, Undo/Redo)
-- [x] **Multi-AI provider support** (Gemini, Claude, OpenAI) with API key validation
-- [x] **Session token usage tracking** — Real-time token counter in footer with cost estimates and per-provider breakdown popup
-- [x] **Auto-update** — `electron-updater` with GitHub Releases, check+prompt UX, non-intrusive notification banner
-- [x] **Inline preview toggle** — Switch between subtitle editor and preview mode (video with subtitle overlay or cinema screen for audio files)
-- [x] **Subtitle caching** — Generated subtitles auto-cached in `electron-store` and restored when loading recents; Clear List action in recents UI also clears subtitle cache
-- [x] **Accessibility** — Comprehensive ARIA support: dialog roles with focus traps, combobox/listbox on custom selects, slider on progress bar, keyboard navigation, live regions, alert roles
-- [x] **Model Labels Update** — Updated UI model labels to rate Gemini Pro as best for foreign languages and Whisper-1 as Standard.
-- [x] **Simulated Progress** — Added simulated progress animation during long translation API requests to prevent the progress bar from appearing frozen.
-- [x] **Word-Level Subtitle Breaking** — Configured Whisper API to use word-level timestamp granularities to ensure accurate subtitle chunking.
-- [x] **UI Refinement** — Improved progress indicator styling (removed redundant spinner, aligned center).
-- [x] **Version Name Auto-Scroll** — Added hover tooltips and a marquee auto-scroll effect for long version names in the model selector.
-- [x] **Version Name Condensation** — Shortened version label formatting from "Version X" to "VX" to conserve space.
-- [x] **Refined Version Naming** — Updated naming convention to prioritize source vs translation and explicit user selection vs auto-detection.
+#### Completed
+- [x] AI transcription (Gemini + OpenAI) with multi-provider selection
+- [x] Subtitle export: SRT, WebVTT, ASS
+- [x] Render video (burn subtitles via FFmpeg)
+- [x] Global subtitle styling (font, size, color, outline, shadow, background, position)
+- [x] Per-screen-size font size defaults and Reset button
+- [x] Accurate render preview (ResizeObserver font scaling per aspect ratio)
+- [x] Keyboard shortcuts (playback, editing, undo/redo, search)
+- [x] Advanced timeline (ruler, grid, minimap, scissors, trim)
+- [x] Translation pipeline with version history
+- [x] Session token usage tracking with cost estimates
+- [x] Auto-update via GitHub Releases
+- [x] Inline preview with WYSIWYG subtitle editing
+- [x] Subtitle caching and recent files with restoration
+- [x] Accessibility (ARIA, focus traps, keyboard navigation, live regions)
+- [x] API keys encrypted at rest via Electron `safeStorage`
+- [x] Custom `media://` protocol for large file streaming
+- [x] Per-run temp file cleanup on failure
+- [x] Non-blocking healing failure warning
+- [x] Portal-based CustomSelect (no sidebar overflow clipping)
 
-### Under Consideration
-- [ ] **Multi-track subtitles**: Support for multiple languages in one project. *Requires planning on UI and "Auto-detect" logic.*
-- [ ] **Speaker diarization**: Identify different speakers. *Requires research into robust audio segmentation and speaker signature usage.*
-
-### Low Priority / Future
-- [ ] **Batch processing**: Processing multiple files in queue.
-- [ ] **Custom AI prompts**: User-configurable system prompts.
+#### Under Consideration
+- [ ] Multi-track subtitles (multiple languages)
+- [ ] Speaker diarization
+- [ ] Waveform visualization for audio files
+- [ ] Batch processing
+- [ ] Custom AI prompt templates
 
 ---
 
 ## Credits
 
-**Application**: Subtitles Generator  
-**Version**: 1.0.0  
-**License**: MIT License (Copyright © 2026 Subtitles Gen)
+**Application**: SUBLIBR
+**Version**: 1.0.0
+**License**: MIT License (Copyright © 2026)
 **Developed by**: Stas Krylov
 
-**Tech Stack**:
-- Electron, React, TypeScript, Vite
-- Google Gemini, Anthropic Claude, OpenAI (Multi-provider AI)
-- FFmpeg (Media Processing)
+**Tech Stack**: Electron · React · TypeScript · Vite · Google Gemini · OpenAI · FFmpeg
 
-**Acknowledgments**:
-Built with the assistance of Anthropic's Claude 3.5 Sonnet and Google's Gemini models via Antigravity.
+**Acknowledgments**: Built with the assistance of Anthropic's Claude Sonnet and Google's Gemini models.
 
 ---
 
