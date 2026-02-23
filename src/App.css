@@ -487,16 +487,10 @@ a:hover {
 }
 
 .custom-select-dropdown {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  left: 0;
-  right: 0;
-  min-width: 100%;
   width: max-content;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  z-index: 200;
   list-style: none;
   padding: var(--space-xs) 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -1895,25 +1889,35 @@ a:hover {
   object-fit: contain; /* letter/pillarbox the source video inside the render canvas */
 }
 
+/* Overlay sits exactly over the canvas */
+.preview-subtitle-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .preview-subtitle {
   position: absolute;
   /* top / left / transform are set inline from SubtitleStyle.positionX/Y */
+  /* font-size is set inline (proportional to canvas width via ResizeObserver) */
+  /* width: max-content so the box expands to fit full authored lines;
+     max-width: 90% caps it so very long lines still wrap at 90% canvas width */
+  width: max-content;
+  max-width: 90%;
   padding: var(--space-sm) var(--space-md);
   background: rgba(0, 0, 0, 0.8);
   border-radius: var(--radius-sm);
   color: white;
   font-family: var(--font-subtitle);
-  font-size: 20px;
   text-align: center;
-  /* Fixed 80% width — forces the box to always use 80% of the canvas.
-     max-width would only cap it, causing the box to shrink to content
-     width (crunch) when lines are short due to newlines or short words. */
-  width: 80%;
   box-sizing: border-box;
-  white-space: pre-wrap;
-  word-break: break-word;
   line-height: 1.4;
   pointer-events: auto;
+}
+
+/* Each explicit \n line is its own block; word-wrap is allowed within it */
+.preview-subtitle-line {
+  display: block;
 }
 
 /* Cinema screen (audio files) */
@@ -2744,6 +2748,14 @@ a:hover {
   flex-direction: column;
   gap: var(--space-md);
 }
+
+.style-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
 
 .style-preview-box {
   display: flex;

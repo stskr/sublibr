@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SelectOption {
     value: string;
@@ -18,13 +19,33 @@ interface CustomSelectProps {
 
 export function CustomSelect({ options, value, onChange, disabled, className, style, id }: CustomSelectProps) {
     const [open, setOpen] = useState(false);
+    const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
     const ref = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLUListElement>(null);
 
     const selected = options.find(o => o.value === value);
 
+    // Recompute portal position whenever the dropdown opens
+    useEffect(() => {
+        if (!open || !triggerRef.current) return;
+        const rect = triggerRef.current.getBoundingClientRect();
+        setDropdownStyle({
+            position: 'fixed',
+            top: rect.bottom + 4,
+            left: rect.left,
+            minWidth: rect.width,
+            zIndex: 9999,
+        });
+    }, [open]);
+
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            if (
+                ref.current && !ref.current.contains(target) &&
+                dropdownRef.current && !dropdownRef.current.contains(target)
+            ) {
                 setOpen(false);
             }
         };
@@ -55,6 +76,31 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
         return () => document.removeEventListener('keydown', handleKey);
     }, [open, options, value, onChange]);
 
+    const dropdown = open && createPortal(
+        <ul ref={dropdownRef} className="custom-select-dropdown" role="listbox" style={dropdownStyle}>
+            {options.map(opt => (
+                <li
+                    key={opt.value}
+                    className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
+                    role="option"
+                    aria-selected={opt.value === value}
+                    title={opt.label}
+                    onClick={() => {
+                        if (opt.disabled) return;
+                        onChange(opt.value);
+                        setOpen(false);
+                    }}
+                >
+                    {opt.value === value && <span className="icon icon-sm custom-select-check">check</span>}
+                    <div className="custom-select-option-wrapper">
+                        <span className="custom-select-option-text">{opt.label}</span>
+                    </div>
+                </li>
+            ))}
+        </ul>,
+        document.body
+    );
+
     return (
         <div
             ref={ref}
@@ -63,6 +109,7 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
             id={id}
         >
             <button
+                ref={triggerRef}
                 type="button"
                 className="custom-select-trigger"
                 onClick={() => !disabled && setOpen(!open)}
@@ -77,29 +124,7 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
                 </div>
                 <span className={`custom-select-arrow ${open ? 'open' : ''}`} />
             </button>
-            {open && (
-                <ul className="custom-select-dropdown" role="listbox">
-                    {options.map(opt => (
-                        <li
-                            key={opt.value}
-                            className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
-                            role="option"
-                            aria-selected={opt.value === value}
-                            title={opt.label}
-                            onClick={() => {
-                                if (opt.disabled) return;
-                                onChange(opt.value);
-                                setOpen(false);
-                            }}
-                        >
-                            {opt.value === value && <span className="icon icon-sm custom-select-check">check</span>}
-                            <div className="custom-select-option-wrapper">
-                                <span className="custom-select-option-text">{opt.label}</span>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            {dropdown}
         </div>
     );
 }

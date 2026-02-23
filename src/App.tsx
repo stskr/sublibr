@@ -527,6 +527,7 @@ function App() {
                     if (window.electronAPI) window.electronAPI.setStoreValue('settings', updated);
                   }}
                   onBack={() => setShowStylePanel(false)}
+                  screenSize={settings.screenSize}
                 />
               )}
 

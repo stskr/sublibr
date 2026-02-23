@@ -64,6 +64,7 @@ export type ScreenSize = 'wide' | 'square' | 'vertical' | 'original';
 // Per-word markup (<font color="...">) acts as an override via CSS cascade.
 export interface SubtitleStyle {
     fontFamily: string;
+    fontSize: number;        // ASS PlayRes units (default 56 at PlayResX=1920)
     textColor: string;       // hex e.g. '#FFFFFF'
     outlineMode: 'none' | 'outline' | 'shadow' | 'both';
     outlineColor: string;
@@ -81,6 +82,7 @@ export interface SubtitleStyle {
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     fontFamily: 'Arial',
+    fontSize: 56,
     textColor: '#FFFFFF',
     outlineMode: 'both',
     outlineColor: '#000000',
@@ -94,6 +96,27 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     backgroundOpacity: 0.8,
     positionX: 50,
     positionY: 85,
+};
+
+// PlayRes dimensions used for ASS generation and preview font scaling.
+// `mediaWidth/Height` are only used for the 'original' mode.
+export function getPlayRes(screenSize: ScreenSize, mediaWidth?: number, mediaHeight?: number): [number, number] {
+    switch (screenSize) {
+        case 'wide':     return [1920, 1080];
+        case 'square':   return [1080, 1080];
+        case 'vertical': return [1080, 1920];
+        case 'original':
+        default:
+            return mediaWidth && mediaHeight ? [mediaWidth, mediaHeight] : [1920, 1080];
+    }
+}
+
+// Sensible per-format font size defaults (ASS PlayRes units).
+export const SCREEN_SIZE_FONT_DEFAULTS: Record<ScreenSize, number> = {
+    wide:     56,
+    square:   40,
+    vertical: 36,
+    original: 56,
 };
 
 // Settings

@@ -1,5 +1,5 @@
-import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize, SubtitleStyle } from '../types';
-import { DEFAULT_SUBTITLE_STYLE } from '../types';
+import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize, SubtitleStyle, MediaFile } from '../types';
+import { DEFAULT_SUBTITLE_STYLE, getPlayRes } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
 import { callProvider, callTextProvider } from './providers';
 
@@ -565,7 +565,12 @@ function hexToAssColor(hex: string, alpha = 0): string {
 }
 
 // Generate ASS file content
-export function generateAss(subtitles: Subtitle[], style: SubtitleStyle = DEFAULT_SUBTITLE_STYLE): string {
+export function generateAss(
+    subtitles: Subtitle[],
+    style: SubtitleStyle = DEFAULT_SUBTITLE_STYLE,
+    renderResolution: ScreenSize = 'wide',
+    mediaFile?: Pick<MediaFile, 'width' | 'height'>,
+): string {
     const primaryColor  = hexToAssColor(style.textColor);
     const outlineColor  = hexToAssColor(style.outlineColor);
     const shadowDepth   = Math.max(style.shadowOffsetX, style.shadowOffsetY);
@@ -584,24 +589,27 @@ export function generateAss(subtitles: Subtitle[], style: SubtitleStyle = DEFAUL
     // Strip quotes from font-family if present (e.g. "'Courier New'" → "Courier New")
     const fontName = style.fontFamily.replace(/^'|'$/g, '');
 
+    const [playResX, playResY] = getPlayRes(renderResolution, mediaFile?.width, mediaFile?.height);
+    const fontSize = Math.round(style.fontSize ?? 56);
+
     const header = `[Script Info]
 ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
+PlayResX: ${playResX}
+PlayResY: ${playResY}
 WrapStyle: 0
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},50,${primaryColor},&H000000FF,${outlineColor},${backColor},0,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,10,10,10,1
+Style: Default,${fontName},${fontSize},${primaryColor},&H000000FF,${outlineColor},${backColor},0,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,10,10,10,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
     // \an2 = bottom-center anchor; \pos(x,y) places that anchor at the given coords
-    const posX = Math.round((style.positionX ?? 50) / 100 * 1920);
-    const posY = Math.round((style.positionY ?? 85) / 100 * 1080);
+    const posX = Math.round((style.positionX ?? 50) / 100 * playResX);
+    const posY = Math.round((style.positionY ?? 85) / 100 * playResY);
     const posTag = `{\\an2\\pos(${posX},${posY})}`;
 
     const events = subtitles.map((sub) => {

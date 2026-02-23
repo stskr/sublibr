@@ -5,7 +5,7 @@ import { RichTextEditor } from './common/RichTextEditor';
 import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle, MediaFile, SubtitleStyle, ScreenSize } from '../types';
-import { DEFAULT_SUBTITLE_STYLE as DEFAULT_STYLE } from '../types';
+import { DEFAULT_SUBTITLE_STYLE as DEFAULT_STYLE, getPlayRes } from '../types';
 
 // Returns the [width, height] of the render canvas matching the selected resolution.
 function getCanvasDimensions(renderResolution: ScreenSize, mediaFile: MediaFile): [number, number] {
@@ -38,12 +38,27 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
     const style = subtitleStyle ?? DEFAULT_STYLE;
     const [canvasW, canvasH] = getCanvasDimensions(renderResolution, mediaFile);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<RichTextEditorRef>(null);
     const [videoReady, setVideoReady] = useState(false);
     const [isPaused, setIsPaused] = useState(true);
     const [editingSubtitleId, setEditingSubtitleId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, size: '' });
+    const [canvasPixelWidth, setCanvasPixelWidth] = useState<number | null>(null);
+
+    // Track render canvas CSS width for proportional font scaling
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setCanvasPixelWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
 
     // Find active subtitle at current time
     const activeSub = subtitles.find(
@@ -156,7 +171,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         e.stopPropagation(); // Prevent app shortcuts
 
-        // WYSIWYG shortcuts are handled by browser/RichTextEditor, 
+        // WYSIWYG shortcuts are handled by browser/RichTextEditor,
         // but we can still intercept them here if needed.
 
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -167,8 +182,12 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
         }
     }, [handleSave]);
 
-
-    // No auto-resize needed for contenteditable as it grows with content
+    // Compute display font size: scale style.fontSize (ASS PlayRes units) to CSS canvas pixels.
+    // This makes the preview match the actual render proportions across all aspect ratios.
+    const [playResX] = getPlayRes(renderResolution, mediaFile.width, mediaFile.height);
+    const displayFontSize = canvasPixelWidth != null
+        ? Math.max(8, (style.fontSize / playResX) * canvasPixelWidth)
+        : undefined;
 
     // Render subtitle content (text or textarea)
     const renderSubtitleContent = () => {
@@ -209,6 +228,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
             // Global subtitle style (per-word <font color> tags override via CSS cascade)
             color: style.textColor,
             fontFamily: style.fontFamily,
+            fontSize: displayFontSize != null ? `${displayFontSize}px` : undefined,
             textShadow: buildSubtitleTextShadow(style),
             background: style.backgroundEnabled
                 ? hexToRgba(style.backgroundColor, style.backgroundOpacity)
@@ -224,7 +244,11 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
                 title={isPaused ? "Click to edit" : undefined}
                 aria-live="polite"
             >
-                <StyledText text={subtitleText} />
+                {subtitleText.split('\n').map((line, i) => (
+                    <span key={i} className="preview-subtitle-line">
+                        <StyledText text={line} />
+                    </span>
+                ))}
             </div>
         );
     };
@@ -250,6 +274,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
                         Subtitles are positioned at X%/Y% of this canvas — same reference
                         frame as the ASS \pos coordinates. */}
                     <div
+                        ref={canvasRef}
                         className="preview-render-canvas"
                         style={{ aspectRatio: `${canvasW} / ${canvasH}` }}
                     >
@@ -258,7 +283,10 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
                             muted
                             playsInline
                         />
-                        {renderSubtitleContent()}
+                        {/* Overlay fills canvas exactly */}
+                        <div className="preview-subtitle-overlay">
+                            {renderSubtitleContent()}
+                        </div>
                     </div>
                 </div>
             ) : (

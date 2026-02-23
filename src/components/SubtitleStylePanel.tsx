@@ -1,4 +1,5 @@
-import type { SubtitleStyle } from '../types';
+import type { SubtitleStyle, ScreenSize } from '../types';
+import { SCREEN_SIZE_FONT_DEFAULTS, DEFAULT_SUBTITLE_STYLE } from '../types';
 import { buildSubtitleTextShadow, hexToRgba } from '../utils';
 import { CustomSelect } from './CustomSelect';
 
@@ -6,6 +7,7 @@ interface SubtitleStylePanelProps {
     style: SubtitleStyle;
     onChange: (style: SubtitleStyle) => void;
     onBack: () => void;
+    screenSize?: ScreenSize;
 }
 
 const FONT_OPTIONS = [
@@ -60,16 +62,27 @@ function set<K extends keyof SubtitleStyle>(
     onChange({ ...style, [key]: value });
 }
 
-export function SubtitleStylePanel({ style, onChange, onBack }: SubtitleStylePanelProps) {
+export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: SubtitleStylePanelProps) {
     const showOutline = style.outlineMode === 'outline' || style.outlineMode === 'both';
     const showShadow = style.outlineMode === 'shadow' || style.outlineMode === 'both';
 
+    const handleReset = () => {
+        const defaultFontSize = screenSize ? SCREEN_SIZE_FONT_DEFAULTS[screenSize] : DEFAULT_SUBTITLE_STYLE.fontSize;
+        onChange({ ...DEFAULT_SUBTITLE_STYLE, fontSize: defaultFontSize });
+    };
+
     return (
         <div className="sidebar-section style-panel">
-            <button className="btn-secondary sidebar-action-btn" onClick={onBack}>
-                <span className="icon icon-sm">chevron_left</span>
-                Back
-            </button>
+            <div className="style-panel-header">
+                <button className="btn-secondary sidebar-action-btn" onClick={onBack}>
+                    <span className="icon icon-sm">chevron_left</span>
+                    Back
+                </button>
+                <button className="btn-secondary sidebar-action-btn style-reset-btn" onClick={handleReset} title="Reset to defaults">
+                    <span className="icon icon-sm">restart_alt</span>
+                    Reset
+                </button>
+            </div>
 
             <StylePreview style={style} />
 
@@ -81,6 +94,19 @@ export function SubtitleStylePanel({ style, onChange, onBack }: SubtitleStylePan
                     value={style.fontFamily}
                     onChange={(v) => set(style, 'fontFamily', v, onChange)}
                 />
+            </div>
+
+            {/* Font size */}
+            <div className="style-control">
+                <label className="sidebar-label">Font Size</label>
+                <div className="style-slider-row">
+                    <input
+                        type="range" min={20} max={120} step={2}
+                        value={style.fontSize}
+                        onChange={(e) => set(style, 'fontSize', parseInt(e.target.value), onChange)}
+                    />
+                    <span className="style-slider-value">{style.fontSize}</span>
+                </div>
             </div>
 
             {/* Text color */}

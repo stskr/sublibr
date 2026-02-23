@@ -391,7 +391,7 @@ export function useTranscriptionPipeline({
         if (!subtitles.length || !mediaFile || !window.electronAPI) return;
 
         // Always use styled ASS for burning — richer quality than plain SRT
-        const assContent = generateAss(subtitles, settings.subtitleStyle);
+        const assContent = generateAss(subtitles, settings.subtitleStyle, renderResolution, mediaFile);
         const defaultName = mediaFile.name.replace(/\.[^.]+$/, '_subtitles.mp4');
 
         const savePath = await window.electronAPI.saveFileDialog(defaultName, 'Video File', ['mp4', 'mkv', 'mov']);
@@ -433,7 +433,7 @@ export function useTranscriptionPipeline({
                 break;
             case 'ass':
                 ext = '.ass';
-                content = generateAss(subtitles, settings.subtitleStyle);
+                content = generateAss(subtitles, settings.subtitleStyle, renderResolution, mediaFile ?? undefined);
                 break;
             case 'srt':
             default:
