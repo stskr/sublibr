@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getFileInfo: (path: string) => ipcRenderer.invoke('file:getInfo', path),
     getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
     registerPath: (path: string) => ipcRenderer.invoke('file:registerPath', path),
+    cleanupTempAudio: () => ipcRenderer.invoke('file:cleanupTempAudio'),
 
     // AI API proxy (calls go through main process — keys never exposed in renderer)
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),

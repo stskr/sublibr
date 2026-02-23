@@ -45,6 +45,7 @@ export interface ProcessingState {
     currentChunk?: number;
     totalChunks?: number;
     error?: string;
+    warning?: string; // Non-fatal issue (e.g. healing step failed)
 }
 
 // AI Providers

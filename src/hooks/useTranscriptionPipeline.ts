@@ -158,6 +158,7 @@ export function useTranscriptionPipeline({
             let merged = mergeSubtitles(allSubtitles);
 
             setProcessing({ status: 'healing', progress: 95 });
+            let healingFailed = false;
             try {
                 const healResult = await healSubtitles(
                     merged,
@@ -174,6 +175,7 @@ export function useTranscriptionPipeline({
                 healResult.tokenUsages.forEach(addTokenUsage);
             } catch (err) {
                 console.error('Healing failed:', err);
+                healingFailed = true;
             }
 
             merged = enforceSubtitleQuality(merged, effectiveScreenSize);
@@ -223,7 +225,11 @@ export function useTranscriptionPipeline({
 
             addVersion(newVersion);
             setSubtitles(merged);
-            setProcessing({ status: 'done', progress: 100 });
+            setProcessing({
+                status: 'done',
+                progress: 100,
+                warning: healingFailed ? 'Healing step failed — subtitle quality may be lower.' : undefined,
+            });
             setShowGenerator(false);
 
             if (mediaFile) {
@@ -235,9 +241,10 @@ export function useTranscriptionPipeline({
 
             setTimeout(() => {
                 setProcessing({ status: 'idle', progress: 0 });
-            }, DONE_STATUS_DELAY_MS);
+            }, healingFailed ? 6000 : DONE_STATUS_DELAY_MS);
 
         } catch (error) {
+            window.electronAPI.cleanupTempAudio().catch(() => { });
             setProcessing({
                 status: 'error',
                 progress: 0,
@@ -249,11 +256,12 @@ export function useTranscriptionPipeline({
     const handleTranslate = useCallback(async () => {
         const activeConfig = settings.providers[settings.activeProvider];
         if (!activeConfig.apiKey) return;
+        if (!subtitles.length) return;
 
         const currentVersion = activeVersionId ? versions.find(v => v.id === activeVersionId) : null;
         const sourceLanguage = currentVersion ? currentVersion.language : settings.language;
         const isAutoDetect = currentVersion
-            ? currentVersion.label?.includes('Auto-Detect')
+            ? currentVersion.label?.includes('_Auto')
             : settings.autoDetectLanguage;
 
         if (sourceLanguage === translateTargetLang && !isAutoDetect) {

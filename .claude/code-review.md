@@ -203,3 +203,75 @@ Removed dead div and associated comments. Also removed unused `duration` prop fr
 
 - **Fixed**: 26 of 26 issues
 - **Deferred** (architectural changes): 0
+
+---
+
+---
+
+# Code Review — Round 2
+
+> **Date**: February 23, 2026
+> **Scope**: Full codebase (45 source files)
+
+---
+
+## Medium
+
+### 26. ~~Bug: `isAutoDetect` label check always returns `false` for auto-generated versions~~ FIXED
+**Files**: `src/hooks/useTranscriptionPipeline.ts:256`
+
+**Problem**: `handleTranslate` derives `isAutoDetect` by calling `currentVersion.label?.includes('Auto-Detect')`, but `handleGenerate` creates version labels with the suffix `_Auto` (line 210: `` `V${n}-${lang}_Auto, ${model}` ``). The string `'Auto-Detect'` never appears in any label, so `isAutoDetect` is always `false` for version-derived auto-detect.
+
+**Impact**:
+1. Translation version labels never use the `_Auto` format — the ternary on line 287 always takes the non-auto branch.
+2. The same-language guard on line 259 (`sourceLanguage === translateTargetLang && !isAutoDetect`) can incorrectly block translation when the detected source language happens to match the target.
+
+**Fix**: Change line 256 to check for `'_Auto'`:
+```ts
+? currentVersion.label?.includes('_Auto')
+```
+
+---
+
+### 27. ~~Bug: Temp audio files not cleaned up on mid-run `handleGenerate` failure~~ FIXED
+**Files**: `src/hooks/useTranscriptionPipeline.ts:240-244`
+
+**Problem**: The `catch` block at line 240 only updates UI error state. If `handleGenerate` fails after `extractAudio` (line 113) or `createAudioChunks` (line 118) have already written files to disk, those files are never removed. Fix #21 added app-quit cleanup patterns, but per-invocation cleanup on error is absent. Repeated failed attempts (bad API key, network timeout) accumulate `subtitles_gen_audio_*` and chunk files in the OS temp directory until the app restarts.
+
+**Fix**: Add a `finally` or targeted cleanup in the `catch` block to `fs.unlink` `processAudioPath` if it was created during this invocation.
+
+---
+
+## Low
+
+### 28. ~~Bug: `handleTranslate` doesn't guard empty `subtitles`~~ FIXED
+**Files**: `src/hooks/useTranscriptionPipeline.ts:249`
+
+**Problem**: `handleTranslate` only checks for a missing API key before proceeding. If `subtitles` is empty (e.g., user clicks Translate before generating), it calls `translateSubtitles([])`, wasting API quota and producing a spurious empty version in history. Compare `handleDownload` which starts with `if (subtitles.length === 0) return`.
+
+**Fix**: Add `if (!subtitles.length) return;` at the top of `handleTranslate`.
+
+---
+
+### 29. ~~UX: Subtitle healing failure silently swallowed~~ FIXED
+**Files**: `src/hooks/useTranscriptionPipeline.ts:175-177`
+
+**Problem**: The healing `catch` block only `console.error`s. Users receive no feedback when healing fails; the pipeline continues silently with unhealed subtitles. The progress bar shows the normal "done" state, giving the impression everything succeeded.
+
+**Fix**: Surface a non-blocking warning in `ProcessingState` (e.g., a `warnings` field) or set a transient toast message so the user knows healing was skipped and quality may be lower.
+
+---
+
+### 30. ~~Code quality: `generateId()` uses `Math.random()`~~ FIXED
+**Files**: `src/utils.ts:49`
+
+**Problem**: `Math.random().toString(36).substring(2, 11)` yields ~46 bits of randomness. Probability of a collision across, say, 10 000 IDs is ~0.01 % — low but non-zero, and `Math.random` is not cryptographically secure. In large subtitle files (hundreds of entries) with rapid add/delete cycles, the risk is small but real.
+
+**Fix**: Replace with `crypto.randomUUID()` (available in Electron's renderer via the Web Crypto API) or `crypto.getRandomValues`.
+
+---
+
+## Summary
+
+- **Fixed**: 26 of 26 issues (Round 1)
+- **Fixed**: 5 of 5 issues (Round 2)

@@ -46,7 +46,7 @@ export function formatDisplayTime(seconds: number): string {
 
 // Generate unique ID
 export function generateId(): string {
-    return Math.random().toString(36).substring(2, 11);
+    return crypto.randomUUID();
 }
 
 // Format file size

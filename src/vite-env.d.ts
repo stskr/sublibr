@@ -17,6 +17,7 @@ export interface ElectronAPI {
     getFileInfo: (path: string) => Promise<{ size: number; path: string; name: string; ext: string }>;
     getTempPath: () => Promise<string>;
     registerPath: (path: string) => Promise<void>;
+    cleanupTempAudio: () => Promise<void>;
 
     // AI API proxy
     testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>;

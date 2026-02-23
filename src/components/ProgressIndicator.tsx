@@ -34,10 +34,23 @@ const STATUS_MESSAGES: Record<string, string> = {
 };
 
 export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: ProgressIndicatorProps) {
-    const { status, progress, currentChunk, totalChunks, error } = state;
+    const { status, progress, currentChunk, totalChunks, error, warning } = state;
 
-    if (status === 'idle' || status === 'done') {
+    if (status === 'idle' || (status === 'done' && !warning)) {
         return null;
+    }
+
+    if (status === 'done' && warning) {
+        return (
+            <div className="progress-indicator" aria-live="polite">
+                <div className="progress-error" role="alert">
+                    <div className="progress-error-message">
+                        <span className="icon icon-sm">warning</span>
+                        {warning}
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     const message = status === 'transcribing' && providerLabel

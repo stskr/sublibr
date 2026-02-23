@@ -259,20 +259,24 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Clean up temp audio files on quit
-app.on('before-quit', () => {
+// Clean up temp audio files created during transcription
+function cleanupTempAudioFiles() {
   try {
     const tempDir = app.getPath('temp');
     const entries = fs.readdirSync(tempDir);
     for (const entry of entries) {
-      if (/^(chunk_\d+\.flac|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.flac)$/.test(entry)) {
-        fs.unlinkSync(path.join(tempDir, entry));
+      if (/^(chunk_\d+\.(flac|mp3)|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.(flac|mp3))$/.test(entry)) {
+        try { fs.unlinkSync(path.join(tempDir, entry)); } catch { /* best-effort */ }
       }
     }
   } catch {
-    // Best-effort cleanup — don't block quit
+    // Best-effort — don't throw
   }
-});
+}
+
+app.on('before-quit', cleanupTempAudioFiles);
+
+ipcMain.handle('file:cleanupTempAudio', () => cleanupTempAudioFiles());
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
