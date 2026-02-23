@@ -599,9 +599,14 @@ Style: Default,${fontName},50,${primaryColor},&H000000FF,${outlineColor},${backC
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
+    // \an2 = bottom-center anchor; \pos(x,y) places that anchor at the given coords
+    const posX = Math.round((style.positionX ?? 50) / 100 * 1920);
+    const posY = Math.round((style.positionY ?? 85) / 100 * 1080);
+    const posTag = `{\\an2\\pos(${posX},${posY})}`;
+
     const events = subtitles.map((sub) => {
         const cleanText = stripSourceTags(sub.text);
-        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${cleanText.replace(/\n/g, '\\N')}`;
+        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${posTag}${cleanText.replace(/\n/g, '\\N')}`;
     }).join('\n');
 
     return header + events;

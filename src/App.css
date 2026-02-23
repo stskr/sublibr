@@ -1860,32 +1860,44 @@ a:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-tertiary);
 }
 
 /* Video preview */
 .preview-video-wrapper {
-  position: relative;
   width: 100%;
   flex: 1;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: black;
+  /* Lighter than black so the render canvas boundary is clearly visible */
+  background: var(--color-bg-tertiary);
 }
 
-.preview-video-wrapper video {
+/* Render canvas: scales to fit the available space while preserving aspect ratio.
+   max-width + max-height + aspect-ratio = object-fit:contain behaviour for a div.
+   The outline marks the exact render frame boundary (1:1, 9:16, etc.). */
+.preview-render-canvas {
+  position: relative;
   max-width: 100%;
   max-height: 100%;
+  background: black;
+  overflow: hidden;
+  outline: 1px solid var(--color-border);
+  /* aspect-ratio set inline from renderResolution */
+}
+
+.preview-render-canvas video {
   display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* letter/pillarbox the source video inside the render canvas */
 }
 
 .preview-subtitle {
   position: absolute;
-  bottom: var(--space-xl);
-  left: 50%;
-  transform: translateX(-50%);
+  /* top / left / transform are set inline from SubtitleStyle.positionX/Y */
   padding: var(--space-sm) var(--space-md);
   background: rgba(0, 0, 0, 0.8);
   border-radius: var(--radius-sm);
@@ -1893,9 +1905,15 @@ a:hover {
   font-family: var(--font-subtitle);
   font-size: 20px;
   text-align: center;
-  max-width: 80%;
+  /* Fixed 80% width — forces the box to always use 80% of the canvas.
+     max-width would only cap it, causing the box to shrink to content
+     width (crunch) when lines are short due to newlines or short words. */
+  width: 80%;
+  box-sizing: border-box;
   white-space: pre-wrap;
+  word-break: break-word;
   line-height: 1.4;
+  pointer-events: auto;
 }
 
 /* Cinema screen (audio files) */

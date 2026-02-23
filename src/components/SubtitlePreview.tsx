@@ -4,14 +4,29 @@ import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
 import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
-import type { Subtitle, MediaFile, SubtitleStyle } from '../types';
+import type { Subtitle, MediaFile, SubtitleStyle, ScreenSize } from '../types';
 import { DEFAULT_SUBTITLE_STYLE as DEFAULT_STYLE } from '../types';
+
+// Returns the [width, height] of the render canvas matching the selected resolution.
+function getCanvasDimensions(renderResolution: ScreenSize, mediaFile: MediaFile): [number, number] {
+    switch (renderResolution) {
+        case 'wide':     return [16, 9];
+        case 'square':   return [1, 1];
+        case 'vertical': return [9, 16];
+        case 'original':
+        default:
+            return mediaFile.width && mediaFile.height
+                ? [mediaFile.width, mediaFile.height]
+                : [16, 9];
+    }
+}
 
 interface SubtitlePreviewProps {
     subtitles: Subtitle[];
     currentTime: number;
     mediaFile: MediaFile;
     subtitleStyle?: SubtitleStyle;
+    renderResolution?: ScreenSize;
     onSubtitleChange?: (id: string, text: string) => void;
     onUndo?: () => void;
     onRedo?: () => void;
@@ -19,8 +34,9 @@ interface SubtitlePreviewProps {
     canRedo?: boolean;
 }
 
-export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleStyle, onSubtitleChange, onUndo, onRedo, canUndo, canRedo }: SubtitlePreviewProps) {
+export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleStyle, renderResolution = 'original', onSubtitleChange, onUndo, onRedo, canUndo, canRedo }: SubtitlePreviewProps) {
     const style = subtitleStyle ?? DEFAULT_STYLE;
+    const [canvasW, canvasH] = getCanvasDimensions(renderResolution, mediaFile);
     const videoRef = useRef<HTMLVideoElement>(null);
     const textareaRef = useRef<RichTextEditorRef>(null);
     const [videoReady, setVideoReady] = useState(false);
@@ -176,7 +192,17 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
 
         if (!subtitleText) return null;
 
+        const posX = style.positionX ?? DEFAULT_STYLE.positionX;
+        const posY = style.positionY ?? DEFAULT_STYLE.positionY;
+
         const overlayStyle: React.CSSProperties = {
+            // Position within the render canvas (matches ASS \pos coordinate space)
+            ...(mediaFile.isVideo ? {
+                top: `${posY}%`,
+                left: `${posX}%`,
+                transform: `translate(-50%, -50%)`,
+                bottom: 'auto',
+            } : {}),
             direction,
             cursor: isPaused && onSubtitleChange ? 'pointer' : 'default',
             border: isPaused && onSubtitleChange ? '1px dashed transparent' : 'none',
@@ -219,12 +245,21 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
             />
             {mediaFile.isVideo ? (
                 <div className="preview-video-wrapper">
-                    <video
-                        ref={videoRef}
-                        muted
-                        playsInline
-                    />
-                    {renderSubtitleContent()}
+                    {/* Render canvas: matches the target render resolution's aspect ratio.
+                        The video is object-fit:contain inside it (simulates FFmpeg scale+pad).
+                        Subtitles are positioned at X%/Y% of this canvas — same reference
+                        frame as the ASS \pos coordinates. */}
+                    <div
+                        className="preview-render-canvas"
+                        style={{ aspectRatio: `${canvasW} / ${canvasH}` }}
+                    >
+                        <video
+                            ref={videoRef}
+                            muted
+                            playsInline
+                        />
+                        {renderSubtitleContent()}
+                    </div>
                 </div>
             ) : (
                 <div className={`preview-cinema${mediaFile.isVideo ? '' : ' audio-mode'}`}>

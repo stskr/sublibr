@@ -74,6 +74,8 @@ export interface SubtitleStyle {
     backgroundEnabled: boolean;
     backgroundColor: string;
     backgroundOpacity: number; // 0 – 1
+    positionX: number;       // 0–100 (% from left), 50 = centered
+    positionY: number;       // 0–100 (% from top), 85 = near-bottom standard
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -89,6 +91,8 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
     backgroundEnabled: false,
     backgroundColor: '#000000',
     backgroundOpacity: 0.8,
+    positionX: 50,
+    positionY: 85,
 };
 
 // Settings

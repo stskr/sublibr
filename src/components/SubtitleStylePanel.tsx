@@ -234,6 +234,31 @@ export function SubtitleStylePanel({ style, onChange, onBack }: SubtitleStylePan
                     </div>
                 </>
             )}
+
+            {/* Position */}
+            <div className="sidebar-divider" style={{ margin: '0.75rem 0' }} />
+            <div className="style-control">
+                <label className="sidebar-label">Horizontal Position</label>
+                <div className="style-slider-row">
+                    <input
+                        type="range" min={0} max={100} step={1}
+                        value={style.positionX}
+                        onChange={(e) => set(style, 'positionX', parseInt(e.target.value), onChange)}
+                    />
+                    <span className="style-slider-value">{style.positionX}%</span>
+                </div>
+            </div>
+            <div className="style-control">
+                <label className="sidebar-label">Vertical Position</label>
+                <div className="style-slider-row">
+                    <input
+                        type="range" min={0} max={100} step={1}
+                        value={style.positionY}
+                        onChange={(e) => set(style, 'positionY', parseInt(e.target.value), onChange)}
+                    />
+                    <span className="style-slider-value">{style.positionY}%</span>
+                </div>
+            </div>
         </div>
     );
 }

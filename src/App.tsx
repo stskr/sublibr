@@ -78,7 +78,24 @@ function App() {
           setSettings(migrated);
           await window.electronAPI.setStoreValue('settings', migrated);
         } else {
-          setSettings({ ...DEFAULT_SETTINGS, ...(saved as Partial<AppSettings>) });
+          const savedSettings = saved as Partial<AppSettings> & { settingsVersion?: number };
+          const savedStyle = savedSettings.subtitleStyle as Partial<typeof DEFAULT_SETTINGS.subtitleStyle> | undefined;
+          // v3 migration: force-reset positionX/Y to defaults (previous saves may have
+          // captured a stale/incorrect value from before the fields were properly initialised)
+          const needsPositionMigration = !savedSettings.settingsVersion || savedSettings.settingsVersion < 3;
+          const mergedSubtitleStyle = {
+            ...DEFAULT_SETTINGS.subtitleStyle,
+            ...savedStyle,
+            ...(needsPositionMigration ? {
+              positionX: DEFAULT_SETTINGS.subtitleStyle.positionX,
+              positionY: DEFAULT_SETTINGS.subtitleStyle.positionY,
+            } : {}),
+          };
+          const merged: AppSettings = { ...DEFAULT_SETTINGS, ...savedSettings, subtitleStyle: mergedSubtitleStyle };
+          setSettings(merged);
+          if (needsPositionMigration && window.electronAPI) {
+            window.electronAPI.setStoreValue('settings', { ...merged, settingsVersion: 3 }).catch(() => {});
+          }
         }
       }
     }
@@ -210,6 +227,23 @@ function App() {
     handleDownload,
     handleRenderVideo
   } = pipeline;
+
+  // Auto-select Subtitle Format + Render Resolution based on video aspect ratio when a file is loaded.
+  // Uses functional setSettings to avoid reading stale 'settings' from the closure
+  // (loadSettings is async and may not have committed yet when mediaFile first changes).
+  useEffect(() => {
+    if (!mediaFile?.isVideo || !mediaFile.width || !mediaFile.height) return;
+    const ratio = mediaFile.width / mediaFile.height;
+    const inferred: 'wide' | 'square' | 'vertical' =
+      ratio >= 1.5 ? 'wide' : ratio >= 0.75 ? 'square' : 'vertical';
+    setSettings(prev => {
+      const updated = { ...prev, screenSize: inferred };
+      window.electronAPI?.setStoreValue('settings', updated).catch(() => {});
+      return updated;
+    });
+    setRenderResolution(inferred);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaFile]);
 
   // Global Editor/Player handlers
   const handleSeek = useCallback((time: number) => {
@@ -556,10 +590,13 @@ function App() {
                   <button
                     className="btn-secondary sidebar-action-btn"
                     onClick={() => setShowStylePanel(true)}
-                    style={{ marginBottom: '1.5rem', width: '100%' }}
+                    style={{ width: '100%' }}
                   >
                     <span className="icon icon-sm">palette</span> Global Style
                   </button>
+                  <p className="sidebar-hint" style={{ marginTop: '0.4rem', marginBottom: '1.25rem' }}>
+                    Switch to the Preview tab to see style changes live.
+                  </p>
 
                   <div className="sidebar-divider"></div>
                   <label className="sidebar-label">Export Format</label>
@@ -653,6 +690,7 @@ function App() {
                     currentTime={currentTime}
                     mediaFile={mediaFile}
                     subtitleStyle={settings.subtitleStyle}
+                    renderResolution={renderResolution}
                     onSubtitleChange={handleSubtitleLineChange}
                     onUndo={handleUndo}
                     onRedo={handleRedo}
