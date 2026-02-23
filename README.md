@@ -38,8 +38,8 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 
 1. **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/subtitles-gen.git
-    cd subtitles-gen
+    git clone https://github.com/stskr/sublibr.git
+    cd sublibr
     ```
 
 2. **Install dependencies**

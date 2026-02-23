@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-electron
 release
 *.local
 
@@ -23,3 +24,9 @@ release
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code dev files
+.claude
+
+# Backup files
+*.bak

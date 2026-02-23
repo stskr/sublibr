@@ -1,2 +1,0 @@
-1. ![icon spinning is not good - progress bar animation here is enough. make the icon middle aligned vertically to the text.](image.png)
-2. ![fix the text that makes it clear that the app itself doesnt collect info but that the users should read the privacy and terms of the models of google and openai to know what data they collect. we need to put all data collection off of us](image-1.png)

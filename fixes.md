@@ -1,1 +1,0 @@
-![make the icon not spinning](image.png)

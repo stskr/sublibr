@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Local subtitle generator using Gemini AI",
-  "author": "SUBLIBR",
+  "author": "Stas Krylov",
   "license": "MIT",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -101,8 +101,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "OWNER",
-      "repo": "REPO"
+      "owner": "stskr",
+      "repo": "sublibr"
     }
   }
 }
