@@ -3,6 +3,7 @@ import { Settings } from './components/Settings';
 import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { AboutModal } from './components/AboutModal';
 import { AudioPlayer } from './components/AudioPlayer';
 import type { AudioPlayerHandle } from './components/AudioPlayer';
 import { SubtitlePreview } from './components/SubtitlePreview';
@@ -46,6 +47,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [showStylePanel, setShowStylePanel] = useState(false);
 
   const [subtitles, setSubtitles, undoSubtitles, redoSubtitles, canUndo, canRedo, resetSubtitles] = useUndoRedo<Subtitle[]>([]);
@@ -414,6 +416,9 @@ function App() {
         <div className="header-right">
           <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts" aria-label="Keyboard Shortcuts">
             <span className="icon">keyboard</span>
+          </button>
+          <button className="btn-icon" onClick={() => setShowAbout(true)} title="About SUBLIBR" aria-label="About SUBLIBR">
+            <span className="icon">info</span>
           </button>
           <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
             <span className="icon">settings</span>
@@ -792,6 +797,15 @@ function App() {
           <ShortcutsModal
             onClose={() => setShowShortcuts(false)}
             view={mediaFile ? 'editor' : 'homepage'}
+          />
+        )
+      }
+
+      {
+        showAbout && (
+          <AboutModal
+            onClose={() => setShowAbout(false)}
+            version="1.0.0"
           />
         )
       }
