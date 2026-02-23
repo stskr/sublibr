@@ -18,6 +18,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   getFileInfo: (path) => import_electron.ipcRenderer.invoke("file:getInfo", path),
   getTempPath: () => import_electron.ipcRenderer.invoke("file:getTempPath"),
   registerPath: (path) => import_electron.ipcRenderer.invoke("file:registerPath", path),
+  cleanupTempAudio: () => import_electron.ipcRenderer.invoke("file:cleanupTempAudio"),
   // AI API proxy (calls go through main process — keys never exposed in renderer)
   testApiKey: (provider, apiKey) => import_electron.ipcRenderer.invoke("ai:testApiKey", provider, apiKey),
   callProvider: (provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript) => import_electron.ipcRenderer.invoke("ai:callProvider", provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript),
