@@ -219,7 +219,7 @@ export function SubtitlePreview({ subtitles, currentTime, mediaFile, subtitleSty
             ...(mediaFile.isVideo ? {
                 top: `${posY}%`,
                 left: `${posX}%`,
-                transform: `translate(-50%, -50%)`,
+                transform: `translate(-50%, -100%)`,
                 bottom: 'auto',
             } : {}),
             direction,

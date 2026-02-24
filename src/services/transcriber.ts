@@ -584,7 +584,7 @@ export function generateAss(
     const borderStyle = style.backgroundEnabled ? 3 : 1;
     const backColor = style.backgroundEnabled
         ? hexToAssColor(style.backgroundColor, 1 - style.backgroundOpacity)
-        : hexToAssColor('#000000');
+        : hexToAssColor(style.shadowColor); // BackColour = shadow color in BorderStyle 1
 
     // Strip quotes from font-family if present (e.g. "'Courier New'" → "Courier New")
     const fontName = style.fontFamily.replace(/^'|'$/g, '');
@@ -601,7 +601,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${fontSize},${primaryColor},&H000000FF,${outlineColor},${backColor},0,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,10,10,10,1
+Style: Default,${fontName},${fontSize},${primaryColor},&HFFFFFFFF,${outlineColor},${backColor},0,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,10,10,10,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
