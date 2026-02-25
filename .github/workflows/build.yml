@@ -31,18 +31,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # Use a versioned cache key so a Node upgrade doesn't serve stale node_modules
           cache: 'npm'
 
-      # Cache the Electron binary so it isn't re-downloaded on every run.
-      # ELECTRON_CACHE points to the same path we tell npm ci to use.
+      # Cache the Electron binary so subsequent runs skip the network download entirely.
       - name: Cache Electron binary
         uses: actions/cache@v4
         with:
           path: ~/.electron-cache
           key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      # Retry up to 3 times to handle transient "socket hang up" failures
+      # that occur when the Electron binary download drops the connection.
       - name: Install dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && break
+            echo "Attempt $attempt failed — retrying in 20s…"
+            sleep 20
+          done
         env:
           ELECTRON_CACHE: ~/.electron-cache
 
@@ -53,5 +61,4 @@ jobs:
           npx electron-builder ${{ matrix.platform }} --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip macOS code signing — no certificate in CI
           CSC_IDENTITY_AUTO_DISCOVERY: false
