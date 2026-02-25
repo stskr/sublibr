@@ -152,7 +152,7 @@ export function FileUpload({
                             </div>
                             <div className="upload-note">
                                 <span className="icon icon-sm">redeem</span>
-                                <span>Google AI Studio offers a free tier with no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
+                                <span>Google AI Studio offers a free tier — no payment required. Flash handles ~20+ hrs of video/day; Pro handles ~1 hr/day. Enable <strong>Free Tier</strong> in Settings for safe rate limiting. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
                             </div>
                             <div className="upload-note disclaimer-note">
                                 <span className="icon icon-sm">gavel</span>

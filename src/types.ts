@@ -56,6 +56,7 @@ export interface ProviderConfig {
     enabled: boolean;
     apiKey: string;
     model: string;
+    freeTier?: boolean;
 }
 
 // Screen constraint options for generating subtitles

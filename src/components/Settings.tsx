@@ -239,6 +239,36 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                                 </a>
                                             </p>
                                         </div>
+
+                                        {provider === 'gemini' && (
+                                            <div className="setting-group">
+                                                <div className="provider-header">
+                                                    <div>
+                                                        <label htmlFor={`freeTier-${provider}`} style={{ marginBottom: '2px' }}>
+                                                            Free Tier
+                                                        </label>
+                                                        <p className="setting-hint" style={{ margin: 0 }}>
+                                                            {config.freeTier
+                                                                ? config.model.includes('pro')
+                                                                    ? 'Sequential mode — ~1 hr/day (Pro: 100 req/day)'
+                                                                    : 'Sequential mode — ~20+ hrs/day (Flash: 1,500 req/day)'
+                                                                : 'Enable if using a Google AI Studio free-tier key'
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <label className="provider-toggle-switch">
+                                                        <input
+                                                            id={`freeTier-${provider}`}
+                                                            type="checkbox"
+                                                            checked={config.freeTier ?? false}
+                                                            onChange={(e) => updateProvider(provider, { freeTier: e.target.checked })}
+                                                            aria-label="Enable free tier mode"
+                                                        />
+                                                        <span className="toggle-slider" />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

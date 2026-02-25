@@ -32,7 +32,7 @@ import logoWhite from './assets/Logo/logo-white.svg';
 const DEFAULT_SETTINGS: AppSettings = {
   activeProvider: 'gemini',
   providers: {
-    gemini: { enabled: true, apiKey: '', model: 'gemini-2.5-flash' },
+    gemini: { enabled: true, apiKey: '', model: 'gemini-2.5-flash', freeTier: false },
     openai: { enabled: false, apiKey: '', model: 'gpt-4o-mini' },
   },
   language: 'English',
@@ -68,6 +68,7 @@ function App() {
             providers: {
               ...DEFAULT_SETTINGS.providers,
               gemini: {
+                ...DEFAULT_SETTINGS.providers.gemini,
                 enabled: true,
                 apiKey: (saved.apiKey as string) || '',
                 model: (saved.model as string) || 'gemini-2.5-flash',
@@ -93,7 +94,15 @@ function App() {
               positionY: DEFAULT_SETTINGS.subtitleStyle.positionY,
             } : {}),
           };
-          const merged: AppSettings = { ...DEFAULT_SETTINGS, ...savedSettings, subtitleStyle: mergedSubtitleStyle };
+          // Deep-merge providers so new ProviderConfig fields (e.g. freeTier) get their
+          // defaults even when loading settings saved before those fields existed.
+          const mergedProviders = {
+            ...DEFAULT_SETTINGS.providers,
+            ...savedSettings.providers,
+            gemini: { ...DEFAULT_SETTINGS.providers.gemini, ...savedSettings.providers?.gemini },
+            openai: { ...DEFAULT_SETTINGS.providers.openai, ...savedSettings.providers?.openai },
+          };
+          const merged: AppSettings = { ...DEFAULT_SETTINGS, ...savedSettings, providers: mergedProviders, subtitleStyle: mergedSubtitleStyle };
           setSettings(merged);
           if (needsPositionMigration && window.electronAPI) {
             window.electronAPI.setStoreValue('settings', { ...merged, settingsVersion: 3 }).catch(() => {});

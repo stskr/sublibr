@@ -29,10 +29,6 @@ import { generateId, formatDisplayTime } from '../utils';
 
 const DONE_STATUS_DELAY_MS = 2000;
 
-// Number of chunks to process concurrently when sending to the AI API.
-// Higher = faster but more likely to hit rate limits.
-const TRANSCRIPTION_CONCURRENCY = 3;
-
 // Retry config: each chunk gets MAX_RETRIES attempts with exponential backoff.
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1500;
@@ -91,6 +87,13 @@ export function useTranscriptionPipeline({
     addToRecents,
     setShowGenerator
 }: UseTranscriptionPipelineProps) {
+    // Number of chunks to process concurrently. Free-tier Gemini keys are rate-limited
+    // by daily request quota, so we process sequentially (1 at a time) to avoid
+    // exhausting the limit and to match the slower cadence that the free tier expects.
+    const geminiCfg = settings.providers.gemini;
+    const transcriptionConcurrency =
+        settings.activeProvider === 'gemini' && geminiCfg.freeTier ? 1 : 3;
+
     const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
     const [showTranslator, setShowTranslator] = useState(false);
     const [translateTargetLang, setTranslateTargetLang] = useState('Spanish');
@@ -155,7 +158,7 @@ export function useTranscriptionPipeline({
         throw lastErr;
     }
 
-    // Process chunks in parallel up to TRANSCRIPTION_CONCURRENCY at a time.
+    // Process chunks in parallel up to transcriptionConcurrency at a time.
     // Respects stop/pause flags — workers stop picking up new chunks when flagged.
     // Returns the processing outcome and the next unstarted chunk index (for resume).
     async function processParallel(
@@ -216,7 +219,7 @@ export function useTranscriptionPipeline({
             }
         };
 
-        const concurrency = Math.min(TRANSCRIPTION_CONCURRENCY, Math.max(1, chunks.length - startFrom));
+        const concurrency = Math.min(transcriptionConcurrency, Math.max(1, chunks.length - startFrom));
         await Promise.all(Array.from({ length: concurrency }, runWorker));
 
         return { outcome, nextIndex, error: fatalError };
@@ -416,7 +419,7 @@ export function useTranscriptionPipeline({
 
             setProcessing({ status: 'detecting-silences', progress: 15 });
             const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat, provider);
-            console.log(`[Transcription] ${chunks.length} chunks detected, concurrency=${TRANSCRIPTION_CONCURRENCY}`);
+            console.log(`[Transcription] ${chunks.length} chunks detected, concurrency=${transcriptionConcurrency}`);
 
             const effectiveScreenSize = settings.screenSize === 'original' && mediaFile.width && mediaFile.height
                 ? inferEffectiveScreenSize(mediaFile.width, mediaFile.height)
