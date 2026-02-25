@@ -33,6 +33,7 @@ export type ProcessingStatus =
     | 'detecting-silences'
     | 'splitting'
     | 'transcribing'
+    | 'paused'
     | 'merging'
     | 'healing'
     | 'rendering'

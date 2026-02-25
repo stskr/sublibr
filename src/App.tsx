@@ -207,6 +207,7 @@ function App() {
     versions,
     activeVersionId,
     setSubtitles,
+    resetSubtitles,
     addVersion,
     addToRecents,
     setShowGenerator
@@ -227,7 +228,13 @@ function App() {
     handleTranslate,
     handleLoadSubtitles,
     handleDownload,
-    handleRenderVideo
+    handleRenderVideo,
+    handlePause,
+    handleStop,
+    handleResume,
+    handleSkipHealing,
+    checkpointReady,
+    isPausing,
   } = pipeline;
 
   // Auto-select Subtitle Format + Render Resolution based on video aspect ratio when a file is loaded.
@@ -658,6 +665,12 @@ function App() {
                 providerLabel={PROVIDER_LABELS[settings.activeProvider]}
                 onRetry={handleGenerate}
                 onDismiss={() => setProcessing({ status: 'idle', progress: 0 })}
+                onPause={handlePause}
+                onResume={handleResume}
+                onStop={handleStop}
+                onSkipHealing={handleSkipHealing}
+                canResume={checkpointReady}
+                isPausing={isPausing}
               />
             </div>
 

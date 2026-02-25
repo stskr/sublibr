@@ -1476,6 +1476,34 @@ a:hover {
   transition: width var(--transition-normal);
 }
 
+@keyframes progress-indeterminate {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+.progress-bar-fill.indeterminate {
+  width: 100% !important;
+  background: linear-gradient(
+    90deg,
+    var(--color-accent-dim) 0%,
+    var(--color-accent) 30%,
+    var(--color-accent-hover) 50%,
+    var(--color-accent) 70%,
+    var(--color-accent-dim) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-indeterminate 1.8s ease-in-out infinite;
+  transition: none;
+}
+
+.progress-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 .progress-footer {
   display: flex;
   justify-content: space-between;

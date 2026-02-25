@@ -495,8 +495,16 @@ ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPa
     ffmpeg(safeInput)
       .audioCodec(codec)
       .toFormat(format)
+      .on('progress', (progress) => {
+        mainWindow?.webContents.send('ffmpeg:extractAudioProgress', {
+          percent: Math.min(99, Math.round(progress.percent || 0)),
+        });
+      })
       .on('end', () => resolve(safeOutput))
-      .on('error', (err) => reject(err.message))
+      .on('error', (err) => {
+        console.error('[FFmpeg] Audio extraction error:', err.message);
+        reject(new Error(`Audio extraction failed: ${err.message}`));
+      })
       .save(safeOutput);
   });
 });
@@ -563,7 +571,10 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
         }
       })
       .on('end', () => resolve(silences))
-      .on('error', (err) => reject(err.message))
+      .on('error', (err) => {
+        console.error('[FFmpeg] Silence detection error:', err.message);
+        reject(new Error(`Silence detection failed: ${err.message}`));
+      })
       .output(process.platform === 'win32' ? 'NUL' : '/dev/null')
       .run();
   });
@@ -587,7 +598,10 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
           results.push(safeOutput);
           resolve();
         })
-        .on('error', (err) => reject(err.message))
+        .on('error', (err) => {
+          console.error(`[FFmpeg] Split audio chunk error:`, err.message);
+          reject(new Error(`Audio split failed: ${err.message}`));
+        })
         .save(safeOutput);
     });
   }

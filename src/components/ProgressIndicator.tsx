@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ProcessingState } from '../types';
 
 interface ProgressIndicatorProps {
@@ -5,6 +6,14 @@ interface ProgressIndicatorProps {
     providerLabel?: string;
     onRetry?: () => void;
     onDismiss?: () => void;
+    onPause?: () => void;
+    onResume?: () => void;
+    onStop?: () => void;
+    onSkipHealing?: () => void;
+    /** True once the checkpoint is ready and resume is safe to call */
+    canResume?: boolean;
+    /** True while a pause request is pending but in-flight API calls haven't finished yet */
+    isPausing?: boolean;
 }
 
 const STATUS_ICONS: Record<string, string> = {
@@ -13,6 +22,7 @@ const STATUS_ICONS: Record<string, string> = {
     'detecting-silences': 'graphic_eq',
     'splitting': 'content_cut',
     'transcribing': 'translate',
+    'paused': 'pause_circle',
     'merging': 'merge',
     'healing': 'healing',
     'rendering': 'movie',
@@ -26,6 +36,7 @@ const STATUS_MESSAGES: Record<string, string> = {
     'detecting-silences': 'Detecting silences...',
     'splitting': 'Splitting audio into chunks...',
     'transcribing': 'Transcribing...',
+    'paused': 'Paused',
     'merging': 'Merging subtitles...',
     'healing': 'Healing gaps...',
     'rendering': 'Burning subtitles into video...',
@@ -33,8 +44,14 @@ const STATUS_MESSAGES: Record<string, string> = {
     'error': 'Error occurred',
 };
 
-export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: ProgressIndicatorProps) {
+// Stages where real progress cannot be measured — show indeterminate animation instead.
+const INDETERMINATE_STATUSES = new Set(['detecting-silences', 'splitting', 'merging']);
+
+export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss, onPause, onResume, onStop, onSkipHealing, canResume, isPausing }: ProgressIndicatorProps) {
     const { status, progress, currentChunk, totalChunks, error, warning } = state;
+
+    // Local two-step confirmation state for Stop
+    const [confirmingStop, setConfirmingStop] = useState(false);
 
     if (status === 'idle' || (status === 'done' && !warning)) {
         return null;
@@ -55,10 +72,31 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: 
 
     const message = status === 'transcribing' && providerLabel
         ? `Transcribing with ${providerLabel}...`
-        : STATUS_MESSAGES[status];
+        : STATUS_MESSAGES[status] ?? status;
+
+    const showPause = status === 'transcribing' && onPause && !isPausing;
+    const showPausingIndicator = status === 'transcribing' && isPausing;
+    const showResume = status === 'paused' && onResume;
+    const resumeReady = canResume !== false;
+    const showStop = (status === 'transcribing' || status === 'paused' || status === 'extracting') && onStop;
+    const showSkipHealing = status === 'healing' && onSkipHealing;
+
+    const isIndeterminate = INDETERMINATE_STATUSES.has(status);
+
+    const handleStopClick = () => {
+        if (confirmingStop) {
+            setConfirmingStop(false);
+            onStop?.();
+        } else {
+            setConfirmingStop(true);
+        }
+    };
+
+    const hasControls = showPause || showPausingIndicator || showResume || showStop || showSkipHealing;
 
     return (
         <div className={`progress-indicator ${status === 'error' ? 'error' : ''}`} aria-live="polite">
+            {/* Status row */}
             <div className="progress-header">
                 <span className="progress-status" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="icon icon-sm">
@@ -66,30 +104,134 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss }: 
                     </span>
                     {message}
                 </span>
-
             </div>
 
+            {/* Progress bar */}
             <div
                 className="progress-bar-container"
                 role="progressbar"
-                aria-valuenow={Math.round(progress)}
+                aria-valuenow={isIndeterminate ? undefined : Math.round(progress)}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-label="Processing progress"
             >
                 <div
-                    className="progress-bar-fill"
-                    style={{ width: `${progress}%` }}
+                    className={`progress-bar-fill${isIndeterminate ? ' indeterminate' : ''}`}
+                    style={{
+                        width: isIndeterminate ? '100%' : `${progress}%`,
+                        ...(status === 'paused' ? { opacity: 0.6 } : {}),
+                    }}
                 />
             </div>
 
+            {/* Controls row — below the bar */}
+            {hasControls && (
+                <div className="progress-controls">
+                    {/* Skip healing */}
+                    {showSkipHealing && (
+                        <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={onSkipHealing}
+                            aria-label="Skip healing and finish"
+                            title="Skip healing gaps and finish with current subtitles"
+                        >
+                            <span className="icon icon-sm">skip_next</span>
+                            Skip healing
+                        </button>
+                    )}
+
+                    {/* Pause / Pausing... */}
+                    {showPause && (
+                        <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={onPause}
+                            aria-label="Pause transcription"
+                            title="Pause — you can resume later"
+                        >
+                            <span className="icon icon-sm">pause</span>
+                            Pause
+                        </button>
+                    )}
+                    {showPausingIndicator && (
+                        <button
+                            className="btn btn-sm btn-ghost"
+                            disabled
+                            aria-label="Pausing transcription"
+                            title="Waiting for current chunk to finish before pausing"
+                            style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                        >
+                            <span className="icon icon-sm">hourglass_empty</span>
+                            Pausing…
+                        </button>
+                    )}
+
+                    {/* Resume */}
+                    {showResume && (
+                        <button
+                            className="btn btn-sm btn-accent"
+                            onClick={onResume}
+                            disabled={!resumeReady}
+                            aria-label="Resume transcription"
+                            title={resumeReady ? 'Continue from where you left off' : 'Saving checkpoint, please wait…'}
+                            style={!resumeReady ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                        >
+                            <span className="icon icon-sm">{resumeReady ? 'play_arrow' : 'hourglass_empty'}</span>
+                            {resumeReady ? 'Resume' : 'Saving…'}
+                        </button>
+                    )}
+
+                    {/* Stop — two-step confirmation */}
+                    {showStop && (
+                        confirmingStop ? (
+                            <>
+                                <button
+                                    className="btn btn-sm btn-ghost"
+                                    onClick={handleStopClick}
+                                    aria-label="Confirm stop processing"
+                                    style={{ color: 'var(--color-error, #f87171)' }}
+                                >
+                                    <span className="icon icon-sm">stop</span>
+                                    Confirm stop
+                                </button>
+                                <button
+                                    className="btn btn-sm btn-ghost"
+                                    onClick={() => setConfirmingStop(false)}
+                                    aria-label="Keep going"
+                                >
+                                    Keep going
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                className="btn btn-sm btn-ghost"
+                                onClick={handleStopClick}
+                                aria-label="Stop processing"
+                                title="Stop and discard progress"
+                                style={{ color: 'var(--color-error, #f87171)' }}
+                            >
+                                <span className="icon icon-sm">stop</span>
+                                Stop
+                            </button>
+                        )
+                    )}
+                </div>
+            )}
+
+            {/* Footer: chunk info + percent */}
             <div className="progress-footer">
-                {status === 'transcribing' && totalChunks ? (
+                {(status === 'transcribing' || status === 'paused') && totalChunks ? (
                     <span className="progress-chunks">
-                        Chunk {currentChunk} of {totalChunks}
+                        {status === 'paused' ? 'Paused — ' : ''}Chunk {currentChunk} of {totalChunks}
+                        {status === 'paused' && (resumeReady ? ' — click Resume to continue' : ' — saving checkpoint…')}
                     </span>
-                ) : <div></div>}
-                <div className="progress-percent">{Math.round(progress)}%</div>
+                ) : status === 'healing' && totalChunks ? (
+                    <span className="progress-chunks">
+                        Gap {currentChunk} of {totalChunks}
+                    </span>
+                ) : <div />}
+                {!isIndeterminate && (
+                    <div className="progress-percent">{Math.round(progress)}%</div>
+                )}
             </div>
 
             {error && (

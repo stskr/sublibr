@@ -26,7 +26,11 @@ export async function healSubtitles(
     model: string,
     language: string,
     autoDetect: boolean,
-    screenSize: ScreenSize = 'wide'
+    screenSize: ScreenSize = 'wide',
+    /** Return true to abort healing early and return what we have so far */
+    shouldSkip?: () => boolean,
+    /** Called with (completedGaps, totalGaps) after each gap is processed */
+    onProgress?: (completed: number, total: number) => void,
 ): Promise<HealResult> {
     if (subtitles.length === 0) return { subtitles, tokenUsages: [] };
 
@@ -82,8 +86,15 @@ export async function healSubtitles(
     // 3. Heal gaps
     const newSubtitles: Subtitle[] = [];
     const tokenUsages: TokenUsage[] = [];
+    const totalGaps = actionableGaps.length;
 
     for (let i = 0; i < actionableGaps.length; i++) {
+        // Check for skip signal before starting each gap
+        if (shouldSkip?.()) {
+            console.log(`[Healing] Skipped after ${i}/${totalGaps} gaps`);
+            break;
+        }
+
         const gap = actionableGaps[i];
 
         // Create a temporary "chunk" for this gap
@@ -143,6 +154,8 @@ export async function healSubtitles(
         } catch (err) {
             console.error(`Failed to heal gap at ${gap.start}:`, err);
         }
+
+        onProgress?.(i + 1, totalGaps);
     }
 
     // 4. Merge new subtitles with existing ones

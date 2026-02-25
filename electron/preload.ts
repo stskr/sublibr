@@ -44,6 +44,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('ffmpeg:burnSubtitlesProgress', listener);
         return () => { ipcRenderer.removeListener('ffmpeg:burnSubtitlesProgress', listener); };
     },
+    onExtractAudioProgress: (callback: (progress: { percent: number }) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, progress: { percent: number }) => callback(progress);
+        ipcRenderer.on('ffmpeg:extractAudioProgress', listener);
+        return () => { ipcRenderer.removeListener('ffmpeg:extractAudioProgress', listener); };
+    },
 
     // App updates
     getVersion: () => ipcRenderer.invoke('app:getVersion'),

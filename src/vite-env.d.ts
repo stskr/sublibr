@@ -48,6 +48,7 @@ export interface ElectronAPI {
     getVideoInfo: (filePath: string) => Promise<{ duration: number; width: number | null; height: number | null }>;
     burnSubtitles: (inputPath: string, subtitleContent: string, outputPath: string, targetWidth: number | null, targetHeight: number | null, subtitleFormat?: 'srt' | 'ass') => Promise<string>;
     onBurnSubtitlesProgress: (callback: (progress: { percent: number }) => void) => () => void;
+    onExtractAudioProgress: (callback: (progress: { percent: number }) => void) => () => void;
     // App updates
     getVersion: () => Promise<string>;
     checkForUpdates: () => Promise<{ updateAvailable: boolean }>;
