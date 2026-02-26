@@ -16,6 +16,7 @@ A modern, AI-powered desktop application that generates high-quality subtitles f
 ## ✨ Features
 
 - **🎙️ AI Transcription**: Multi-provider support — Google Gemini and OpenAI — with per-provider API key validation and a unified "Active Model" selector.
+- **🆓 Google Free Tier Support**: Enable **Free Tier** in Settings when using a Google AI Studio free key. Switches to sequential processing to stay within daily request limits — Flash handles ~20+ hrs of video/day, Pro ~1 hr/day. No payment required to get started.
 - **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
 - **🔄 Versions & Regenerate**: Create multiple subtitle versions with different settings and switch between them instantly.
 - **🌐 Translate**: Translate generated subtitles to another language via a text-to-text AI model while perfectly preserving timestamps.
@@ -78,7 +79,7 @@ npm run build && npx electron-builder --linux
 
 ## 🛠️ How to Use
 
-1. **Set API Key**: Click **Settings** (gear icon), toggle the providers you want, paste an API key for each, and click **Test** to verify. Select your active model from the hero dropdown.
+1. **Set API Key**: Click **Settings** (gear icon), toggle the providers you want, paste an API key for each, and click **Test** to verify. Select your active model from the hero dropdown. If using a Google AI Studio free-tier key, also enable the **Free Tier** toggle under Gemini.
 2. **Import Media**: Drag & drop a file, or click to browse. Supports audio (mp3, wav, flac, etc.) and video (mp4, mkv, mov, etc.).
 3. **Generate**: Select your language (or leave as Auto-detect), choose your **Screen Format** (Wide, Square, Vertical), and click **Generate Subtitles**.
 4. **Style**: Click **Global Style** to customize font, font size, colors, outline/shadow effects, background box, and subtitle position. Use **Reset** to restore per-format defaults.
@@ -88,6 +89,7 @@ npm run build && npx electron-builder --linux
 ## ⚙️ Configuration
 
 - **Model Selection**: Choose from models across all enabled providers (e.g. Gemini 2.5 Flash, GPT-4o, Whisper-1).
+- **Free Tier (Gemini)**: Toggle in Gemini settings when using a Google AI Studio free key. Enables sequential processing (1 chunk at a time) to respect daily quotas — Flash: ~20+ hrs/day, Pro: ~1 hr/day.
 - **Screen Format**: Wide (16:9), Square (1:1), Vertical (9:16), or Original — controls line length, font size defaults, and render resolution.
 - **Subtitle Style**: Fully configurable per-project in the Global Style panel.
 - **Theme**: The app defaults to a modern dark theme optimized for video editing.
