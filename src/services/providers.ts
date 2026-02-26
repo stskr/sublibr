@@ -24,28 +24,6 @@ export const PROVIDER_KEY_URLS: Record<AIProvider, { label: string; url: string 
     openai: { label: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys' },
 };
 
-// --- Pricing (USD per 1M tokens) ---
-
-export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-    // Gemini
-    'gemini-2.5-flash': { input: 0.15, output: 0.60 },
-    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
-    // OpenAI
-    'whisper-1': { input: 0, output: 0 },
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    'gpt-4o': { input: 2.50, output: 10.00 },
-};
-
-export function calculateCost(tokenUsages: TokenUsage[]): number {
-    return tokenUsages.reduce((total, usage) => {
-        const pricing = MODEL_PRICING[usage.model];
-        if (!pricing) return total;
-        const inputCost = (usage.inputTokens / 1_000_000) * pricing.input;
-        const outputCost = (usage.outputTokens / 1_000_000) * pricing.output;
-        return total + inputCost + outputCost;
-    }, 0);
-}
-
 // --- API Key Testing (proxied via main process) ---
 
 export async function testApiKey(

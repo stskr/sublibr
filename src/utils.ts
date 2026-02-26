@@ -74,27 +74,6 @@ export function isSupportedFile(ext: string): boolean {
     return isVideoFile(ext) || isAudioFile(ext);
 }
 
-// Estimate API cost based on audio duration
-// Uses canonical pricing from providers.ts via dynamic import to avoid duplication
-export function estimateCost(durationSeconds: number, model: string): { chunks: number; estimatedTokens: number; estimatedCostUSD: number } {
-    // Estimate ~80 tokens per second of audio transcription output
-    // Plus ~100 tokens for prompt per chunk
-    const chunkDuration = 75; // average chunk size in seconds
-    const chunks = Math.ceil(durationSeconds / chunkDuration);
-    const tokensPerChunk = 80 * chunkDuration + 100; // output + prompt
-    const estimatedTokens = chunks * tokensPerChunk;
-
-    // Inline fallback pricing (output rate per 1M tokens) — kept minimal;
-    // canonical source of truth is MODEL_PRICING in providers.ts
-    const outputRates: Record<string, number> = {
-        'gemini-2.5-flash': 0.60, 'gemini-2.5-pro': 10.00,
-        'gpt-4o-mini': 0.60, 'gpt-4o': 10.00,
-    };
-    const ratePerMillion = outputRates[model] ?? 0.60;
-    const estimatedCostUSD = (estimatedTokens / 1_000_000) * ratePerMillion;
-
-    return { chunks, estimatedTokens, estimatedCostUSD };
-}
 
 // Languages list for autocomplete
 export const LANGUAGES = [
