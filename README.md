@@ -4,6 +4,8 @@
 
 A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini and OpenAI.
 
+תוכנה מודרנית מבוססת AI לתמלול אוטומטי של קטעי וידאו או אודיו. נא לשים לב שאיכות התמלול בעברית עולה משמעותית בשימוש במודל של Gemini Pro. 
+
 ## 📸 Screenshots
 
 | | |
