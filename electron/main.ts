@@ -8,8 +8,27 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
-import { WHISPER_PUNCTUATION_PROMPT } from '../src/prompts/whisper';
 import { createRequire } from 'module';
+import { callGeminiAudio, callGeminiText, callOpenAiAudio, callOpenAiText } from './ai';
+import { probeLocalWhisper, transcribeLocal } from './localWhisper';
+import { callLocalText, probeLocalLlm, setLlmIdleMinutes, stopLocalLlm } from './localLlm';
+import { killAllChildren, killFfmpegJobs, trackFfmpeg } from './childProcesses';
+import {
+  assembleLibraryMap,
+  defaultProjectsFolder,
+  getProjectsFolder,
+  getWorkDir,
+  isLibraryKey,
+  loadProject,
+  migrateLibraryIntoProjects,
+  migrateLibraryTo,
+  peekProjectsFolder,
+  readLibraryJson,
+  saveProject,
+  setProjectsFolderPath,
+  writeLibraryJson,
+  writeLibraryMap,
+} from './projects';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 
@@ -55,8 +74,9 @@ function validatePath(filePath: string, ...allowedDirs: string[]): string {
 // Directories that IPC handlers are allowed to access
 function getAllowedDirs(): string[] {
   return [
-    app.getPath('temp'),
+    peekProjectsFolder(),
     app.getPath('userData'),
+    app.getPath('temp'),
   ];
 }
 
@@ -146,10 +166,12 @@ function getMimeType(ext: string): string {
 }
 
 // Media Server Logic
+let mediaServer: http.Server | null = null;
 let mediaServerPort = 0;
 
 function startMediaServer() {
-  const server = http.createServer(async (req, res) => {
+  if (mediaServer) return;
+  mediaServer = http.createServer(async (req, res) => {
     try {
       // CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -217,8 +239,8 @@ function startMediaServer() {
     }
   });
 
-  server.listen(0, '127.0.0.1', () => {
-    const address = server.address();
+  mediaServer.listen(0, '127.0.0.1', () => {
+    const address = mediaServer?.address();
     if (address && typeof address !== 'string') {
       mediaServerPort = address.port;
       console.log(`Media server listening on port ${mediaServerPort}`);
@@ -226,10 +248,79 @@ function startMediaServer() {
   });
 }
 
+function stopMediaServer() {
+  if (!mediaServer) return;
+  mediaServer.close();
+  mediaServer = null;
+  mediaServerPort = 0;
+}
+
+function applyIdleMinutesFromSettings(value: unknown): void {
+  if (!value || typeof value !== 'object') return;
+  const minutes = (value as { unloadAfterMinutes?: unknown }).unloadAfterMinutes;
+  if (typeof minutes === 'number') setLlmIdleMinutes(minutes);
+}
+
+function applyProjectsFolderFromSettings(value: unknown): void {
+  if (!value || typeof value !== 'object') return;
+  const folder = (value as { projectsFolder?: unknown }).projectsFolder;
+  if (typeof folder === 'string' && folder.trim()) {
+    setProjectsFolderPath(folder);
+  }
+}
+
+function migrateLegacyLibraryFromStore(): void {
+  for (const key of ['subtitle-cache', 'subtitle-versions'] as const) {
+    if (!store.has(key)) continue;
+    const value = store.get(key);
+    if (value !== undefined && readLibraryJson(key) === undefined) {
+      writeLibraryJson(key, value);
+    }
+    store.delete(key);
+  }
+  migrateLibraryIntoProjects();
+}
+
+function persistProjectsFolder(folder: string): string {
+  const resolved = setProjectsFolderPath(folder);
+  const current = store.get('settings');
+  const decrypted = current && typeof current === 'object'
+    ? decryptApiKeys(current as Record<string, unknown>)
+    : {};
+  store.set('settings', encryptApiKeys({ ...decrypted, projectsFolder: resolved, projectsFolderSet: true }));
+  migrateLegacyLibraryFromStore();
+  return resolved;
+}
+
+async function pickProjectsFolderDialog(): Promise<string | null> {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Projects folder',
+    defaultPath: peekProjectsFolder(),
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return path.resolve(result.filePaths[0]);
+}
+
+function shutdownSublibrServices(): void {
+  stopLocalLlm();
+  killFfmpegJobs();
+  killAllChildren();
+  stopMediaServer();
+}
+
 
 app.whenReady().then(() => {
-  // Register media:// protocol for streaming files
+  const savedSettings = store.get('settings');
+  const savedFolder = savedSettings && typeof savedSettings === 'object'
+    ? (savedSettings as { projectsFolder?: unknown }).projectsFolder
+    : undefined;
+  if (typeof savedFolder === 'string' && savedFolder.trim()) {
+    setProjectsFolderPath(savedFolder);
+    migrateLegacyLibraryFromStore();
+  }
   startMediaServer();
+  applyIdleMinutesFromSettings(savedSettings);
 
   // Register media:// protocol for streaming files
   protocol.handle('media', (request) => {
@@ -254,31 +345,40 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  shutdownSublibrServices();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// Clean up temp audio files created during transcription
+const WORK_FILE_RE = /^(chunk_\d+\.(flac|mp3)|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.(flac|mp3)|sublibr_subs_burn\.(srt|ass)|sublibr-whisper-.*)$/;
+
+// Clean up working audio/json created during transcription
 function cleanupTempAudioFiles() {
-  try {
-    const tempDir = app.getPath('temp');
-    const entries = fs.readdirSync(tempDir);
-    for (const entry of entries) {
-      if (/^(chunk_\d+\.(flac|mp3)|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.(flac|mp3))$/.test(entry)) {
-        try { fs.unlinkSync(path.join(tempDir, entry)); } catch { /* best-effort */ }
+  const dirs = new Set([getWorkDir(), app.getPath('temp')]);
+  for (const dir of dirs) {
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        if (WORK_FILE_RE.test(entry)) {
+          try { fs.unlinkSync(path.join(dir, entry)); } catch { /* best-effort */ }
+        }
       }
+    } catch {
+      // Best-effort — don't throw
     }
-  } catch {
-    // Best-effort — don't throw
   }
 }
 
-app.on('before-quit', cleanupTempAudioFiles);
+app.on('before-quit', () => {
+  shutdownSublibrServices();
+  cleanupTempAudioFiles();
+});
 
 ipcMain.handle('file:cleanupTempAudio', () => cleanupTempAudioFiles());
 
 app.on('activate', () => {
+  startMediaServer();
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
@@ -376,6 +476,9 @@ ipcMain.handle('store:get', (_event, key: string) => {
   if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
     throw new Error(`Invalid store key: ${key}`);
   }
+  if (isLibraryKey(key)) {
+    return assembleLibraryMap(key);
+  }
   const value = store.get(key);
   if (key === 'settings' && value && typeof value === 'object') {
     return decryptApiKeys(value as Record<string, unknown>);
@@ -387,8 +490,14 @@ ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
   if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
     throw new Error(`Invalid store key: ${key}`);
   }
+  if (isLibraryKey(key)) {
+    writeLibraryMap(key, value);
+    return;
+  }
   if (key === 'settings' && value && typeof value === 'object') {
     store.set(key, encryptApiKeys(value as Record<string, unknown>));
+    applyIdleMinutesFromSettings(value);
+    applyProjectsFolderFromSettings(value);
   } else {
     store.set(key, value);
   }
@@ -397,6 +506,9 @@ ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
 ipcMain.handle('store:delete', (_event, key: string) => {
   if (typeof key !== 'string' || !ALLOWED_STORE_KEYS.includes(key)) {
     throw new Error(`Invalid store key: ${key}`);
+  }
+  if (isLibraryKey(key)) {
+    return;
   }
   store.delete(key);
 });
@@ -465,7 +577,59 @@ ipcMain.handle('file:getInfo', async (_event, filePath: string) => {
 });
 
 ipcMain.handle('file:getTempPath', () => {
-  return app.getPath('temp');
+  return getWorkDir();
+});
+
+ipcMain.handle('projects:getFolder', () => {
+  return getProjectsFolder();
+});
+
+ipcMain.handle('projects:getDefaultFolder', () => {
+  return defaultProjectsFolder();
+});
+
+ipcMain.handle('projects:pickFolder', async () => {
+  return pickProjectsFolderDialog();
+});
+
+ipcMain.handle('projects:confirmFolder', (_event, folder: unknown) => {
+  const chosen = typeof folder === 'string' && folder.trim()
+    ? folder
+    : defaultProjectsFolder();
+  return persistProjectsFolder(chosen);
+});
+
+ipcMain.handle('projects:chooseFolder', async () => {
+  const picked = await pickProjectsFolderDialog();
+  if (!picked) return null;
+  const folder = migrateLibraryTo(picked);
+  return persistProjectsFolder(folder);
+});
+
+ipcMain.handle('projects:load', (_event, sourcePath: unknown) => {
+  if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
+    throw new Error('Invalid source path');
+  }
+  return loadProject(sourcePath);
+});
+
+ipcMain.handle('projects:save', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid project payload');
+  }
+  const { sourcePath, name, subtitles, versions } = payload as {
+    sourcePath?: unknown;
+    name?: unknown;
+    subtitles?: unknown;
+    versions?: unknown;
+  };
+  if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
+    throw new Error('Invalid source path');
+  }
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('Invalid project name');
+  }
+  return saveProject(sourcePath, name, { subtitles, versions });
 });
 
 // Only allow registering paths to supported media files (for drag-and-drop)
@@ -492,9 +656,15 @@ ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPa
   const codec = format === 'mp3' ? 'libmp3lame' : 'flac';
 
   return new Promise((resolve, reject) => {
-    ffmpeg(safeInput)
+    let cmd = ffmpeg(safeInput)
       .audioCodec(codec)
-      .toFormat(format)
+      .toFormat(format);
+
+    if (format === 'mp3') {
+      cmd = cmd.audioBitrate('64k').audioChannels(1).audioFrequency(16000);
+    }
+
+    cmd
       .on('progress', (progress) => {
         mainWindow?.webContents.send('ffmpeg:extractAudioProgress', {
           percent: Math.min(99, Math.round(progress.percent || 0)),
@@ -506,6 +676,7 @@ ipcMain.handle('ffmpeg:extractAudio', async (_event, inputPath: string, outputPa
         reject(new Error(`Audio extraction failed: ${err.message}`));
       })
       .save(safeOutput);
+    trackFfmpeg(cmd);
   });
 });
 
@@ -553,7 +724,7 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
     const silences: { start: number; end: number }[] = [];
     let currentSilence: { start: number; end?: number } | null = null;
 
-    ffmpeg(safePath)
+    trackFfmpeg(ffmpeg(safePath)
       .audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`)
       .format('null')
       .on('stderr', (line: string) => {
@@ -576,7 +747,7 @@ ipcMain.handle('ffmpeg:detectSilences', async (_event, filePath: string, thresho
         reject(new Error(`Silence detection failed: ${err.message}`));
       })
       .output(process.platform === 'win32' ? 'NUL' : '/dev/null')
-      .run();
+      .run());
   });
 });
 
@@ -589,11 +760,12 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
   for (const chunk of chunks) {
     const safeOutput = validatePath(chunk.outputPath, ...getAllowedDirs());
     await new Promise<void>((resolve, reject) => {
-      ffmpeg(safeInput)
+      trackFfmpeg(ffmpeg(safeInput)
         .setStartTime(chunk.start)
         .setDuration(chunk.end - chunk.start)
         .audioCodec(codec)
         .toFormat(format)
+        .outputOptions(format === 'mp3' ? ['-b:a', '64k', '-ac', '1', '-ar', '16000'] : [])
         .on('end', () => {
           results.push(safeOutput);
           resolve();
@@ -602,7 +774,7 @@ ipcMain.handle('ffmpeg:splitAudio', async (_event, inputPath: string, chunks: { 
           console.error(`[FFmpeg] Split audio chunk error:`, err.message);
           reject(new Error(`Audio split failed: ${err.message}`));
         })
-        .save(safeOutput);
+        .save(safeOutput));
     });
   }
 
@@ -614,7 +786,7 @@ ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, subtitl
   const safeInput = validatePath(inputPath, ...getAllowedDirs());
   const safeOutput = validatePath(outputPath, ...getAllowedDirs());
 
-  const tempDir = app.getPath('temp');
+  const tempDir = getWorkDir();
   const tempSrtPath = path.join(tempDir, `sublibr_subs_burn.${subtitleFormat}`);
   await fs.promises.writeFile(tempSrtPath, subtitleContent, 'utf-8');
 
@@ -633,7 +805,7 @@ ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, subtitl
     : `subtitles='${escapedSrtPath}'`;
 
   return new Promise((resolve, reject) => {
-    ffmpeg(safeInput)
+    trackFfmpeg(ffmpeg(safeInput)
       .videoFilters(videoFilter)
       .outputOptions(['-c:a', 'copy'])
       .on('progress', (progress) => {
@@ -650,11 +822,9 @@ ipcMain.handle('ffmpeg:burnSubtitles', async (_event, inputPath: string, subtitl
         await fs.promises.unlink(tempSrtPath).catch(() => {});
         reject(err.message);
       })
-      .save(safeOutput);
+      .save(safeOutput));
   });
 });
-
-// ============== App Update IPC ==============
 
 ipcMain.handle('app:getVersion', () => {
   return app.getVersion();
@@ -682,7 +852,7 @@ ipcMain.handle('app:installUpdate', () => {
 // ============== AI API Proxy ==============
 // All AI calls go through the main process so API keys are never exposed in the renderer.
 
-type AIProvider = 'gemini' | 'anthropic' | 'openai';
+type AIProvider = 'gemini' | 'anthropic' | 'openai' | 'local';
 
 ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: string) => {
   try {
@@ -728,6 +898,19 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
         }
         return { ok: true };
       }
+      case 'local': {
+        const whisper = await probeLocalWhisper();
+        const llm = await probeLocalLlm();
+        if (!whisper.ok && !llm.ok) {
+          return { ok: false, error: whisper.error || llm.error };
+        }
+        return {
+          ok: true,
+          error: whisper.ok ? undefined : whisper.error,
+          llm: llm.ok,
+          llmError: llm.error,
+        };
+      }
     }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Network error' };
@@ -741,173 +924,19 @@ ipcMain.handle('ai:callProvider', async (
   model: string,
   prompt: string,
   audioBase64: string,
-  audioFormat: string = 'flac', // Default to flac
+  audioFormat: string = 'flac',
   language?: string | null,
   previousTranscript?: string,
 ) => {
   const mimeType = `audio/${audioFormat}`;
 
   switch (provider) {
-    case 'gemini': {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const geminiModel = genAI.getGenerativeModel({ model });
-
-      const result = await geminiModel.generateContent([
-        prompt,
-        {
-          inlineData: {
-            mimeType: mimeType,
-            data: audioBase64,
-          },
-        },
-      ]);
-
-      const response = await result.response;
-      const usage = response.usageMetadata;
-
-      return {
-        text: response.text(),
-        tokenUsage: {
-          inputTokens: usage?.promptTokenCount ?? 0,
-          outputTokens: usage?.candidatesTokenCount ?? 0,
-          provider: 'gemini',
-          model,
-          timestamp: Date.now(),
-        },
-      };
-    }
-
-
-
-    case 'openai': {
-      // Check if using a chat model (gpt-4o) or legacy whisper
-      const isChatModel = model.startsWith('gpt-4o');
-
-      if (isChatModel) {
-        // Chat Completions API with Audio Input
-        // Docs: https://platform.openai.com/docs/guides/audio?lang=node
-
-        let mappedModel = model;
-        // The standard gpt-4o and gpt-4o-mini models do not support audio input blocks.
-        // We must use the specific audio-preview models.
-        if (model === 'gpt-4o') {
-          mappedModel = 'gpt-4o-audio-preview';
-        } else if (model === 'gpt-4o-mini') {
-          mappedModel = 'gpt-4o-mini-audio-preview';
-        }
-
-        const formatOption = audioFormat === 'mp3' ? 'mp3' : 'wav';
-        const messages = [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              {
-                type: 'input_audio',
-                input_audio: {
-                  data: audioBase64,
-                  format: formatOption, // OpenAI supports wav, mp3. 
-                },
-              },
-            ],
-          },
-        ];
-
-        const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: mappedModel,
-            modalities: ['text'], // We only want text back
-            messages: messages,
-          }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
-          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
-        }
-
-        const data = await res.json() as {
-          choices: { message: { content: string } }[];
-          usage?: { prompt_tokens: number; completion_tokens: number };
-        };
-
-        const text = data.choices[0]?.message?.content || '';
-
-        return {
-          text,
-          tokenUsage: {
-            inputTokens: data.usage?.prompt_tokens || 0,
-            outputTokens: data.usage?.completion_tokens || 0,
-            provider: 'openai',
-            model,
-            timestamp: Date.now(),
-          },
-        };
-
-      } else {
-        // Legacy Whisper API (audio/transcriptions)
-        const buffer = Buffer.from(audioBase64, 'base64');
-        const blob = new Blob([buffer], { type: mimeType });
-
-        const formData = new FormData();
-        formData.append('file', blob, `audio.${audioFormat}`);
-        formData.append('model', 'whisper-1');
-        formData.append('response_format', 'verbose_json');
-        formData.append('timestamp_granularities[]', 'word');
-
-        if (language) {
-          formData.append('language', language);
-        }
-
-        // We can't pass the full complex prompt to Whisper in the same way, 
-        // but we can pass a "prompt" for context/style. 
-        // By passing properly punctuated sentences, we strongly coerce Whisper 
-        // to return punctuated sentences instead of long unpunctuated blocks.
-        let finalPrompt = WHISPER_PUNCTUATION_PROMPT;
-        if (previousTranscript) {
-          finalPrompt = `${previousTranscript}\n\n${finalPrompt}`;
-        }
-        formData.append('prompt', finalPrompt);
-
-        // However, since we need specific timestamp formatting, we'll parse the 'verbose_json' result
-        // and format it ourselves to match what the app expects ([MM:SS] Text).
-
-        const res = await net.fetch('https://api.openai.com/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
-          throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
-        }
-
-        const data = await res.json() as {
-          text: string;
-          words?: { start: number; end: number; word: string }[];
-        };
-
-        return {
-          text: JSON.stringify(data),
-          tokenUsage: {
-            inputTokens: 0,
-            outputTokens: 0,
-            provider: 'openai',
-            model: 'whisper-1',
-            timestamp: Date.now(),
-          },
-        };
-      }
-    }
+    case 'gemini':
+      return callGeminiAudio(apiKey, model, prompt, audioBase64, mimeType, language);
+    case 'openai':
+      return callOpenAiAudio(apiKey, model, prompt, audioBase64, audioFormat, mimeType, language, previousTranscript);
+    case 'local':
+      throw new Error('Local Whisper must be called with a file path, not a cloud audio payload.');
   }
 });
 
@@ -919,79 +948,17 @@ ipcMain.handle('ai:callTextProvider', async (
   prompt: string,
 ) => {
   switch (provider) {
-    case 'gemini': {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const geminiModel = genAI.getGenerativeModel({ model });
-
-      const result = await geminiModel.generateContent(prompt);
-      const response = await result.response;
-      const usage = response.usageMetadata;
-
-      return {
-        text: response.text(),
-        tokenUsage: {
-          inputTokens: usage?.promptTokenCount ?? 0,
-          outputTokens: usage?.candidatesTokenCount ?? 0,
-          provider: 'gemini',
-          model,
-          timestamp: Date.now(),
-        },
-      };
-    }
-
-    case 'openai': {
-      // For text-only parsing, we can just use the standard chat completions endpoint
-      // gpt-4o, gpt-4o-mini, etc.
-
-      let mappedModel = model;
-      // We don't need audio-preview models for text-to-text
-      if (model === 'gpt-4o-audio-preview') mappedModel = 'gpt-4o';
-      if (model === 'gpt-4o-mini-audio-preview') mappedModel = 'gpt-4o-mini';
-      // Whisper cannot do text translations, fall back to mini
-      if (model === 'whisper-1') mappedModel = 'gpt-4o-mini';
-
-      const messages = [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ];
-
-      const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: mappedModel,
-          messages: messages,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: res.statusText } })) as { error?: { message?: string } };
-        throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
-      }
-
-      const data = await res.json() as {
-        choices: { message: { content: string } }[];
-        usage?: { prompt_tokens: number; completion_tokens: number };
-      };
-
-      const text = data.choices[0]?.message?.content || '';
-
-      return {
-        text,
-        tokenUsage: {
-          inputTokens: data.usage?.prompt_tokens || 0,
-          outputTokens: data.usage?.completion_tokens || 0,
-          provider: 'openai',
-          model,
-          timestamp: Date.now(),
-        },
-      };
-    }
+    case 'gemini':
+      return callGeminiText(apiKey, model, prompt);
+    case 'openai':
+      return callOpenAiText(apiKey, model, prompt);
+    case 'local':
+      return callLocalText(model, prompt);
   }
 });
+
+ipcMain.handle('ai:callLocalTranscribe', async (_event, filePath: string, language?: string | null, model?: string) => {
+  const safePath = validatePath(filePath, ...getAllowedDirs());
+  return transcribeLocal(safePath, language, model);
+});
+

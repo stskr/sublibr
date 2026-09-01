@@ -24,6 +24,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTempPath: () => ipcRenderer.invoke('file:getTempPath'),
     registerPath: (path: string) => ipcRenderer.invoke('file:registerPath', path),
     cleanupTempAudio: () => ipcRenderer.invoke('file:cleanupTempAudio'),
+    getProjectsFolder: () => ipcRenderer.invoke('projects:getFolder'),
+    getDefaultProjectsFolder: () => ipcRenderer.invoke('projects:getDefaultFolder'),
+    pickProjectsFolder: () => ipcRenderer.invoke('projects:pickFolder'),
+    confirmProjectsFolder: (folder: string) => ipcRenderer.invoke('projects:confirmFolder', folder),
+    chooseProjectsFolder: () => ipcRenderer.invoke('projects:chooseFolder'),
+    loadProject: (sourcePath: string) => ipcRenderer.invoke('projects:load', sourcePath),
+    saveProject: (payload: { sourcePath: string; name: string; subtitles?: unknown; versions?: unknown }) =>
+        ipcRenderer.invoke('projects:save', payload),
 
     // AI API proxy (calls go through main process — keys never exposed in renderer)
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
@@ -31,6 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript),
     callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) =>
         ipcRenderer.invoke('ai:callTextProvider', provider, apiKey, model, prompt),
+    callLocalTranscribe: (filePath: string, language?: string | null, model?: string) =>
+        ipcRenderer.invoke('ai:callLocalTranscribe', filePath, language, model),
 
     // FFmpeg operations
     extractAudio: (inputPath: string, outputPath: string, format?: string) => ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath, format),

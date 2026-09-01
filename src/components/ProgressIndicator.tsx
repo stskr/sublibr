@@ -10,6 +10,7 @@ interface ProgressIndicatorProps {
     onResume?: () => void;
     onStop?: () => void;
     onSkipHealing?: () => void;
+    isLocal?: boolean;
     /** True once the checkpoint is ready and resume is safe to call */
     canResume?: boolean;
     /** True while a pause request is pending but in-flight API calls haven't finished yet */
@@ -47,7 +48,7 @@ const STATUS_MESSAGES: Record<string, string> = {
 // Stages where real progress cannot be measured — show indeterminate animation instead.
 const INDETERMINATE_STATUSES = new Set(['detecting-silences', 'splitting', 'merging']);
 
-export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss, onPause, onResume, onStop, onSkipHealing, canResume, isPausing }: ProgressIndicatorProps) {
+export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDismiss, onPause, onResume, onStop, onSkipHealing, canResume, isPausing }: ProgressIndicatorProps) {
     const { status, progress, currentChunk, totalChunks, error, warning } = state;
 
     // Local two-step confirmation state for Stop
@@ -70,8 +71,10 @@ export function ProgressIndicator({ state, providerLabel, onRetry, onDismiss, on
         );
     }
 
-    const message = status === 'transcribing' && providerLabel
-        ? `Transcribing with ${providerLabel}...`
+    const message = status === 'transcribing'
+        ? (isLocal
+            ? 'Transcribing locally on this computer — audio stays here'
+            : (providerLabel ? `Transcribing in the cloud with ${providerLabel} — audio is uploaded` : 'Transcribing in the cloud...'))
         : STATUS_MESSAGES[status] ?? status;
 
     const showPause = status === 'transcribing' && onPause && !isPausing;

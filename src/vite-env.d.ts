@@ -18,15 +18,22 @@ export interface ElectronAPI {
     getTempPath: () => Promise<string>;
     registerPath: (path: string) => Promise<void>;
     cleanupTempAudio: () => Promise<void>;
+    getProjectsFolder: () => Promise<string>;
+    getDefaultProjectsFolder: () => Promise<string>;
+    pickProjectsFolder: () => Promise<string | null>;
+    confirmProjectsFolder: (folder: string) => Promise<string>;
+    chooseProjectsFolder: () => Promise<string | null>;
+    loadProject: (sourcePath: string) => Promise<{ dir: string; subtitles: unknown; versions: unknown } | null>;
+    saveProject: (payload: { sourcePath: string; name: string; subtitles?: unknown; versions?: unknown }) => Promise<string>;
 
     // AI API proxy
-    testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>;
+    testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string; llm?: boolean; llmError?: string }>;
     callProvider: (provider: string, apiKey: string, model: string, prompt: string, audioBase64: string, audioFormat?: string, language?: string | null, previousTranscript?: string) => Promise<{
         text: string;
         tokenUsage: {
             inputTokens: number;
             outputTokens: number;
-            provider: 'gemini' | 'openai';
+            provider: 'gemini' | 'openai' | 'local';
             model: string;
             timestamp: number;
         };
@@ -36,7 +43,17 @@ export interface ElectronAPI {
         tokenUsage: {
             inputTokens: number;
             outputTokens: number;
-            provider: 'gemini' | 'openai';
+            provider: 'gemini' | 'openai' | 'local';
+            model: string;
+            timestamp: number;
+        };
+    }>;
+    callLocalTranscribe: (filePath: string, language?: string | null, model?: string) => Promise<{
+        text: string;
+        tokenUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            provider: 'gemini' | 'openai' | 'local';
             model: string;
             timestamp: number;
         };

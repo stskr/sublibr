@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { RecentFiles } from './RecentFiles';
 import type { MediaFile, AppSettings, RecentFile } from '../types';
+import { isTranscriptionReady } from '../services/providers';
 
 interface FileUploadProps {
     settings: AppSettings;
@@ -49,7 +50,7 @@ export function FileUpload({
         // Check API key availability
         const activeProvider = settings.activeProvider;
         const config = settings.providers[activeProvider];
-        const hasKey = config?.apiKey && config.apiKey.trim().length > 0;
+        const hasKey = isTranscriptionReady(activeProvider, config);
 
         if (!hasKey) return;
 
@@ -99,7 +100,7 @@ export function FileUpload({
     };
 
     const activeConfig = settings.providers[settings.activeProvider];
-    const hasApiKey = activeConfig.apiKey && activeConfig.apiKey.trim().length > 0;
+    const hasApiKey = isTranscriptionReady(settings.activeProvider, activeConfig);
 
     return (
         <div className="file-upload-container">
@@ -107,7 +108,7 @@ export function FileUpload({
             {!hasApiKey && (
                 <div className="api-key-warning" role="alert">
                     <span className="icon icon-sm warning-icon">warning</span>
-                    <span>Please add your API key in Settings before uploading files</span>
+                    <span>Please choose a transcription model in Settings before uploading files</span>
                 </div>
             )}
 
@@ -148,16 +149,18 @@ export function FileUpload({
                             </div>
                             <div className="upload-note">
                                 <span className="icon icon-sm">auto_awesome</span>
-                                <span>Best quality: Gemini 2.5 Pro or Claude Sonnet. Lower cost: Gemini 2.5 Flash or GPT-4o Mini.</span>
+                                <span>Offline: Whisper Large v3 Turbo (Hebrew weights when Hebrew is selected). Online: Gemini 3.5 Transcribe / OpenAI Whisper. All return word timestamps.</span>
                             </div>
                             <div className="upload-note">
                                 <span className="icon icon-sm">redeem</span>
-                                <span>Google AI Studio offers a free tier — no payment required. Flash handles ~20+ hrs of video/day; Pro handles ~1 hr/day. Enable <strong>Free Tier</strong> in Settings for safe rate limiting. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
+                                <span>Google AI Studio offers a free API key — no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
                             </div>
                             <div className="upload-note disclaimer-note">
                                 <span className="icon icon-sm">gavel</span>
                                 <span>
-                                    By using this service, you acknowledge that AI-generated results may vary in accuracy. Data is processed via your selected provider (OpenAI or Google Gemini).
+                                    By using this service, you acknowledge that AI-generated results may vary in accuracy.
+                                    Cloud models send audio to your selected provider (OpenAI or Google Gemini).
+                                    Offline Whisper models transcribe on this computer and do not upload audio.
                                     We value your privacy: no tracking is used, and data collection is limited to optional usability surveys or marketing updates you explicitly approve.
                                     This software is provided "as is"—the developer assumes no liability for outcomes, and use is at the user's sole responsibility.
                                 </span>

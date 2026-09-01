@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface SelectOption {
     value: string;
     label: string;
     disabled?: boolean;
+    group?: string;
 }
 
 interface CustomSelectProps {
@@ -78,25 +79,32 @@ export function CustomSelect({ options, value, onChange, disabled, className, st
 
     const dropdown = open && createPortal(
         <ul ref={dropdownRef} className="custom-select-dropdown" role="listbox" style={dropdownStyle}>
-            {options.map(opt => (
-                <li
-                    key={opt.value}
-                    className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
-                    role="option"
-                    aria-selected={opt.value === value}
-                    title={opt.label}
-                    onClick={() => {
-                        if (opt.disabled) return;
-                        onChange(opt.value);
-                        setOpen(false);
-                    }}
-                >
-                    {opt.value === value && <span className="icon icon-sm custom-select-check">check</span>}
-                    <div className="custom-select-option-wrapper">
-                        <span className="custom-select-option-text">{opt.label}</span>
-                    </div>
-                </li>
-            ))}
+            {options.map((opt, i) => {
+                const showGroup = Boolean(opt.group) && opt.group !== options[i - 1]?.group;
+                return (
+                    <Fragment key={opt.value}>
+                        {showGroup && (
+                            <li className="custom-select-group" role="presentation">{opt.group}</li>
+                        )}
+                        <li
+                            className={`custom-select-option ${opt.value === value ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''}`}
+                            role="option"
+                            aria-selected={opt.value === value}
+                            title={opt.label}
+                            onClick={() => {
+                                if (opt.disabled) return;
+                                onChange(opt.value);
+                                setOpen(false);
+                            }}
+                        >
+                            {opt.value === value && <span className="icon icon-sm custom-select-check">check</span>}
+                            <div className="custom-select-option-wrapper">
+                                <span className="custom-select-option-text">{opt.label}</span>
+                            </div>
+                        </li>
+                    </Fragment>
+                );
+            })}
         </ul>,
         document.body
     );

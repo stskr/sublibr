@@ -1,9 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AppSettings, AIProvider } from '../types';
-import { PROVIDER_LABELS, MODEL_OPTIONS, PROVIDER_KEY_URLS, testApiKey } from '../services/providers';
+import { PROVIDER_LABELS, MODEL_OPTIONS, TRANSLATOR_MODEL_OPTIONS, PROVIDER_KEY_URLS, testApiKey, providerNeedsApiKey, CLOUD_PROVIDERS, resolveSavedModel } from '../services/providers';
 import { CustomSelect } from './CustomSelect';
 
-const ALL_PROVIDERS: AIProvider[] = ['gemini', 'openai'];
+const ALL_PROVIDERS: AIProvider[] = ['local', 'gemini', 'openai'];
+
+type SettingsTab = 'general' | 'models' | 'keys';
+
+function OfflineOnlineSwitch({
+    id,
+    online,
+    onChange,
+    offlineLabel,
+    onlineLabel,
+}: {
+    id: string;
+    online: boolean;
+    onChange: (online: boolean) => void;
+    offlineLabel: string;
+    onlineLabel: string;
+}) {
+    return (
+        <div className={`offline-online-switch ${online ? 'is-online' : 'is-offline'}`}>
+            <span className={`mode-label ${!online ? 'is-active is-offline' : ''}`}>Offline</span>
+            <label className="provider-toggle-switch">
+                <input
+                    id={id}
+                    type="checkbox"
+                    checked={online}
+                    onChange={(e) => onChange(e.target.checked)}
+                    aria-label={online ? onlineLabel : offlineLabel}
+                />
+                <span className="toggle-slider" />
+            </label>
+            <span className={`mode-label ${online ? 'is-active is-online' : ''}`}>Online</span>
+        </div>
+    );
+}
 
 interface SettingsProps {
     settings: AppSettings;
@@ -14,9 +47,23 @@ interface SettingsProps {
 type KeyStatus = 'idle' | 'testing' | 'valid' | 'invalid';
 
 export function Settings({ settings, onSettingsChange, onClose }: SettingsProps) {
-    const [draft, setDraft] = useState<AppSettings>(structuredClone(settings));
+    const [draft, setDraft] = useState<AppSettings>(() => {
+        const next = structuredClone(settings);
+        if (typeof next.unloadAfterMinutes !== 'number' || !Number.isFinite(next.unloadAfterMinutes)) {
+            next.unloadAfterMinutes = 5;
+        }
+        if (typeof next.projectsFolder !== 'string') {
+            next.projectsFolder = '';
+        }
+        if (typeof next.projectsFolderSet !== 'boolean') {
+            next.projectsFolderSet = false;
+        }
+        next.providers.local.model = resolveSavedModel('local', next.providers.local.model);
+        return next;
+    });
+    const [tab, setTab] = useState<SettingsTab>('general');
+    const [choosingFolder, setChoosingFolder] = useState(false);
 
-    // Initialize key status: keys that match saved non-empty keys start as 'valid'
     const [keyStatus, setKeyStatus] = useState<Record<AIProvider, KeyStatus>>(() => {
         const init = {} as Record<AIProvider, KeyStatus>;
         for (const p of ALL_PROVIDERS) {
@@ -25,12 +72,26 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
         }
         return init;
     });
+    const [localLlmReady, setLocalLlmReady] = useState(false);
     const [keyError, setKeyError] = useState<Record<AIProvider, string>>(
-        () => ({ gemini: '', openai: '' }),
+        () => ({ gemini: '', openai: '', local: '' }),
     );
 
-    const enabledProviders = ALL_PROVIDERS.filter(p => draft.providers[p].enabled);
-    const hasAnyKey = ALL_PROVIDERS.some(p => draft.providers[p].apiKey.trim());
+    const lastCloudTranscribe = useRef<AIProvider>(
+        settings.activeProvider === 'local' ? 'gemini' : settings.activeProvider,
+    );
+    const lastCloudTranslate = useRef<AIProvider>(
+        settings.translator.provider === 'local' ? 'gemini' : settings.translator.provider,
+    );
+    const lastCloudTranslateModel = useRef(
+        settings.translator.provider === 'local'
+            ? TRANSLATOR_MODEL_OPTIONS.gemini[0].value
+            : settings.translator.model,
+    );
+
+    const transcribeOnline = draft.activeProvider !== 'local';
+    const translateOnline = draft.translator.provider !== 'local';
+    const readyCloud = CLOUD_PROVIDERS.filter(p => keyStatus[p] === 'valid');
 
     const updateProvider = (provider: AIProvider, patch: Partial<AppSettings['providers'][AIProvider]>) => {
         setDraft(prev => ({
@@ -49,55 +110,185 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
     };
 
     const handleTest = async (provider: AIProvider) => {
-        const apiKey = draft.providers[provider].apiKey.trim();
-        if (!apiKey) return;
+        if (providerNeedsApiKey(provider) && !draft.providers[provider].apiKey.trim()) return;
 
         setKeyStatus(prev => ({ ...prev, [provider]: 'testing' }));
         setKeyError(prev => ({ ...prev, [provider]: '' }));
 
-        const result = await testApiKey(provider, apiKey);
+        const result = await testApiKey(provider, draft.providers[provider].apiKey.trim());
 
         setKeyStatus(prev => ({ ...prev, [provider]: result.ok ? 'valid' : 'invalid' }));
+        if (provider === 'local') {
+            setLocalLlmReady(Boolean(result.llm));
+        }
         if (!result.ok) {
             setKeyError(prev => ({ ...prev, [provider]: result.error || 'Invalid key' }));
         }
     };
 
-    const handleToggle = (provider: AIProvider) => {
-        const wasEnabled = draft.providers[provider].enabled;
-        const nowEnabled = !wasEnabled;
+    const pickCloud = (preferred: AIProvider, ready: AIProvider[]): AIProvider => {
+        if (ready.includes(preferred)) return preferred;
+        return ready[0] ?? (preferred === 'openai' ? 'openai' : 'gemini');
+    };
 
-        const next = {
-            ...draft,
-            providers: {
-                ...draft.providers,
-                [provider]: { ...draft.providers[provider], enabled: nowEnabled },
-            },
-        };
-
-        // If we disabled the active provider, switch to first remaining enabled
-        if (!nowEnabled && draft.activeProvider === provider) {
-            const fallback = ALL_PROVIDERS.find(p => p !== provider && next.providers[p].enabled);
-            if (fallback) {
-                next.activeProvider = fallback;
-            }
+    const setTranscribeOnline = (online: boolean) => {
+        if (online) {
+            const ready = CLOUD_PROVIDERS.filter(p => keyStatus[p] === 'valid');
+            if (ready.length === 0) setTab('keys');
+            setDraft(prev => {
+                if (prev.activeProvider !== 'local') lastCloudTranscribe.current = prev.activeProvider;
+                const cloud = pickCloud(lastCloudTranscribe.current, ready);
+                lastCloudTranscribe.current = cloud;
+                return { ...prev, activeProvider: cloud };
+            });
+            return;
         }
 
-        setDraft(next);
+        setDraft(prev => {
+            if (prev.activeProvider !== 'local') lastCloudTranscribe.current = prev.activeProvider;
+            return { ...prev, activeProvider: 'local' };
+        });
+        setTimeout(() => { void handleTest('local'); }, 0);
+    };
+
+    const setTranslateOnline = (online: boolean) => {
+        if (online) {
+            const ready = CLOUD_PROVIDERS.filter(p => keyStatus[p] === 'valid');
+            if (ready.length === 0) setTab('keys');
+            setDraft(prev => {
+                if (prev.translator.provider !== 'local') {
+                    lastCloudTranslate.current = prev.translator.provider;
+                    lastCloudTranslateModel.current = prev.translator.model;
+                }
+                const cloud = pickCloud(lastCloudTranslate.current, ready);
+                lastCloudTranslate.current = cloud;
+                const savedModel = lastCloudTranslateModel.current;
+                const model = TRANSLATOR_MODEL_OPTIONS[cloud].some(m => m.value === savedModel)
+                    ? savedModel
+                    : TRANSLATOR_MODEL_OPTIONS[cloud][0].value;
+                return { ...prev, translator: { provider: cloud, model } };
+            });
+            return;
+        }
+
+        setDraft(prev => {
+            if (prev.translator.provider !== 'local') {
+                lastCloudTranslate.current = prev.translator.provider;
+                lastCloudTranslateModel.current = prev.translator.model;
+            }
+            return {
+                ...prev,
+                translator: {
+                    provider: 'local',
+                    model: TRANSLATOR_MODEL_OPTIONS.local[0].value,
+                },
+            };
+        });
+        setTimeout(() => { void handleTest('local'); }, 0);
     };
 
     const handleSave = () => {
-        onSettingsChange(draft);
+        onSettingsChange({
+            ...draft,
+            providers: {
+                gemini: { ...draft.providers.gemini, enabled: keyStatus.gemini === 'valid' },
+                openai: { ...draft.providers.openai, enabled: keyStatus.openai === 'valid' },
+                local: {
+                    ...draft.providers.local,
+                    enabled: draft.activeProvider === 'local' || draft.translator.provider === 'local',
+                },
+            },
+        });
         onClose();
     };
 
-    const canSave =
-        enabledProviders.length > 0 &&
-        keyStatus[draft.activeProvider] === 'valid';
+    const handleChangeFolder = async () => {
+        if (!window.electronAPI?.chooseProjectsFolder) return;
+        setChoosingFolder(true);
+        try {
+            const folder = await window.electronAPI.chooseProjectsFolder();
+            if (!folder) return;
+            setDraft(prev => ({ ...prev, projectsFolder: folder, projectsFolderSet: true }));
+            onSettingsChange({ ...settings, projectsFolder: folder, projectsFolderSet: true });
+        } finally {
+            setChoosingFolder(false);
+        }
+    };
+
+    useEffect(() => {
+        if (settings.projectsFolder && settings.projectsFolder !== draft.projectsFolder) {
+            setDraft(prev => ({ ...prev, projectsFolder: settings.projectsFolder }));
+        }
+    }, [settings.projectsFolder, draft.projectsFolder]);
+
+    useEffect(() => {
+        if (draft.projectsFolder || !window.electronAPI?.getDefaultProjectsFolder) return;
+        window.electronAPI.getDefaultProjectsFolder().then((folder) => {
+            setDraft(prev => prev.projectsFolder ? prev : { ...prev, projectsFolder: folder });
+        }).catch(() => {});
+    }, [draft.projectsFolder]);
+
+    const transcribeReady = transcribeOnline
+        ? keyStatus[draft.activeProvider] === 'valid'
+        : keyStatus.local === 'valid';
+    const translatorReady = translateOnline
+        ? keyStatus[draft.translator.provider] === 'valid'
+        : localLlmReady;
+    const canSave = transcribeReady && translatorReady;
+
+    const transcribeOptions = (transcribeOnline ? readyCloud : ['local'] as const)
+        .flatMap(p => MODEL_OPTIONS[p].map(m => ({
+            value: `${p}:${m.value}`,
+            label: p === 'local' ? m.label : `${PROVIDER_LABELS[p]} — ${m.label}`,
+        })));
+
+    const translateOptions = (translateOnline ? readyCloud : ['local'] as const)
+        .flatMap(p => TRANSLATOR_MODEL_OPTIONS[p].map(m => ({
+            value: `${p}:${m.value}`,
+            label: p === 'local' ? m.label.replace(' (offline translator)', '') : `${PROVIDER_LABELS[p]} — ${m.label}`,
+        })));
+
+    const transcribeSelectValue = transcribeOnline
+        ? (readyCloud.includes(draft.activeProvider)
+            ? `${draft.activeProvider}:${draft.providers[draft.activeProvider].model}`
+            : '')
+        : `local:${draft.providers.local.model}`;
+
+    const translateSelectValue = translateOnline
+        ? (readyCloud.includes(draft.translator.provider)
+            ? `${draft.translator.provider}:${draft.translator.model}`
+            : '')
+        : `local:${draft.translator.model}`;
 
     const modalRef = useRef<HTMLDivElement>(null);
 
-    // Focus trap + Escape key
+    useEffect(() => {
+        const ready = CLOUD_PROVIDERS.filter(p => keyStatus[p] === 'valid');
+        setDraft(prev => {
+            let next = prev;
+            if (prev.activeProvider !== 'local' && ready.length > 0 && !ready.includes(prev.activeProvider)) {
+                next = { ...next, activeProvider: ready[0] };
+            }
+            if (prev.translator.provider !== 'local' && ready.length > 0 && !ready.includes(prev.translator.provider)) {
+                next = {
+                    ...next,
+                    translator: {
+                        provider: ready[0],
+                        model: TRANSLATOR_MODEL_OPTIONS[ready[0]][0].value,
+                    },
+                };
+            }
+            return next;
+        });
+    }, [keyStatus.gemini, keyStatus.openai]);
+
+    useEffect(() => {
+        if (draft.activeProvider !== 'local' && draft.translator.provider !== 'local') return;
+        void handleTest('local');
+        // Probe once when Settings opens with either task offline.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         const prev = document.activeElement as HTMLElement;
         modalRef.current?.focus();
@@ -118,6 +309,22 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
         return () => { document.removeEventListener('keydown', handleKeyDown); prev?.focus(); };
     }, [onClose]);
 
+    const localStatus = keyStatus.local;
+    const localError = keyError.local;
+    const testedKeyCount = readyCloud.length;
+
+    const noOnlineModelsCallout = (
+        <div className="settings-empty-callout">
+            <span className="icon icon-sm">vpn_key</span>
+            <div>
+                <p>No tested API keys yet. Online models appear here after you add a key and tap Test.</p>
+                <button type="button" className="text-link-btn" onClick={() => setTab('keys')}>
+                    Open API keys
+                </button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="settings-overlay">
             <div
@@ -135,150 +342,352 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                     </button>
                 </div>
 
+                <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+                    <button
+                        type="button"
+                        role="tab"
+                        id="settings-tab-general"
+                        aria-selected={tab === 'general'}
+                        aria-controls="settings-panel-general"
+                        className={`settings-tab ${tab === 'general' ? 'is-active' : ''}`}
+                        onClick={() => setTab('general')}
+                    >
+                        General
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        id="settings-tab-models"
+                        aria-selected={tab === 'models'}
+                        aria-controls="settings-panel-models"
+                        className={`settings-tab ${tab === 'models' ? 'is-active' : ''}`}
+                        onClick={() => setTab('models')}
+                    >
+                        Models
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        id="settings-tab-keys"
+                        aria-selected={tab === 'keys'}
+                        aria-controls="settings-panel-keys"
+                        className={`settings-tab ${tab === 'keys' ? 'is-active' : ''}`}
+                        onClick={() => setTab('keys')}
+                    >
+                        API keys
+                        <span className={`settings-tab-count ${testedKeyCount > 0 ? 'is-ready' : ''}`}>
+                            {testedKeyCount}/2
+                        </span>
+                    </button>
+                </div>
+
                 <div className="settings-content">
-                    {/* Active Model Hero */}
-                    <div className="active-provider-hero">
-                        <label htmlFor="activeModel">Active Model</label>
-                        {hasAnyKey ? (
-                            <CustomSelect
-                                id="activeModel"
-                                value={enabledProviders.length > 0 ? `${draft.activeProvider}:${draft.providers[draft.activeProvider].model}` : ''}
-                                disabled={enabledProviders.length === 0}
-                                onChange={(val) => {
-                                    const [provider, model] = val.split(':') as [AIProvider, string];
-                                    setDraft(prev => ({
-                                        ...prev,
-                                        activeProvider: provider,
-                                        providers: {
-                                            ...prev.providers,
-                                            [provider]: { ...prev.providers[provider], model },
-                                        },
-                                    }));
-                                }}
-                                options={[
-                                    ...(enabledProviders.length === 0 ? [{ value: '', label: 'Enable a provider below', disabled: true }] : []),
-                                    ...enabledProviders.flatMap(p =>
-                                        MODEL_OPTIONS[p].map(m => ({
-                                            value: `${p}:${m.value}`,
-                                            label: `${PROVIDER_LABELS[p]} — ${m.label}`,
-                                        }))
-                                    ),
-                                ]}
-                            />
-                        ) : (
-                            <div className="hero-info-banner">
-                                <span className="icon icon-sm">info</span>
-                                <span>Toggle the providers you'd like to use below and paste an API key for each one.</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Provider Sections */}
-                    {ALL_PROVIDERS.map(provider => {
-                        const config = draft.providers[provider];
-                        const keyUrl = PROVIDER_KEY_URLS[provider];
-                        const status = keyStatus[provider];
-                        const error = keyError[provider];
-
-                        return (
-                            <div key={provider} className={`provider-section ${!config.enabled ? 'provider-disabled' : ''}`}>
-                                <div className="provider-header">
-                                    <span className="provider-name">{PROVIDER_LABELS[provider]}</span>
-                                    <label className="provider-toggle-switch">
-                                        <input
-                                            type="checkbox"
-                                            checked={config.enabled}
-                                            onChange={() => handleToggle(provider)}
-                                            aria-label={`Enable ${PROVIDER_LABELS[provider]}`}
-                                        />
-                                        <span className="toggle-slider" />
-                                    </label>
+                    {tab === 'models' && (
+                        <div
+                            id="settings-panel-models"
+                            role="tabpanel"
+                            aria-labelledby="settings-tab-models"
+                            className="settings-panel"
+                        >
+                            <div className={`active-provider-hero ${transcribeOnline ? 'is-online' : 'is-offline'}`}>
+                                <div className="hero-label-row">
+                                    <label htmlFor="activeModel">Transcription</label>
+                                    <OfflineOnlineSwitch
+                                        id="transcribeMode"
+                                        online={transcribeOnline}
+                                        onChange={setTranscribeOnline}
+                                        offlineLabel="Transcribe offline on this computer"
+                                        onlineLabel="Transcribe online in the cloud"
+                                    />
                                 </div>
-
-                                {config.enabled && (
-                                    <div className="provider-fields">
-                                        <div className="setting-group">
-                                            <label htmlFor={`apiKey-${provider}`}>API Key</label>
-                                            <div className="api-key-row">
-                                                <input
-                                                    id={`apiKey-${provider}`}
-                                                    type="password"
-                                                    value={config.apiKey}
-                                                    onChange={(e) => handleKeyChange(provider, e.target.value)}
-                                                    placeholder="Enter your API key..."
-                                                    className="input-field"
-                                                />
-                                                {status === 'valid' ? (
-                                                    <span className="key-status-valid" aria-label="API key valid">
-                                                        <span className="icon icon-sm">check_circle</span>
-                                                    </span>
-                                                ) : status === 'invalid' ? (
-                                                    <span className="key-status-invalid" aria-label="API key invalid">
-                                                        <span className="icon icon-sm">cancel</span>
-                                                    </span>
-                                                ) : null}
-                                                <button
-                                                    className="test-key-btn btn-secondary"
-                                                    onClick={() => handleTest(provider)}
-                                                    disabled={status === 'testing' || !config.apiKey.trim()}
-                                                >
-                                                    {status === 'testing' ? (
-                                                        <span className="key-status-testing">
-                                                            <span className="spinner-inline" />
-                                                        </span>
-                                                    ) : 'Test'}
-                                                </button>
-                                            </div>
-                                            {status === 'invalid' && error && (
-                                                <p className="setting-hint key-error-text">{error}</p>
-                                            )}
-                                            <p className="setting-hint">
-                                                Get your key from{' '}
-                                                <a href={keyUrl.url} target="_blank" rel="noopener noreferrer">
-                                                    {keyUrl.label}
-                                                </a>
-                                            </p>
-                                        </div>
-
-                                        {provider === 'gemini' && (
-                                            <div className="setting-group">
-                                                <div className="provider-header">
-                                                    <div>
-                                                        <label htmlFor={`freeTier-${provider}`} style={{ marginBottom: '2px' }}>
-                                                            Free Tier
-                                                        </label>
-                                                        <p className="setting-hint" style={{ margin: 0 }}>
-                                                            {config.freeTier
-                                                                ? config.model.includes('pro')
-                                                                    ? 'Sequential mode — ~1 hr/day (Pro: 100 req/day)'
-                                                                    : 'Sequential mode — ~20+ hrs/day (Flash: 1,500 req/day)'
-                                                                : 'Enable if using a Google AI Studio free-tier key'
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <label className="provider-toggle-switch">
-                                                        <input
-                                                            id={`freeTier-${provider}`}
-                                                            type="checkbox"
-                                                            checked={config.freeTier ?? false}
-                                                            onChange={(e) => updateProvider(provider, { freeTier: e.target.checked })}
-                                                            aria-label="Enable free tier mode"
-                                                        />
-                                                        <span className="toggle-slider" />
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        )}
+                                {transcribeOnline && transcribeOptions.length === 0 ? noOnlineModelsCallout : (
+                                    <CustomSelect
+                                        id="activeModel"
+                                        value={transcribeSelectValue}
+                                        onChange={(val) => {
+                                            const [provider, model] = val.split(':') as [AIProvider, string];
+                                            if (provider !== 'local') lastCloudTranscribe.current = provider;
+                                            setDraft(prev => ({
+                                                ...prev,
+                                                activeProvider: provider,
+                                                providers: {
+                                                    ...prev.providers,
+                                                    [provider]: { ...prev.providers[provider], model },
+                                                },
+                                            }));
+                                        }}
+                                        options={transcribeOptions}
+                                    />
+                                )}
+                                <p className="setting-hint" style={{ marginTop: '8px', marginBottom: 0 }}>
+                                    {transcribeOnline
+                                        ? (transcribeOptions.length === 0
+                                            ? 'Online transcription needs a tested Gemini or OpenAI key.'
+                                            : 'Audio is uploaded to this cloud API. Only models that return word timestamps can make subtitles.')
+                                        : 'Whisper Large v3 Turbo, running locally. Uses Hebrew Whisper weights when Hebrew is the transcription language. Audio never leaves this computer.'}
+                                </p>
+                                {!transcribeOnline && (
+                                    <div className="local-setup-row">
+                                        {localStatus === 'valid' ? (
+                                            <span className="key-status-valid" aria-label="Local transcription ready">
+                                                <span className="icon icon-sm">check_circle</span>
+                                            </span>
+                                        ) : localStatus === 'invalid' ? (
+                                            <span className="key-status-invalid" aria-label="Local transcription not ready">
+                                                <span className="icon icon-sm">cancel</span>
+                                            </span>
+                                        ) : null}
+                                        <button
+                                            className="test-key-btn btn-secondary"
+                                            onClick={() => handleTest('local')}
+                                            disabled={localStatus === 'testing'}
+                                        >
+                                            {localStatus === 'testing' ? (
+                                                <span className="key-status-testing">
+                                                    <span className="spinner-inline" />
+                                                </span>
+                                            ) : 'Check setup'}
+                                        </button>
                                     </div>
                                 )}
+                                {!transcribeOnline && localStatus === 'invalid' && localError && (
+                                    <p className="setting-hint key-error-text">{localError}</p>
+                                )}
                             </div>
-                        );
-                    })}
+
+                            <div className={`active-provider-hero translator-hero ${translateOnline ? 'is-online' : 'is-offline'}`}>
+                                <div className="hero-label-row">
+                                    <label htmlFor="translatorModel">Translation</label>
+                                    <OfflineOnlineSwitch
+                                        id="translateMode"
+                                        online={translateOnline}
+                                        onChange={setTranslateOnline}
+                                        offlineLabel="Translate offline on this computer"
+                                        onlineLabel="Translate online in the cloud"
+                                    />
+                                </div>
+                                {translateOnline && translateOptions.length === 0 ? noOnlineModelsCallout : (
+                                    <CustomSelect
+                                        id="translatorModel"
+                                        value={translateSelectValue}
+                                        onChange={(val) => {
+                                            const [provider, model] = val.split(':') as [AIProvider, string];
+                                            if (provider !== 'local') {
+                                                lastCloudTranslate.current = provider;
+                                                lastCloudTranslateModel.current = model;
+                                            }
+                                            setDraft(prev => ({
+                                                ...prev,
+                                                translator: { provider, model },
+                                            }));
+                                        }}
+                                        options={translateOptions}
+                                    />
+                                )}
+                                <p className="setting-hint" style={{ marginTop: '8px', marginBottom: 0 }}>
+                                    {translateOnline
+                                        ? (translateOptions.length === 0
+                                            ? 'Online translation needs a tested Gemini or OpenAI key.'
+                                            : 'Used for translation and language detection. Transcription models cannot rewrite text.')
+                                        : 'Rewrites subtitle text on this computer. Whisper cannot translate.'}
+                                </p>
+                                {!translateOnline && (
+                                    <>
+                                        <div className="local-setup-row">
+                                            {localLlmReady ? (
+                                                <span className="key-status-valid" aria-label="Local translator ready">
+                                                    <span className="icon icon-sm">check_circle</span>
+                                                </span>
+                                            ) : localStatus === 'invalid' || (localStatus === 'valid' && !localLlmReady) ? (
+                                                <span className="key-status-invalid" aria-label="Local translator not ready">
+                                                    <span className="icon icon-sm">cancel</span>
+                                                </span>
+                                            ) : null}
+                                            <button
+                                                className="test-key-btn btn-secondary"
+                                                onClick={() => handleTest('local')}
+                                                disabled={localStatus === 'testing'}
+                                            >
+                                                {localStatus === 'testing' ? (
+                                                    <span className="key-status-testing">
+                                                        <span className="spinner-inline" />
+                                                    </span>
+                                                ) : 'Check setup'}
+                                            </button>
+                                        </div>
+                                        {!localLlmReady && (
+                                            <p className="setting-hint">
+                                                Offline translation needs{' '}
+                                                <code>models/Qwen2.5-7B-Instruct-Q4_K_M.gguf</code>
+                                                .
+                                            </p>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 'keys' && (
+                        <div
+                            id="settings-panel-keys"
+                            role="tabpanel"
+                            aria-labelledby="settings-tab-keys"
+                            className="settings-panel"
+                        >
+                            <p className="settings-tab-intro">
+                                Test a key to unlock that provider’s models. Untested keys stay out of the model lists.
+                            </p>
+                            {CLOUD_PROVIDERS.map(provider => {
+                                const config = draft.providers[provider];
+                                const keyUrl = PROVIDER_KEY_URLS[provider];
+                                const status = keyStatus[provider];
+                                const error = keyError[provider];
+
+                                return (
+                                    <div key={provider} className={`provider-section is-online ${status === 'valid' ? 'is-ready' : ''}`}>
+                                        <div className="provider-header">
+                                            <div className="provider-title">
+                                                <span className="provider-name">{PROVIDER_LABELS[provider]}</span>
+                                                {status === 'valid' && (
+                                                    <span className="run-location-chip is-cloud">Ready</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="provider-fields">
+                                            <div className="setting-group">
+                                                <label htmlFor={`apiKey-${provider}`}>API Key</label>
+                                                <div className="api-key-row">
+                                                    <input
+                                                        id={`apiKey-${provider}`}
+                                                        type="password"
+                                                        value={config.apiKey}
+                                                        onChange={(e) => handleKeyChange(provider, e.target.value)}
+                                                        placeholder="Enter your API key..."
+                                                        className="input-field"
+                                                    />
+                                                    {status === 'valid' ? (
+                                                        <span className="key-status-valid" aria-label="API key valid">
+                                                            <span className="icon icon-sm">check_circle</span>
+                                                        </span>
+                                                    ) : status === 'invalid' ? (
+                                                        <span className="key-status-invalid" aria-label="API key invalid">
+                                                            <span className="icon icon-sm">cancel</span>
+                                                        </span>
+                                                    ) : null}
+                                                    <button
+                                                        className="test-key-btn btn-secondary"
+                                                        onClick={() => handleTest(provider)}
+                                                        disabled={status === 'testing' || !config.apiKey.trim()}
+                                                    >
+                                                        {status === 'testing' ? (
+                                                            <span className="key-status-testing">
+                                                                <span className="spinner-inline" />
+                                                            </span>
+                                                        ) : 'Test'}
+                                                    </button>
+                                                </div>
+                                                {status === 'invalid' && error && (
+                                                    <p className="setting-hint key-error-text">{error}</p>
+                                                )}
+                                                {status === 'idle' && config.apiKey.trim() && (
+                                                    <p className="setting-hint">Test this key to add its models to the lists.</p>
+                                                )}
+                                                <p className="setting-hint">
+                                                    Get your key from{' '}
+                                                    <a href={keyUrl.url} target="_blank" rel="noopener noreferrer">
+                                                        {keyUrl.label}
+                                                    </a>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {tab === 'general' && (
+                        <div
+                            id="settings-panel-general"
+                            role="tabpanel"
+                            aria-labelledby="settings-tab-general"
+                            className="settings-panel"
+                        >
+                            <div className="projects-folder-section">
+                                <h3 className="settings-section-heading">Projects folder</h3>
+                                <p className="setting-hint projects-folder-hint">
+                                    Sublibr stores each media file in its own folder. API keys are never saved here.
+                                </p>
+                                <div className="projects-folder-row">
+                                    <code className="projects-folder-path" title={draft.projectsFolder}>
+                                        {draft.projectsFolder || '…'}
+                                    </code>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary projects-folder-btn"
+                                        onClick={handleChangeFolder}
+                                        disabled={choosingFolder}
+                                    >
+                                        Change folder
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="memory-section">
+                                <h3 className="settings-section-heading">Model memory</h3>
+                                <div className="memory-row">
+                                    <div className="memory-copy">
+                                        <span className="memory-label">Unload model after inactivity</span>
+                                        <p className="setting-hint">
+                                            Releases the local translator from memory and VRAM when it hasn’t been used.
+                                            Whisper already unloads after each clip. Never keeps it loaded until you quit.
+                                        </p>
+                                    </div>
+                                    <div className="stepper" role="group" aria-label="Unload after inactivity">
+                                        <button
+                                            type="button"
+                                            className="stepper-btn"
+                                            disabled={draft.unloadAfterMinutes <= 0}
+                                            onClick={() => setDraft(prev => ({
+                                                ...prev,
+                                                unloadAfterMinutes: Math.max(0, prev.unloadAfterMinutes - 1),
+                                            }))}
+                                            aria-label="Decrease minutes"
+                                        >
+                                            <span className="icon icon-sm">remove</span>
+                                        </button>
+                                        <span className="stepper-value">
+                                            {draft.unloadAfterMinutes <= 0
+                                                ? 'Never'
+                                                : `${draft.unloadAfterMinutes} ${draft.unloadAfterMinutes === 1 ? 'minute' : 'minutes'}`}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="stepper-btn"
+                                            disabled={draft.unloadAfterMinutes >= 60}
+                                            onClick={() => setDraft(prev => ({
+                                                ...prev,
+                                                unloadAfterMinutes: Math.min(60, prev.unloadAfterMinutes + 1),
+                                            }))}
+                                            aria-label="Increase minutes"
+                                        >
+                                            <span className="icon icon-sm">add</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="settings-footer">
-                    {!canSave && enabledProviders.length > 0 && (
-                        <span className="save-hint">Test the active provider's API key first</span>
+                    {!canSave && (
+                        <span className="save-hint">
+                            {transcribeOnline || translateOnline
+                                ? (readyCloud.length === 0 ? 'Add and test an API key first' : 'Test the cloud API key first')
+                                : 'Check the offline setup first'}
+                        </span>
                     )}
                     <button className="btn-secondary" onClick={onClose}>Cancel</button>
                     <button className="btn-primary" onClick={handleSave} disabled={!canSave}>

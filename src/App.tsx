@@ -4,6 +4,7 @@ import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AboutModal } from './components/AboutModal';
+import { ProjectsFolderSetup } from './components/ProjectsFolderSetup';
 import { AudioPlayer } from './components/AudioPlayer';
 import type { AudioPlayerHandle } from './components/AudioPlayer';
 import { SubtitlePreview } from './components/SubtitlePreview';
@@ -23,7 +24,7 @@ import { useTranscriptionPipeline } from './hooks/useTranscriptionPipeline';
 import { generateId } from './utils';
 import type { Subtitle, AppSettings, MediaFile, RecentFile, ScreenSize } from './types';
 import { DEFAULT_SUBTITLE_STYLE } from './types';
-import { PROVIDER_LABELS, MODEL_OPTIONS } from './services/providers';
+import { PROVIDER_LABELS, resolveSavedModel, resolveSavedTranslatorModel, TRANSLATOR_MODEL_OPTIONS, isTranscriptionReady, CLOUD_PROVIDERS, transcriptionModelLabel } from './services/providers';
 import { SubtitleStylePanel } from './components/SubtitleStylePanel';
 
 import './App.css';
@@ -31,20 +32,26 @@ import logoWhite from './assets/Logo/logo-white.svg';
 
 const DEFAULT_SETTINGS: AppSettings = {
   activeProvider: 'gemini',
+  translator: { provider: 'gemini', model: 'gemini-3.6-flash' },
   providers: {
-    gemini: { enabled: true, apiKey: '', model: 'gemini-2.5-flash', freeTier: false },
-    openai: { enabled: false, apiKey: '', model: 'gpt-4o-mini' },
+    gemini: { enabled: true, apiKey: '', model: 'gemini-3.5-transcribe' },
+    openai: { enabled: false, apiKey: '', model: 'whisper-1' },
+    local: { enabled: false, apiKey: '', model: 'whisper-large-v3-turbo' },
   },
   language: 'English',
   autoDetectLanguage: false,
   screenSize: 'wide',
   subtitleStyle: DEFAULT_SUBTITLE_STYLE,
+  unloadAfterMinutes: 5,
+  projectsFolder: '',
+  projectsFolderSet: false,
 };
 
 const DEFAULT_SUBTITLE_DURATION = 2; // seconds
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [folderSetup, setFolderSetup] = useState<'loading' | 'needed' | 'done'>('loading');
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -54,15 +61,26 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [editorView, setEditorView] = useState<'subtitles' | 'preview'>('subtitles');
   const [activeTool, setActiveTool] = useState<'select' | 'scissors' | 'trim'>('select');
-
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
 
   useEffect(() => {
     async function loadSettings() {
-      if (!window.electronAPI) return;
-      const saved = await window.electronAPI.getStoreValue('settings') as Record<string, unknown> | null;
+      if (!window.electronAPI) {
+        setFolderSetup('done');
+        return;
+      }
+      try {
+        let suggestedFolder = '';
+        try {
+          suggestedFolder = await window.electronAPI.getDefaultProjectsFolder();
+        } catch {
+          suggestedFolder = '';
+        }
+        const saved = await window.electronAPI.getStoreValue('settings') as Record<string, unknown> | null;
       if (saved) {
         if ('apiKey' in saved && !('providers' in saved)) {
+          const chosenFolder = typeof saved.projectsFolder === 'string' ? saved.projectsFolder.trim() : '';
+          const folderSet = Boolean((saved as { projectsFolderSet?: unknown }).projectsFolderSet);
           const migrated: AppSettings = {
             ...DEFAULT_SETTINGS,
             providers: {
@@ -71,15 +89,21 @@ function App() {
                 ...DEFAULT_SETTINGS.providers.gemini,
                 enabled: true,
                 apiKey: (saved.apiKey as string) || '',
-                model: (saved.model as string) || 'gemini-2.5-flash',
+                model: resolveSavedModel('gemini', (saved.model as string) || 'gemini-3.5-transcribe'),
               },
             },
             language: (saved.language as string) || 'English',
             autoDetectLanguage: (saved.autoDetectLanguage as boolean) ?? false,
             screenSize: (saved.screenSize as ScreenSize) || 'wide',
+            projectsFolder: chosenFolder || suggestedFolder,
+            projectsFolderSet: folderSet,
           };
           setSettings(migrated);
-          await window.electronAPI.setStoreValue('settings', migrated);
+          await window.electronAPI.setStoreValue('settings', {
+            ...migrated,
+            ...(folderSet ? {} : { projectsFolder: chosenFolder, projectsFolderSet: false }),
+          });
+          setFolderSetup(folderSet ? 'done' : 'needed');
         } else {
           const savedSettings = saved as Partial<AppSettings> & { settingsVersion?: number };
           const savedStyle = savedSettings.subtitleStyle as Partial<typeof DEFAULT_SETTINGS.subtitleStyle> | undefined;
@@ -94,20 +118,58 @@ function App() {
               positionY: DEFAULT_SETTINGS.subtitleStyle.positionY,
             } : {}),
           };
-          // Deep-merge providers so new ProviderConfig fields (e.g. freeTier) get their
+          // Deep-merge providers so new ProviderConfig fields get their
           // defaults even when loading settings saved before those fields existed.
           const mergedProviders = {
             ...DEFAULT_SETTINGS.providers,
             ...savedSettings.providers,
             gemini: { ...DEFAULT_SETTINGS.providers.gemini, ...savedSettings.providers?.gemini },
             openai: { ...DEFAULT_SETTINGS.providers.openai, ...savedSettings.providers?.openai },
+            local: { ...DEFAULT_SETTINGS.providers.local, ...savedSettings.providers?.local },
           };
-          const merged: AppSettings = { ...DEFAULT_SETTINGS, ...savedSettings, providers: mergedProviders, subtitleStyle: mergedSubtitleStyle };
+          mergedProviders.gemini.model = resolveSavedModel('gemini', mergedProviders.gemini.model);
+          mergedProviders.openai.model = resolveSavedModel('openai', mergedProviders.openai.model);
+          mergedProviders.local.model = resolveSavedModel('local', mergedProviders.local.model);
+          let translatorProvider = savedSettings.translator?.provider ?? DEFAULT_SETTINGS.translator.provider;
+          const translatorUsable = (p: typeof translatorProvider) => {
+            if (TRANSLATOR_MODEL_OPTIONS[p]?.length === 0) return false;
+            if (p === 'local') return true;
+            return Boolean(mergedProviders[p]?.apiKey?.trim());
+          };
+          if (!translatorUsable(translatorProvider)) {
+            translatorProvider = (['local', ...CLOUD_PROVIDERS] as const).find(translatorUsable) ?? 'gemini';
+          }
+          const translatorModel = resolveSavedTranslatorModel(
+            translatorProvider,
+            savedSettings.translator?.model ?? TRANSLATOR_MODEL_OPTIONS[translatorProvider][0].value,
+          );
+          const chosenFolder = savedSettings.projectsFolder?.trim() || '';
+          const folderSet = Boolean(savedSettings.projectsFolderSet);
+          const merged: AppSettings = {
+            ...DEFAULT_SETTINGS,
+            ...savedSettings,
+            providers: mergedProviders,
+            translator: { provider: translatorProvider, model: translatorModel },
+            subtitleStyle: mergedSubtitleStyle,
+            projectsFolder: chosenFolder || suggestedFolder,
+            projectsFolderSet: folderSet,
+          };
           setSettings(merged);
           if (needsPositionMigration && window.electronAPI) {
-            window.electronAPI.setStoreValue('settings', { ...merged, settingsVersion: 3 }).catch(() => {});
+            window.electronAPI.setStoreValue('settings', {
+              ...merged,
+              settingsVersion: 3,
+              ...(folderSet ? {} : { projectsFolderSet: false }),
+            }).catch(() => {});
           }
+          setFolderSetup(folderSet ? 'done' : 'needed');
         }
+      } else {
+        setSettings({ ...DEFAULT_SETTINGS, projectsFolder: suggestedFolder });
+        setFolderSetup('needed');
+      }
+      } catch {
+        setFolderSetup('needed');
       }
     }
     loadSettings();
@@ -401,7 +463,7 @@ function App() {
   });
 
   const activeConfig = settings.providers[settings.activeProvider];
-  const canGenerate = mediaFile && activeConfig.enabled && activeConfig.apiKey && processing.status === 'idle';
+  const canGenerate = mediaFile && isTranscriptionReady(settings.activeProvider, activeConfig) && processing.status === 'idle';
   const isProcessing = processing.status !== 'idle' && processing.status !== 'done' && processing.status !== 'error';
 
   return (
@@ -520,8 +582,16 @@ function App() {
                     onClick={handleGenerate}
                     disabled={!canGenerate}
                   >
-                    <span className="icon icon-sm">auto_awesome</span> Generate Subtitles
+                    <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'auto_awesome'}</span>
+                    {settings.activeProvider === 'local' ? 'Generate locally' : 'Generate Subtitles'}
                   </button>
+                  {settings.activeProvider === 'local' && (
+                    <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
+                      {settings.language === 'Hebrew'
+                        ? 'Hebrew Whisper weights run on this computer. Audio is not uploaded.'
+                        : 'Whisper Large v3 Turbo runs on this computer. Audio is not uploaded.'}
+                    </p>
+                  )}
 
                   <div className="sidebar-divider">
                     <span>or</span>
@@ -672,6 +742,7 @@ function App() {
               <ProgressIndicator
                 state={processing}
                 providerLabel={PROVIDER_LABELS[settings.activeProvider]}
+                isLocal={settings.activeProvider === 'local'}
                 onRetry={handleGenerate}
                 onDismiss={() => setProcessing({ status: 'idle', progress: 0 })}
                 onPause={handlePause}
@@ -764,12 +835,23 @@ function App() {
               />
               <div className="footer-info-row">
                 <div className="footer-left-group">
-                  <button className="active-model-badge" onClick={() => setShowSettings(true)} title="Click to change model">
-                    <span className="icon icon-sm">smart_toy</span>
-                    <span className="active-model-label">Model in use:</span>
-                    <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
+                  <button
+                    className={`active-model-badge${settings.activeProvider === 'local' ? ' is-local' : ' is-cloud'}`}
+                    onClick={() => setShowSettings(true)}
+                    title="Click to change model"
+                  >
+                    <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'cloud'}</span>
+                    <span className={`run-location-chip ${settings.activeProvider === 'local' ? 'is-offline' : 'is-cloud'}`}>
+                      {settings.activeProvider === 'local' ? 'Offline' : 'Online'}
+                    </span>
+                    <span className="active-model-label">
+                      {settings.activeProvider === 'local' ? 'Transcription:' : 'Online transcription:'}
+                    </span>
+                    {settings.activeProvider !== 'local' && (
+                      <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
+                    )}
                     <span className="active-model-name">
-                      {MODEL_OPTIONS[settings.activeProvider]?.find(m => m.value === activeConfig.model)?.label ?? activeConfig.model}
+                      {transcriptionModelLabel(settings.activeProvider, activeConfig.model)}
                     </span>
                   </button>
                   <TokenUsageDisplay stats={tokenStats} />
@@ -805,7 +887,19 @@ function App() {
       }
 
       {
-        showSettings && (
+        folderSetup === 'needed' && (
+          <ProjectsFolderSetup
+            suggestedFolder={settings.projectsFolder}
+            onConfirm={(folder) => {
+              setSettings(prev => ({ ...prev, projectsFolder: folder, projectsFolderSet: true }));
+              setFolderSetup('done');
+            }}
+          />
+        )
+      }
+
+      {
+        showSettings && folderSetup === 'done' && (
           <Settings
             settings={settings}
             onSettingsChange={handleSettingsChange}

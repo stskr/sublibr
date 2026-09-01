@@ -24,27 +24,34 @@ export function useVersionHistory({
         if (!mediaFile || !window.electronAPI) return;
 
         const timeout = setTimeout(async () => {
+            if (versions.length === 0 && subtitles.length === 0) return;
             try {
-                const cache = (await window.electronAPI.getStoreValue('subtitle-versions') || {}) as Record<string, SubtitleVersion[]>;
-                cache[mediaFile.path] = versions;
-                await window.electronAPI.setStoreValue('subtitle-versions', cache);
+                await window.electronAPI.saveProject({
+                    sourcePath: mediaFile.path,
+                    name: mediaFile.name,
+                    versions,
+                    subtitles,
+                });
             } catch (error) {
                 console.error('Failed to save versions:', error);
             }
         }, 500);
 
         return () => clearTimeout(timeout);
-    }, [versions, mediaFile]);
+    }, [versions, mediaFile, subtitles]);
 
     const persistVersions = useCallback((newVersions: SubtitleVersion[]) => {
         if (mediaFile && window.electronAPI) {
-            window.electronAPI.getStoreValue('subtitle-versions').then((store) => {
-                const versionCache = (store || {}) as Record<string, SubtitleVersion[]>;
-                versionCache[mediaFile.path] = newVersions;
-                window.electronAPI.setStoreValue('subtitle-versions', versionCache);
+            window.electronAPI.saveProject({
+                sourcePath: mediaFile.path,
+                name: mediaFile.name,
+                versions: newVersions,
+                subtitles,
+            }).catch((error) => {
+                console.error('Failed to save versions:', error);
             });
         }
-    }, [mediaFile]);
+    }, [mediaFile, subtitles]);
 
     const addVersion = useCallback((newVersion: SubtitleVersion) => {
         setVersions(prev => {

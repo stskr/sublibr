@@ -50,13 +50,12 @@ export interface ProcessingState {
 }
 
 // AI Providers
-export type AIProvider = 'gemini' | 'openai';
+export type AIProvider = 'gemini' | 'openai' | 'local';
 
 export interface ProviderConfig {
     enabled: boolean;
     apiKey: string;
     model: string;
-    freeTier?: boolean;
 }
 
 // Screen constraint options for generating subtitles
@@ -121,14 +120,26 @@ export const SCREEN_SIZE_FONT_DEFAULTS: Record<ScreenSize, number> = {
     original: 56,
 };
 
+export interface TranslatorConfig {
+    provider: AIProvider;
+    model: string;
+}
+
 // Settings
 export interface AppSettings {
     activeProvider: AIProvider;
+    translator: TranslatorConfig;
     providers: Record<AIProvider, ProviderConfig>;
     language: string;
     autoDetectLanguage: boolean;
     screenSize: ScreenSize;
     subtitleStyle: SubtitleStyle;
+    /** 0 = keep the local translator loaded until quit. */
+    unloadAfterMinutes: number;
+    /** Folder where transcripts, extracted media, and working files live. */
+    projectsFolder: string;
+    /** True after the user has confirmed a projects folder on first run or in Settings. */
+    projectsFolderSet: boolean;
 }
 
 // File info

@@ -1,7 +1,7 @@
 import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize, SubtitleStyle, MediaFile } from '../types';
 import { DEFAULT_SUBTITLE_STYLE, getPlayRes } from '../types';
 import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
-import { callProvider, callTextProvider } from './providers';
+import { callProvider, callTextProvider, isAsrModel, callLocalTranscribe, resolveLocalWhisperModel } from './providers';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -19,59 +19,6 @@ async function audioToBase64(filePath: string): Promise<string> {
         parts.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
     }
     return btoa(parts.join(''));
-}
-
-// Parse transcription response into subtitles
-function parseTranscription(text: string, startOffset: number): Subtitle[] {
-    const subtitles: Subtitle[] = [];
-
-    // Try to parse timestamped format first: [00:00] Text or 00:00 - Text
-    const timestampPattern = /\[?(\d{1,2}):(\d{2})(?::(\d{2}))?\]?\s*[-–]?\s*(.+?)(?=\[?\d{1,2}:\d{2}|\n\n|$)/gs;
-    let match;
-
-    while ((match = timestampPattern.exec(text)) !== null) {
-        const [, minutes, seconds, extraSeconds, content] = match;
-        const startTime = startOffset + parseInt(minutes) * 60 + parseInt(seconds) + (extraSeconds ? parseInt(extraSeconds) : 0);
-        const cleanText = content.trim();
-
-        if (cleanText) {
-            subtitles.push({
-                id: generateId(),
-                index: subtitles.length + 1,
-                startTime,
-                endTime: startTime + Math.max(2, cleanText.length * 0.05), // Estimate based on chars (approx 20 chars/sec reading speed)
-                text: cleanText,
-            });
-        }
-    }
-
-    // If no timestamps found, split by sentences
-    if (subtitles.length === 0) {
-        const sentences = text.split(/[.!?]+/).filter(s => s.trim());
-        const avgDuration = 3; // seconds per sentence
-        let currentTime = startOffset;
-
-        for (const sentence of sentences) {
-            const cleanText = sentence.trim();
-            if (cleanText.length > 0) {
-                subtitles.push({
-                    id: generateId(),
-                    index: subtitles.length + 1,
-                    startTime: currentTime,
-                    endTime: currentTime + avgDuration,
-                    text: cleanText,
-                });
-                currentTime += avgDuration;
-            }
-        }
-    }
-
-    // Adjust end times to start of next subtitle
-    for (let i = 0; i < subtitles.length - 1; i++) {
-        subtitles[i].endTime = subtitles[i + 1].startTime - 0.1;
-    }
-
-    return subtitles;
 }
 
 // Build standard subtitles from individual word-level timestamps (native Whisper)
@@ -153,13 +100,28 @@ function buildSubtitlesFromWords(words: { start: number; end: number; word: stri
     return subtitles;
 }
 
+function buildSubtitlesFromSegments(
+    segments: { start: number; end: number; text: string }[],
+    startOffset: number,
+): Subtitle[] {
+    return segments
+        .map(s => ({ start: s.start, end: s.end, text: (s.text ?? '').trim() }))
+        .filter(s => s.text)
+        .map((s, i) => ({
+            id: generateId(),
+            index: i + 1,
+            startTime: startOffset + s.start,
+            endTime: startOffset + s.end,
+            text: s.text,
+        }));
+}
+
 
 import { getStandardTranscriptionPrompt as getGeminiTranscriptionPrompt } from '../prompts/gemini/transcription';
 import { getHealingTranscriptionPrompt as getGeminiHealingPrompt } from '../prompts/gemini/healing';
 import { getOpenAITranscriptionPrompt } from '../prompts/openai/transcription';
 import { getOpenAIHealingPrompt } from '../prompts/openai/healing';
 import { getIsoLanguage } from '../utils';
-import { parseSrt } from './subtitleParser';
 
 export function getScreenSizeConstraints(screenSize: ScreenSize) {
     switch (screenSize) {
@@ -182,8 +144,14 @@ export async function transcribeChunk(
     previousTranscript?: string,
     screenSize: ScreenSize = 'wide'
 ): Promise<TranscriptionResult> {
-    // Read and encode audio
-    const audioBase64 = await audioToBase64(chunk.filePath);
+    const sttModel = provider === 'local' ? resolveLocalWhisperModel(language) : model;
+    if (!isAsrModel(sttModel)) {
+        throw new Error(
+            `${sttModel} does not return timestamps and cannot be used for subtitles.`,
+        );
+    }
+
+    const audioBase64 = provider === 'local' ? '' : await audioToBase64(chunk.filePath);
 
     const languageInstruction = autoDetect
         ? 'Auto-detect the language of the audio.'
@@ -208,34 +176,33 @@ export async function transcribeChunk(
 
     const languageIso = getIsoLanguage(language, autoDetect);
 
-    const providerResponse = await callProvider(provider, apiKey, model, prompt, audioBase64, audioFormat, languageIso, previousTranscript);
+    const providerResponse = provider === 'local'
+        ? await callLocalTranscribe(chunk.filePath, languageIso, sttModel)
+        : await callProvider(provider, apiKey, sttModel, prompt, audioBase64, audioFormat, languageIso, previousTranscript);
     const text = providerResponse.text;
 
     let subtitles: Subtitle[] = [];
-    if (provider === 'openai') {
-        if (model === 'whisper-1') {
-            try {
-                const data = JSON.parse(text) as { words?: { start: number; end: number; word: string }[] };
-                if (data.words && data.words.length > 0) {
-                    subtitles = buildSubtitlesFromWords(data.words, chunk.startTime, maxLines, maxCharsPerLine);
-                } else {
-                    subtitles = parseTranscription(text, chunk.startTime);
-                }
-            } catch {
-                subtitles = parseTranscription(text, chunk.startTime);
-            }
-        } else {
-            // GPT models return SRT strings
-            subtitles = parseSrt(text);
-            subtitles = subtitles.map(s => ({
-                ...s,
-                startTime: chunk.startTime + s.startTime,
-                endTime: chunk.startTime + s.endTime,
-            }));
-        }
-    } else {
-        // Gemini returns our custom [MM:SS] format
-        subtitles = parseTranscription(text, chunk.startTime);
+    let data: {
+        words?: { start: number; end: number; word: string }[];
+        segments?: { start: number; end: number; text: string }[];
+        text?: string;
+    };
+    try {
+        data = JSON.parse(text) as typeof data;
+    } catch {
+        throw new Error(
+            `${sttModel} returned a transcript with no timestamps. Subtitles need word-level times from the API — this result cannot be used.`,
+        );
+    }
+
+    if (data.words && data.words.length > 0) {
+        subtitles = buildSubtitlesFromWords(data.words, chunk.startTime, maxLines, maxCharsPerLine);
+    } else if (data.segments && data.segments.length > 0) {
+        subtitles = buildSubtitlesFromSegments(data.segments, chunk.startTime);
+    } else if ((data.text ?? '').trim()) {
+        throw new Error(
+            `${sttModel} returned a transcript with no timestamps. Subtitles need word-level times from the API — this result cannot be used.`,
+        );
     }
 
     // Post-processing: Split long subtitles (Safety Net)

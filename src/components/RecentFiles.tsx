@@ -17,7 +17,7 @@ export function RecentFiles({ files, onLoadRecent, onClearRecents, highlightedIn
             <div className="recent-files-header-row">
                 <h3 className="recent-files-header">Recently Generated</h3>
                 <div className="recent-files-actions">
-                    <button className="recent-clear-btn" onClick={onClearRecents} title="Remove all items from the recents list" aria-label="Clear recent files list">
+                    <button className="recent-clear-btn" onClick={onClearRecents} title="Remove items from this list. Project folders stay in your Projects folder." aria-label="Clear recent files list">
                         Clear List
                     </button>
                 </div>
@@ -38,7 +38,7 @@ export function RecentFiles({ files, onLoadRecent, onClearRecents, highlightedIn
                             <div className="recent-file-meta">
                                 {file.lastAction === 'generated' ? 'Generated' : 'Opened'} • {formatTimeAgo(file.date)}
                                 {file.subtitleCount != null && (
-                                    <span className="recent-file-cached"> • {file.subtitleCount} subs cached</span>
+                                    <span className="recent-file-cached"> • {file.subtitleCount} subtitles</span>
                                 )}
                             </div>
                         </div>

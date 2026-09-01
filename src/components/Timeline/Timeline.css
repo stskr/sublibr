@@ -50,12 +50,20 @@
 .timeline-main-track {
     position: relative;
     height: 45px;
+    min-height: 45px;
+    flex-shrink: 0;
     background: var(--color-bg-secondary);
     border-radius: var(--radius-sm);
     /* overflow: hidden; -- Removed to allow hover tooltips to show outside */
     border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
+    transition: height 160ms ease;
+}
+
+.timeline-main-track.tool-scissors,
+.timeline-main-track.tool-trim {
+    height: 120px;
 }
 
 .timeline-main-track.tool-select {
@@ -76,7 +84,7 @@
 /* Precision Hover Tooltip */
 .timeline-hover-subtitle {
     position: absolute;
-    top: 50px;
+    top: calc(100% + 4px);
     /* Below the track */
     left: 50%;
     /* transform handled by JS for boundary check */
@@ -206,34 +214,30 @@
     min-width: 1px;
     display: flex;
     justify-content: space-between;
-    padding: 0 4px;
+    padding: 0;
     font-size: 11px;
     color: #fff;
     overflow: hidden;
 }
 
-.timeline-segment-content {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: var(--timeline-height, 27px);
-    /* Updated to reflect reduced height */
-    text-align: center;
-    pointer-events: none;
-    opacity: 0.9;
-}
-
 .trim-handle {
-    width: 6px;
+    position: absolute;
+    top: 0;
+    width: 8px;
     height: 100%;
     cursor: col-resize;
     background: rgba(255, 255, 255, 0.2);
     opacity: 0;
     transition: opacity var(--transition-fast);
+    z-index: 2;
 }
 
-.timeline-main-segment:hover .trim-handle {
+.timeline-main-track.tool-trim .trim-handle {
+    opacity: 0.45;
+}
+
+.timeline-main-segment:hover .trim-handle,
+.timeline-main-track.tool-trim .timeline-main-segment:hover .trim-handle {
     opacity: 1;
 }
 
@@ -242,11 +246,13 @@
 }
 
 .trim-handle.start {
+    left: 0;
     border-top-left-radius: 2px;
     border-bottom-left-radius: 2px;
 }
 
 .trim-handle.end {
+    right: 0;
     border-top-right-radius: 2px;
     border-bottom-right-radius: 2px;
 }

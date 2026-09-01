@@ -47,8 +47,6 @@ export function useMediaManager() {
         setRecentFiles([]);
         if (window.electronAPI) {
             await window.electronAPI.setStoreValue('recent-files', []);
-            await window.electronAPI.deleteStoreValue('subtitle-cache');
-            await window.electronAPI.deleteStoreValue('subtitle-versions');
         }
     }, []);
 
@@ -86,12 +84,11 @@ export function useMediaManager() {
             setDuration(fileDuration);
             setAudioPath(file.path);
 
-            const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
-            let subsToLoad = cache[recent.path] || [];
+            const project = await window.electronAPI.loadProject(recent.path);
+            const versions = (project?.versions || []) as SubtitleVersion[];
+            let subsToLoad = (project?.subtitles || []) as Subtitle[];
             let hasSubtitles = subsToLoad.length > 0;
-
-            const versionCache = (await window.electronAPI.getStoreValue('subtitle-versions') || {}) as Record<string, SubtitleVersion[]>;
-            const cachedVersions = versionCache[recent.path] || [];
+            const cachedVersions = versions;
 
             if (cachedVersions.length > 0 && !hasSubtitles) {
                 const latestVersion = cachedVersions[cachedVersions.length - 1];
@@ -146,12 +143,15 @@ export function useMediaManager() {
         let hasSubtitles = false;
 
         try {
-            const store = await window.electronAPI.getStoreValue('subtitle-versions') as Record<string, SubtitleVersion[]>;
-            const existing = store?.[file.path];
+            const project = await window.electronAPI.loadProject(file.path);
+            const existing = (project?.versions || []) as SubtitleVersion[];
 
-            if (existing && existing.length > 0) {
+            if (existing.length > 0) {
                 cachedVersions = existing;
                 subsToLoad = existing[existing.length - 1].subtitles;
+                hasSubtitles = true;
+            } else if (Array.isArray(project?.subtitles) && (project.subtitles as Subtitle[]).length > 0) {
+                subsToLoad = project.subtitles as Subtitle[];
                 hasSubtitles = true;
             }
         } catch (err) {

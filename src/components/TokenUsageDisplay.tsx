@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import type { SessionTokenStats } from '../types';
-import { PROVIDER_LABELS, MODEL_OPTIONS } from '../services/providers';
+import type { SessionTokenStats, AIProvider } from '../types';
+import { PROVIDER_LABELS, transcriptionModelLabel } from '../services/providers';
 
 interface TokenUsageDisplayProps {
     stats: SessionTokenStats;
@@ -45,9 +45,7 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
     }
 
     function getModelLabel(provider: string, modelId: string): string {
-        const providerKey = provider as keyof typeof MODEL_OPTIONS;
-        const model = MODEL_OPTIONS[providerKey]?.find(m => m.value === modelId);
-        return model?.label ?? modelId;
+        return transcriptionModelLabel(provider as AIProvider, modelId);
     }
 
     return (

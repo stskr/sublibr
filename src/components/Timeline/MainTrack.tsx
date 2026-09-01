@@ -120,9 +120,6 @@ export const MainTrack: React.FC<MainTrackProps> = ({
                                 width: `${Math.max(0.2, width)}%`
                             }}
                         >
-                            <div className="timeline-segment-content">
-                                {/* Text removed as per request */}
-                            </div>
                             {activeTool === 'trim' && (
                                 <>
                                     <div

@@ -1,10 +1,84 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { Fragment, useState, useCallback, useRef, useEffect } from 'react';
 import { formatSrtTime, parseSrtTime, generateId, detectDirection } from '../utils';
 import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
 import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
 import type { Subtitle } from '../types';
+
+/** Shortest cue that can be inserted between two existing lines without moving them. */
+const MIN_INSERT_DURATION = 0.1;
+const TIME_NUDGE_SEC = 0.1;
+const TIME_NUDGE_SHIFT_SEC = 1;
+
+function roundMs(seconds: number): number {
+    return Math.round(Math.max(0, seconds) * 1000) / 1000;
+}
+
+function TimeInput({
+    seconds,
+    onCommit,
+    min = 0,
+    max,
+    ariaLabel,
+}: {
+    seconds: number;
+    onCommit: (seconds: number) => void;
+    min?: number;
+    max?: number;
+    ariaLabel: string;
+}) {
+    const [text, setText] = useState(formatSrtTime(seconds));
+    const focusedRef = useRef(false);
+
+    useEffect(() => {
+        if (!focusedRef.current) setText(formatSrtTime(seconds));
+    }, [seconds]);
+
+    const clamp = (value: number) => {
+        let next = roundMs(value);
+        if (min != null) next = Math.max(min, next);
+        if (max != null) next = Math.min(max, next);
+        return next;
+    };
+
+    const commit = (value: number) => {
+        const next = clamp(value);
+        setText(formatSrtTime(next));
+        onCommit(next);
+    };
+
+    return (
+        <input
+            type="text"
+            className="time-input"
+            value={text}
+            spellCheck={false}
+            aria-label={ariaLabel}
+            title="↑↓ or ←→ to nudge 100ms · Shift for 1s"
+            onClick={(e) => e.stopPropagation()}
+            onFocus={() => { focusedRef.current = true; }}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => {
+                focusedRef.current = false;
+                commit(parseSrtTime(text));
+            }}
+            onKeyDown={(e) => {
+                const step = e.shiftKey ? TIME_NUDGE_SHIFT_SEC : TIME_NUDGE_SEC;
+                if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    commit(seconds + step);
+                } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    commit(seconds - step);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                }
+            }}
+        />
+    );
+}
 
 interface SubtitleEditorProps {
     subtitles: Subtitle[];
@@ -198,10 +272,15 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
         );
     }, [subtitles, onSubtitlesChange]);
 
-    const handleTimeBlur = useCallback((id: string, field: 'startTime' | 'endTime', value: string) => {
-        const seconds = parseSrtTime(value);
+    const handleTimeChange = useCallback((id: string, field: 'startTime' | 'endTime', seconds: number) => {
         onSubtitlesChange(
-            subtitles.map(sub => sub.id === id ? { ...sub, [field]: seconds } : sub)
+            subtitles.map(sub => {
+                if (sub.id !== id) return sub;
+                if (field === 'startTime') {
+                    return { ...sub, startTime: Math.min(seconds, roundMs(sub.endTime - 0.05)) };
+                }
+                return { ...sub, endTime: Math.max(seconds, roundMs(sub.startTime + 0.05)) };
+            })
         );
     }, [subtitles, onSubtitlesChange]);
 
@@ -224,6 +303,53 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
         onSubtitlesChange([...subtitles, newSub]);
         setEditingId(newSub.id);
     }, [subtitles, onSubtitlesChange]);
+
+    const handleInsertBetween = useCallback((afterIndex: number) => {
+        const prev = subtitles[afterIndex];
+        const next = subtitles[afterIndex + 1];
+        if (!prev || !next) return;
+        const gap = next.startTime - prev.endTime;
+        if (gap < MIN_INSERT_DURATION) return;
+
+        const newSub: Subtitle = {
+            id: generateId(),
+            index: 0,
+            startTime: prev.endTime,
+            endTime: next.startTime,
+            text: '',
+        };
+        const nextList = [
+            ...subtitles.slice(0, afterIndex + 1),
+            newSub,
+            ...subtitles.slice(afterIndex + 1),
+        ].map((s, i) => ({ ...s, index: i + 1 }));
+        onSubtitlesChange(nextList);
+        setEditingId(newSub.id);
+    }, [subtitles, onSubtitlesChange]);
+
+    const handleMergePair = useCallback((firstIndex: number) => {
+        const first = subtitles[firstIndex];
+        const second = subtitles[firstIndex + 1];
+        if (!first || !second) return;
+
+        const mergedText = [first.text, second.text]
+            .map(t => t.trim())
+            .filter(Boolean)
+            .join('\n');
+
+        const merged: Subtitle = {
+            ...first,
+            endTime: second.endTime,
+            text: mergedText,
+        };
+        const nextList = [
+            ...subtitles.slice(0, firstIndex),
+            merged,
+            ...subtitles.slice(firstIndex + 2),
+        ].map((s, i) => ({ ...s, index: i + 1 }));
+        onSubtitlesChange(nextList);
+        if (editingId === second.id) setEditingId(merged.id);
+    }, [subtitles, onSubtitlesChange, editingId]);
 
     const isActive = (sub: Subtitle) =>
         currentTime >= sub.startTime && currentTime <= sub.endTime;
@@ -357,17 +483,20 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                 </div>
             ) : (
                 <div className="subtitle-list" role="list">
-                    {subtitles.map((sub) => {
+                    {subtitles.map((sub, i) => {
                         const isBeyondMedia = mediaDuration ? sub.startTime > mediaDuration : false;
                         const isMatch = matches.includes(sub.id);
                         const isCurrentMatch = matches[currentMatchIndex] === sub.id;
+                        const nextSub = subtitles[i + 1];
+                        const gapDuration = nextSub ? nextSub.startTime - sub.endTime : 0;
+                        const canInsert = Boolean(nextSub) && gapDuration >= MIN_INSERT_DURATION;
 
                         // Viewing logic: if not editing, check for search highlights
                         const showHighlight = (showSearch && searchQuery && isMatch) && editingId !== sub.id;
 
                         return (
+                            <Fragment key={sub.id}>
                             <div
-                                key={sub.id}
                                 ref={isActive(sub) ? activeRef : null}
                                 className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''} ${isBeyondMedia ? 'beyond-media' : ''} ${isCurrentMatch ? 'search-match' : ''}`}
                                 onClick={() => onSeek(sub.startTime)}
@@ -376,24 +505,20 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                 <div className="subtitle-index">{sub.index}</div>
 
                                 <div className="subtitle-times">
-                                    <input
-                                        key={`start-${sub.id}-${sub.startTime}`}
-                                        type="text"
-                                        className="time-input"
-                                        defaultValue={formatSrtTime(sub.startTime)}
-                                        onBlur={(e) => handleTimeBlur(sub.id, 'startTime', e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        aria-label={`Subtitle ${sub.index} start time`}
+                                    <TimeInput
+                                        seconds={sub.startTime}
+                                        onCommit={(value) => handleTimeChange(sub.id, 'startTime', value)}
+                                        min={0}
+                                        max={roundMs(sub.endTime - 0.05)}
+                                        ariaLabel={`Subtitle ${sub.index} start time`}
                                     />
                                     <span className="time-separator">→</span>
-                                    <input
-                                        key={`end-${sub.id}-${sub.endTime}`}
-                                        type="text"
-                                        className="time-input"
-                                        defaultValue={formatSrtTime(sub.endTime)}
-                                        onBlur={(e) => handleTimeBlur(sub.id, 'endTime', e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        aria-label={`Subtitle ${sub.index} end time`}
+                                    <TimeInput
+                                        seconds={sub.endTime}
+                                        onCommit={(value) => handleTimeChange(sub.id, 'endTime', value)}
+                                        min={roundMs(sub.startTime + 0.05)}
+                                        max={mediaDuration}
+                                        ariaLabel={`Subtitle ${sub.index} end time`}
                                     />
                                 </div>
 
@@ -449,6 +574,40 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     <span className="icon icon-sm">close</span>
                                 </button>
                             </div>
+                            {nextSub && (
+                                <div className="subtitle-gap" role="group" aria-label={`Actions between subtitle ${sub.index} and ${nextSub.index}`}>
+                                    <button
+                                        type="button"
+                                        className="gap-action-btn"
+                                        disabled={!canInsert}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleInsertBetween(i);
+                                        }}
+                                        title={canInsert
+                                            ? 'Add a line in the gap — existing times stay as they are'
+                                            : 'Not enough time between these lines to add another subtitle'}
+                                        aria-label={canInsert
+                                            ? `Add subtitle between ${sub.index} and ${nextSub.index}`
+                                            : `Cannot add a subtitle between ${sub.index} and ${nextSub.index} — not enough time`}
+                                    >
+                                        <span className="icon icon-sm">add</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="gap-action-btn gap-action-merge"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMergePair(i);
+                                        }}
+                                        title="Merge these two lines into one"
+                                        aria-label={`Merge subtitle ${sub.index} and ${nextSub.index}`}
+                                    >
+                                        <span className="icon icon-sm">call_merge</span>
+                                    </button>
+                                </div>
+                            )}
+                            </Fragment>
                         );
                     })}
 

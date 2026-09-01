@@ -28,5 +28,8 @@ release
 # Claude Code dev files
 .claude
 
-# Backup files
-*.bak
+# Local Whisper weights (ivrit.ai / ggml) — too large for git
+models/*.bin
+models/*.gguf
+models/*.partial
+

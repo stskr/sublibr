@@ -24,7 +24,7 @@ import {
 } from '../services/transcriber';
 import { healSubtitles } from '../services/healer';
 import { parseSubtitleFile } from '../services/subtitleParser';
-import { callTextProvider } from '../services/providers';
+import { callTextProvider, providerNeedsApiKey } from '../services/providers';
 import { generateId, formatDisplayTime } from '../utils';
 
 const DONE_STATUS_DELAY_MS = 2000;
@@ -87,12 +87,7 @@ export function useTranscriptionPipeline({
     addToRecents,
     setShowGenerator
 }: UseTranscriptionPipelineProps) {
-    // Number of chunks to process concurrently. Free-tier Gemini keys are rate-limited
-    // by daily request quota, so we process sequentially (1 at a time) to avoid
-    // exhausting the limit and to match the slower cadence that the free tier expects.
-    const geminiCfg = settings.providers.gemini;
-    const transcriptionConcurrency =
-        settings.activeProvider === 'gemini' && geminiCfg.freeTier ? 1 : 3;
+    const transcriptionConcurrency = settings.activeProvider === 'local' ? 1 : 3;
 
     const [processing, setProcessing] = useState<ProcessingState>({ status: 'idle', progress: 0 });
     const [showTranslator, setShowTranslator] = useState(false);
@@ -279,7 +274,13 @@ export function useTranscriptionPipeline({
             try {
                 const sampleText = merged.slice(0, 10).map(s => s.text).join(' ');
                 const prompt = `What language is this text? Reply with ONLY the exact English name of the language (e.g., 'Spanish', 'French', 'Hebrew', 'English'). TEXT: ${sampleText}`;
-                const langResponse = await callTextProvider(provider, apiKey, model, prompt);
+                const translator = currentSettings.translator;
+                const langResponse = await callTextProvider(
+                    translator.provider,
+                    currentSettings.providers[translator.provider].apiKey,
+                    translator.model,
+                    prompt,
+                );
                 addTokenUsage(langResponse.tokenUsage);
                 const cleanLang = langResponse.text.trim().replace(/[^a-zA-Z]/g, '');
                 if (cleanLang.length > 0 && cleanLang.length < 20) finalLanguage = cleanLang;
@@ -318,9 +319,11 @@ export function useTranscriptionPipeline({
 
         if (currentMediaFile && window.electronAPI) {
             addToRecents(currentMediaFile, 'generated', merged.length);
-            const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
-            cache[currentMediaFile.path] = merged;
-            window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => { });
+            window.electronAPI.saveProject({
+                sourcePath: currentMediaFile.path,
+                name: currentMediaFile.name,
+                subtitles: merged,
+            }).catch(() => { });
         }
 
         setTimeout(() => {
@@ -370,7 +373,7 @@ export function useTranscriptionPipeline({
     const handleGenerate = useCallback(async () => {
         const activeConfig = settings.providers[settings.activeProvider];
         if (!mediaFile) return;
-        if (!activeConfig.apiKey) return;
+        if (providerNeedsApiKey(settings.activeProvider) && !activeConfig.apiKey) return;
 
         // Reset abort flags
         stopRequestedRef.current = false;
@@ -385,31 +388,26 @@ export function useTranscriptionPipeline({
             if (!window.electronAPI) throw new Error('Electron API not found');
 
             const tempDir = await window.electronAPI.getTempPath();
-            const audioFormat = provider === 'openai' ? 'mp3' : 'flac';
+            const audioFormat = 'mp3';
 
-            let processAudioPath = mediaFile.path;
-            if (mediaFile.isVideo) {
-                setProcessing({ status: 'extracting', progress: 1 });
-                const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.${audioFormat}`;
+            setProcessing({ status: 'extracting', progress: 1 });
+            const audioOutput = `${tempDir}/subtitles_gen_audio_${Date.now()}.${audioFormat}`;
 
-                // Listen for FFmpeg extraction progress so the UI doesn't freeze at 1%
-                const unsubExtract = window.electronAPI.onExtractAudioProgress(({ percent }) => {
-                    if (!stopRequestedRef.current) {
-                        // Map FFmpeg's 0-100% to overall progress 1-15%
-                        setProcessing({ status: 'extracting', progress: 1 + Math.round(percent * 0.14) });
-                    }
-                });
-
-                try {
-                    await window.electronAPI.extractAudio(mediaFile.path, audioOutput, audioFormat);
-                } catch (err) {
-                    console.error('[Extract] Audio extraction error:', err);
-                    throw new Error(`Audio extraction failed: ${err instanceof Error ? err.message : String(err)}`);
-                } finally {
-                    unsubExtract();
+            const unsubExtract = window.electronAPI.onExtractAudioProgress(({ percent }) => {
+                if (!stopRequestedRef.current) {
+                    setProcessing({ status: 'extracting', progress: 1 + Math.round(percent * 0.14) });
                 }
-                processAudioPath = audioOutput;
+            });
+
+            try {
+                await window.electronAPI.extractAudio(mediaFile.path, audioOutput, audioFormat);
+            } catch (err) {
+                console.error('[Extract] Audio extraction error:', err);
+                throw new Error(`Audio extraction failed: ${err instanceof Error ? err.message : String(err)}`);
+            } finally {
+                unsubExtract();
             }
+            const processAudioPath = audioOutput;
 
             if (stopRequestedRef.current) {
                 window.electronAPI.cleanupTempAudio().catch(() => { });
@@ -521,7 +519,7 @@ export function useTranscriptionPipeline({
         if (!checkpoint) return;
 
         const activeConfig = settings.providers[settings.activeProvider];
-        if (!activeConfig.apiKey) return;
+        if (providerNeedsApiKey(settings.activeProvider) && !activeConfig.apiKey) return;
 
         pauseRequestedRef.current = false;
         stopRequestedRef.current = false;
@@ -608,8 +606,8 @@ export function useTranscriptionPipeline({
     // ─────────────────────── translation ───────────────────────
 
     const handleTranslate = useCallback(async () => {
-        const activeConfig = settings.providers[settings.activeProvider];
-        if (!activeConfig.apiKey) return;
+        const translatorConfig = settings.providers[settings.translator.provider];
+        if (providerNeedsApiKey(settings.translator.provider) && !translatorConfig?.apiKey) return;
         if (!subtitles.length) return;
 
         const currentVersion = activeVersionId ? versions.find(v => v.id === activeVersionId) : null;
@@ -637,9 +635,9 @@ export function useTranscriptionPipeline({
             const result = await translateSubtitles(
                 subtitles,
                 translateTargetLang,
-                settings.activeProvider,
-                activeConfig.apiKey,
-                activeConfig.model,
+                settings.translator.provider,
+                settings.providers[settings.translator.provider].apiKey,
+                settings.translator.model,
                 (progress) => setProcessing({ status: 'transcribing', progress })
             );
 
@@ -647,15 +645,15 @@ export function useTranscriptionPipeline({
 
             const versionNumber = versions.length + 1;
             const labelStr = isAutoDetect
-                ? `V${versionNumber}-${sourceLanguage}_Auto-${translateTargetLang}, ${activeConfig.model}`
-                : `V${versionNumber}-${sourceLanguage}-${translateTargetLang}, ${activeConfig.model}`;
+                ? `V${versionNumber}-${sourceLanguage}_Auto-${translateTargetLang}, ${settings.translator.model}`
+                : `V${versionNumber}-${sourceLanguage}-${translateTargetLang}, ${settings.translator.model}`;
 
             const versionId = generateId();
             const newVersion: SubtitleVersion = {
                 id: versionId,
                 timestamp: Date.now(),
-                provider: settings.activeProvider,
-                model: activeConfig.model,
+                provider: settings.translator.provider,
+                model: settings.translator.model,
                 language: translateTargetLang,
                 subtitles: result.subtitles,
                 label: labelStr,
@@ -668,11 +666,11 @@ export function useTranscriptionPipeline({
 
             if (mediaFile) {
                 addToRecents(mediaFile, 'generated', result.subtitles.length);
-                if (window.electronAPI) {
-                    const cache = (await window.electronAPI.getStoreValue('subtitle-cache') || {}) as Record<string, Subtitle[]>;
-                    cache[mediaFile.path] = result.subtitles;
-                    window.electronAPI.setStoreValue('subtitle-cache', cache).catch(() => { });
-                }
+                window.electronAPI?.saveProject({
+                    sourcePath: mediaFile.path,
+                    name: mediaFile.name,
+                    subtitles: result.subtitles,
+                }).catch(() => { });
             }
 
             setTimeout(() => {
