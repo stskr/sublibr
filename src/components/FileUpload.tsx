@@ -8,7 +8,6 @@ interface FileUploadProps {
     highlightedRecentIndex: number | null;
     onProcessFile: (path: string) => Promise<void>;
     onStartFromScratch: () => void;
-    onLoadExisting: () => void;
     onRequestDelete: (project: ProjectSummary) => void;
     onDuplicateProject: (project: ProjectSummary) => void;
     onRenameProject: (project: ProjectSummary) => void;
@@ -23,7 +22,6 @@ export function FileUpload({
     highlightedRecentIndex,
     onProcessFile,
     onStartFromScratch,
-    onLoadExisting,
     onRequestDelete,
     onDuplicateProject,
     onRenameProject,
@@ -90,7 +88,7 @@ export function FileUpload({
 
     const handleBrowse = async () => {
         if (!window.electronAPI) return;
-        const filePath = await window.electronAPI.openFileDialog();
+        const filePath = await (window.electronAPI.openImportDialog ?? window.electronAPI.openFileDialog)();
         if (filePath) onProcessFile(filePath);
     };
 
@@ -104,7 +102,7 @@ export function FileUpload({
                 onDragLeave={handleDragLeave}
                 role="button"
                 tabIndex={0}
-                aria-label="Drop a file or project, or browse"
+                aria-label="Drop a video, audio, subtitle, or Sublibr project, or browse"
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBrowse(); }
                 }}
@@ -118,7 +116,9 @@ export function FileUpload({
                     <div className="upload-prompt">
                         <span className="icon icon-xl upload-icon">folder_open</span>
                         <h3>Drop a file here</h3>
-                        <p>Video, audio, subtitles, or a Sublibr project</p>
+                        <p className="upload-formats">
+                            Video or audio (MP4, MOV, MP3, WAV…), subtitles (SRT, VTT, ASS), or a Sublibr project
+                        </p>
                         <button className="btn-primary" onClick={handleBrowse}>
                             Browse files
                         </button>
@@ -126,16 +126,18 @@ export function FileUpload({
                 )}
             </div>
 
-            <div className="home-actions">
-                <button className="btn-secondary home-action-btn" onClick={onStartFromScratch} disabled={isAnalyzing}>
-                    <span className="icon icon-sm">add</span>
-                    Start from scratch
+            <p className="home-scratch">
+                <span className="home-scratch-or">or</span>
+                {' '}
+                <button
+                    type="button"
+                    className="home-scratch-link"
+                    onClick={onStartFromScratch}
+                    disabled={isAnalyzing}
+                >
+                    start from scratch
                 </button>
-                <button className="btn-secondary home-action-btn" onClick={onLoadExisting} disabled={isAnalyzing}>
-                    <span className="icon icon-sm">folder_open</span>
-                    Load existing project
-                </button>
-            </div>
+            </p>
 
             {propsError && (
                 <div className="error-message" role="alert">

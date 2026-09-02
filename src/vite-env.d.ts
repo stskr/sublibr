@@ -6,6 +6,7 @@ export interface ElectronAPI {
     setStoreValue: (key: string, value: unknown) => Promise<void>;
     deleteStoreValue: (key: string) => Promise<void>;
     openFileDialog: () => Promise<string | null>;
+    openImportDialog: () => Promise<string | null>;
     openSubtitleFileDialog: () => Promise<string | null>;
     saveFileDialog: (defaultName: string, filterName?: string, filterExtensions?: string[]) => Promise<string | null>;
     showMessageBox: (options: Electron.MessageBoxOptions) => Promise<Electron.MessageBoxReturnValue>;

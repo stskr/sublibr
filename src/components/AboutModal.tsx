@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import logoWhite from '../assets/Logo/logo-white.svg';
+import logoFull from '../assets/Logo/logo-full-white.svg';
 
 interface AboutModalProps {
     onClose: () => void;
@@ -52,8 +52,7 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
 
                     {/* App identity */}
                     <div className="about-hero">
-                        <img src={logoWhite} alt="SUBLIBR" className="about-logo" />
-                        <div className="about-app-name">SUBLIBR</div>
+                        <img src={logoFull} alt="Sublibr" className="about-logo" />
                         <div className="about-version">Version {version}</div>
                         <p className="about-description">
                             Transcribe video and audio into timed subtitles, on this computer or in the cloud. Edit on a timeline, style the text, and export files or a burned-in video.

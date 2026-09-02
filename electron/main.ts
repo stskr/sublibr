@@ -558,7 +558,30 @@ ipcMain.handle('dialog:openFile', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
-      { name: 'Media Files', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'] },
+      { name: 'Media Files', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'mts', 'm2ts', 'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac', 'wma', 'alac', 'aiff'] },
+    ],
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
+});
+
+ipcMain.handle('dialog:openImport', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile', 'openDirectory'],
+    filters: [
+      {
+        name: 'Supported files',
+        extensions: [
+          'mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'mts', 'm2ts',
+          'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac', 'wma', 'alac', 'aiff',
+          'srt', 'vtt', 'ass', 'ssa', 'sublibr',
+        ],
+      },
+      { name: 'Media', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'mts', 'm2ts', 'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac', 'wma', 'alac', 'aiff'] },
+      { name: 'Subtitles', extensions: ['srt', 'vtt', 'ass', 'ssa'] },
+      { name: 'Sublibr project', extensions: ['sublibr'] },
+      { name: 'All files', extensions: ['*'] },
     ],
   });
   const filePath = result.filePaths[0] || null;

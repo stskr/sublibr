@@ -5,7 +5,7 @@ import { CustomSelect } from './CustomSelect';
 
 const ALL_PROVIDERS: AIProvider[] = ['local', 'gemini', 'openai'];
 
-type SettingsTab = 'general' | 'models' | 'keys';
+export type SettingsTab = 'general' | 'models' | 'keys';
 
 function OfflineOnlineSwitch({
     id,
@@ -42,6 +42,7 @@ interface SettingsProps {
     settings: AppSettings;
     onSettingsChange: (settings: AppSettings) => void;
     onClose: () => void;
+    initialTab?: SettingsTab;
 }
 
 type KeyStatus = 'idle' | 'testing' | 'valid' | 'invalid' | 'unverified';
@@ -59,7 +60,7 @@ function cloudKeySavable(status: KeyStatus, apiKey: string): boolean {
     return status !== 'testing';
 }
 
-export function Settings({ settings, onSettingsChange, onClose }: SettingsProps) {
+export function Settings({ settings, onSettingsChange, onClose, initialTab = 'general' }: SettingsProps) {
     const [draft, setDraft] = useState<AppSettings>(() => {
         const next = structuredClone(settings);
         if (typeof next.unloadAfterMinutes !== 'number' || !Number.isFinite(next.unloadAfterMinutes)) {
@@ -74,7 +75,7 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
         next.providers.local.model = resolveSavedModel('local', next.providers.local.model);
         return next;
     });
-    const [tab, setTab] = useState<SettingsTab>('general');
+    const [tab, setTab] = useState<SettingsTab>(initialTab);
     const [choosingFolder, setChoosingFolder] = useState(false);
 
     const [keyStatus, setKeyStatus] = useState<Record<AIProvider, KeyStatus>>(() => {
@@ -445,7 +446,7 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                         options={transcribeOptions}
                                     />
                                 )}
-                                <p className="setting-hint" style={{ marginTop: '8px', marginBottom: 0 }}>
+                                <p className="setting-hint setting-hint-flush">
                                     {transcribeOnline
                                         ? (transcribeOptions.length === 0
                                             ? 'Add a tested Gemini or OpenAI key to transcribe online.'
@@ -510,7 +511,7 @@ export function Settings({ settings, onSettingsChange, onClose }: SettingsProps)
                                         options={translateOptions}
                                     />
                                 )}
-                                <p className="setting-hint" style={{ marginTop: '8px', marginBottom: 0 }}>
+                                <p className="setting-hint setting-hint-flush">
                                     {translateOnline
                                         ? (translateOptions.length === 0
                                             ? 'Add a tested Gemini or OpenAI key to translate online.'

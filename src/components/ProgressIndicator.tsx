@@ -197,7 +197,7 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                                     className="btn btn-sm btn-ghost"
                                     onClick={handleStopClick}
                                     aria-label="Confirm stop processing"
-                                    style={{ color: 'var(--color-error, #f87171)' }}
+                                    style={{ color: 'var(--color-error)' }}
                                 >
                                     <span className="icon icon-sm">stop</span>
                                     Confirm stop
@@ -216,7 +216,7 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                                 onClick={handleStopClick}
                                 aria-label="Stop processing"
                                 title="Stop and discard progress"
-                                style={{ color: 'var(--color-error, #f87171)' }}
+                                style={{ color: 'var(--color-error)' }}
                             >
                                 <span className="icon icon-sm">stop</span>
                                 Stop

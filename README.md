@@ -1,71 +1,64 @@
 # SUBLIBR
 
+<img src="src/assets/Logo/logo-black.svg" alt="Sublibr" height="40">
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A modern, AI-powered desktop application that generates high-quality subtitles for your videos and audio files. Supports multiple AI providers: Google Gemini and OpenAI.
+A desktop app that turns video and audio into **timed subtitles**. Transcribe on this computer or in the cloud, edit on a timeline, style the text, and export files or a burned-in video.
 
-תוכנה מודרנית מבוססת AI לתמלול אוטומטי של קטעי וידאו או אודיו. נא לשים לב שאיכות התמלול בעברית עולה משמעותית בשימוש במודל של Gemini Pro. 
+תוכנה שולחנית לתמלול וידאו ואודיו לכתוביות עם חותמות זמן. אפשר לעבוד לגמרי במחשב (Whisper, כולל משקלי ivrit.ai לעברית) או בענן (Gemini / OpenAI).
 
-## 📸 Screenshots
+## Screenshots
 
 | | |
 |---|---|
-| ![Upload video or audio](readme-screenshots/1-Upload%20Video%20Audio.png) | ![API key setup](readme-screenshots/2-Easy%20LLM%20Provider%20API%20Key%20Setup.png) |
-| ![AI subtitles generation](readme-screenshots/3-AI%20Subtitles%20Generation.png) | ![Subtitles editor](readme-screenshots/4-Subtitles%20Editor.png) |
+| ![Home — drop media or a project](readme-screenshots/1-Upload%20Video%20Audio.png) | ![API keys](readme-screenshots/2-Easy%20LLM%20Provider%20API%20Key%20Setup.png) |
+| ![Generate subtitles](readme-screenshots/3-AI%20Subtitles%20Generation.png) | ![Subtitle editor](readme-screenshots/4-Subtitles%20Editor.png) |
 
-![Preview video](readme-screenshots/5-Preview%20Video.png)
+![Preview](readme-screenshots/5-Preview%20Video.png)
 
-## ✨ Features
+## Features
 
-- **🎙️ AI Transcription**: Dedicated speech-to-text models that return word timestamps — Gemini 3.5 Transcribe and OpenAI Whisper — with per-provider API key validation and a unified "Active Model" selector.
-- **🌍 90+ Languages**: Auto-detects languages or lets you choose from over 90 options.
-- **🔄 Versions & Regenerate**: Create multiple subtitle versions with different settings and switch between them instantly.
-- **🌐 Translate**: Translate generated subtitles to another language via a text-to-text AI model while perfectly preserving timestamps.
-- **✂️ Smart Processing**: Automatically handles long files by splitting them into chunks with context-aware 20-second overlap and smart stitching at boundaries.
-- **🩹 Gap Healing**: Intelligently detects and re-transcribes missing subtitle segments that AI skipped.
-- **🎬 Render Video**: Burn styled subtitles directly into a video at any target resolution (Wide 16:9, Square 1:1, Vertical 9:16, or Original).
-- **🎨 Global Subtitle Styling**: Full per-project style control — font, font size, text color, outline/shadow effects, background box, and precise X/Y position. Per-screen-size defaults and a one-click Reset button.
-- **📤 Multi-Format Export**: SRT, WebVTT, and ASS with full style embedding.
-- **📝 Recent Files History**: Tracks your last 10 files for quick access with automatic subtitle caching for instant restoration.
-- **⚡ Quality Control**: Enforces reading speeds, line limits, and minimum durations for professional-looking subtitles.
-- **⌨️ Keyboard Shortcuts**: Control playback (Space, Arrows) and editing (Undo/Redo, Insert/Delete, Search) with global shortcuts.
-- **🎬 Advanced Visual Editor**: Two-tier timeline with a zoomed detail view, precision ruler, vertical grid, and a global minimap for precise navigation. Includes a **Scissors tool** (C) for splitting and **drag-to-trim** handles.
-- **🔍 Search & Replace**: Find and correct text across all subtitles with "Replace All" and keyboard navigation.
-- **✏️ Rich Text Editing**: WYSIWYG inline subtitle editing with bold, italic, underline, and per-word color markup preserved through the full pipeline.
-- **👁️ Preview Mode**: Toggle between subtitle list and inline video preview. Font size scales proportionally to the selected render resolution for an accurate representation of the final render.
-- **🔒 Private & Local**: Your files stay on your machine (except audio chunks sent securely to the selected AI provider).
-- **♿ Accessible**: Full ARIA support with keyboard navigation, focus traps on modals, screen reader announcements, and labeled controls.
+**Transcription, with timestamps.** Sublibr only uses speech models that return times. Cloud: Gemini 3.5 Transcribe, or OpenAI Whisper (`whisper-1`). Offline: Whisper Large v3 Turbo on this machine; Hebrew uses dedicated [ivrit.ai](https://huggingface.co/ivrit-ai) weights.
 
-## 🚀 Getting Started
+**Translation.** Rewrite subtitle text while keeping the same cues. Cloud: Gemini or GPT. Offline: Qwen2.5 7B via `llama-server`. Whisper does not translate.
+
+**Portable projects.** Each job is a folder (default `~/Documents/Sublibr`). Media is copied into `media/` so you can move the folder to another computer. Latest projects on the home screen: open, rename, duplicate, delete, or relink missing media. Drop or browse a video, audio file, SRT/VTT/ASS, or a Sublibr project. Start from scratch when you have no file yet.
+
+**Editor.** Two-tier timeline (detail + minimap), scissors, drag-to-trim, search and replace, undo/redo, and inline rich text (bold, italic, underline, per-word color). RTL typography for Hebrew and similar scripts. Versions let you keep a transcription and go back to change language or model.
+
+**Style and output.** Per-project style: font, size, color, outline, box, position. Screen format (wide 16:9, square, vertical, original) drives line length, defaults, and render size. Download SRT, WebVTT, or ASS. Burn styled subtitles into a video.
+
+**Long files.** Splits audio into overlapping parts, stitches at boundaries, then fills gaps the model skipped. Pause and resume transcription. Token usage is shown for cloud runs.
+
+**Private by design.** API keys live in OS-encrypted electron-store, never in the project folder. Offline audio never leaves this machine. Online runs send audio to Google or OpenAI under those providers’ terms. Session logs (no secrets) sit in each project’s `logs/` folder, last 20 kept.
+
+## Getting started
 
 ### Prerequisites
 
-- **Node.js**: v18 or newer
-- **AI Provider API Key** (at least one):
-  - [Google AI Studio](https://aistudio.google.com/apikey) (Gemini)
-  - [OpenAI Platform](https://platform.openai.com/api-keys) (Whisper)
+- **Node.js** 18 or newer
+- For **online** transcription: a [Google AI Studio](https://aistudio.google.com/apikey) key and/or an [OpenAI](https://platform.openai.com/api-keys) key
+- For **offline** transcription and translation, see [Offline models](#offline-models)
 
-### Installation
+### Run from source
 
-1. **Clone the repository**
-    ```bash
-    git clone https://github.com/stskr/sublibr.git
-    cd sublibr
-    ```
+```bash
+git clone https://github.com/stskr/sublibr.git
+cd sublibr
+npm install
+npm run dev
+```
 
-2. **Install dependencies**
-    ```bash
-    npm install
-    ```
+If Electron exits immediately in Cursor, the shell is injecting `ELECTRON_RUN_AS_NODE=1`. Clear it:
 
-3. **Run the app**
-    ```bash
-    npm run dev
-    ```
+```bash
+ELECTRON_RUN_AS_NODE= npm run dev
+```
 
-### Building for Production
+First launch asks where to store projects (suggested: `Documents/Sublibr`). Then Settings → **API keys** to test a cloud key, or Models → **Offline** and **Check setup**.
 
-To create an installer for your OS (`.dmg`, `.exe`, or `.AppImage`):
+### Production build
 
 ```bash
 # macOS
@@ -78,29 +71,59 @@ npm run build && npx electron-builder --win
 npm run build && npx electron-builder --linux
 ```
 
-## 🛠️ How to Use
+### Tests
 
-1. **Set API Key**: Click **Settings** (gear icon), toggle the providers you want, paste an API key for each, and click **Test** to verify. Select Gemini 3.5 Transcribe or Whisper from the Active Model dropdown.
-2. **Import Media**: Drag & drop a file, or click to browse. Supports audio (mp3, wav, flac, etc.) and video (mp4, mkv, mov, etc.).
-3. **Generate**: Select your language (or leave as Auto-detect), choose your **Screen Format** (Wide, Square, Vertical), and click **Generate Subtitles**.
-4. **Style**: Click **Global Style** to customize font, font size, colors, outline/shadow effects, background box, and subtitle position. Use **Reset** to restore per-format defaults.
-5. **Edit & Preview**: Review subtitles in the timeline editor or switch to **Preview** mode to see an accurate render preview with correct font scaling per aspect ratio.
-6. **Export or Render**: **Download** as SRT/VTT/ASS, or click **Render Video** to burn styled subtitles directly into your video.
+```bash
+npx vitest run
+```
 
-## ⚙️ Configuration
+## How to use
 
-- **Model Selection**: Gemini 3.5 Transcribe or Whisper (both return word timestamps).
-- **Screen Format**: Wide (16:9), Square (1:1), Vertical (9:16), or Original — controls line length, font size defaults, and render resolution.
-- **Subtitle Style**: Fully configurable per-project in the Global Style panel.
-- **Theme**: The app defaults to a modern dark theme optimized for video editing.
+1. **Open something.** Drop or browse video/audio, a subtitle file, or a project folder / `project.sublibr`. Or start from scratch and add media later.
+2. **Choose a model.** Settings → Models: transcribe online or offline. Cloud options appear after a key is tested. Open Models from the generate panel to jump straight there.
+3. **Generate subtitles.** Pick a language (or auto-detect) and screen format, then Generate. Offline is enabled only when Whisper is actually installed and probed.
+4. **Edit.** Timeline, list, or Preview. Style in Global Style. Translate or regenerate; the current version is kept.
+5. **Export.** Download SRT / VTT / ASS, or Render video to burn the styled track in.
 
-## 🏗️ Tech Stack
+## Offline models
 
-- **Core**: Electron, React 19, TypeScript, Vite
-- **AI**: Google Gemini, OpenAI (multi-provider)
-- **Media**: FFmpeg (via `@ffmpeg-installer` for easy distribution)
-- **Styling**: Vanilla CSS with comprehensive design tokens
+Put weights in a `models/` folder at the repo root (gitignored). Settings → Models → **Check setup** reports what’s missing.
 
-## 📄 License
+| File | Used for |
+|------|----------|
+| `ggml-large-v3-turbo-official.bin` | Whisper Large v3 Turbo (most languages) |
+| `ggml-large-v3-turbo.bin` | Hebrew (ivrit.ai) |
+| `Qwen2.5-7B-Instruct-Q4_K_M.gguf` | Offline translation |
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+On macOS:
+
+```bash
+brew install whisper-cpp
+brew install llama.cpp
+```
+
+Sublibr looks for `whisper-cli` and `llama-server` on your PATH (and Homebrew’s usual locations). The translator unloads after a few idle minutes (configurable in General). Whisper unloads after each clip.
+
+## Project folder
+
+```
+Documents/Sublibr/
+  My Video/
+    project.sublibr      # JSON manifest (relative paths)
+    media/               # collected copy of the source file
+    subtitles.json
+    versions.json
+    logs/                # session-YYYYMMDD-HHMMSS.jsonl
+```
+
+Identity is the **folder**, not an absolute media path. Opening a legacy `project.json` migrates to `project.sublibr`. API keys are never written here.
+
+## Tech stack
+
+Electron, React 19, TypeScript, Vite, FFmpeg. Cloud: Google Gemini, OpenAI. Offline: whisper.cpp, llama.cpp. Settings in electron-store.
+
+## License
+
+MIT — see [LICENSE](LICENSE). FFmpeg is LGPL 2.1+; source at [ffmpeg.org/download](https://ffmpeg.org/download.html).
+
+You are responsible for having the right to transcribe, subtitle, and distribute any media you process.

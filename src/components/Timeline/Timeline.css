@@ -3,7 +3,7 @@
 .timeline-container {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-xs);
     width: 100%;
     user-select: none;
     padding-bottom: var(--space-xs);
@@ -13,7 +13,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-xs);
     min-width: 0;
 }
 
@@ -29,6 +29,11 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
+}
+
+.btn-tool:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
 }
 
 .btn-tool:hover {
@@ -84,47 +89,40 @@
 /* Precision Hover Tooltip */
 .timeline-hover-subtitle {
     position: absolute;
-    top: calc(100% + 4px);
-    /* Below the track */
+    top: calc(100% + var(--space-xs));
     left: 50%;
-    /* transform handled by JS for boundary check */
-    background: #d1d1d1;
-    color: #1a1a1a;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 13px;
+    background: var(--color-tooltip);
+    color: var(--color-on-tooltip);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
     font-weight: 500;
     white-space: pre-wrap;
-    /* Support multi-line if needed */
     width: auto !important;
-    min-width: 300px !important;
-    max-width: 600px !important;
+    min-width: 18.75rem !important;
+    max-width: 37.5rem !important;
     z-index: 100;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    border: 1px solid #999;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-tooltip-border);
     pointer-events: none;
     text-align: center;
-    /* Generally safer for tooltips */
 }
 
 .timeline-hover-timecode {
     position: absolute;
-    top: 4px;
-    /* Inside the track at top */
+    top: var(--space-xs);
     left: 50%;
-    /* transform handled by JS for boundary check */
-    background: rgba(0, 0, 0, 0.85);
-    /* Black box */
-    color: #fff;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 11px;
+    background: var(--color-overlay-strong);
+    color: var(--color-on-video);
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-2xs);
     font-family: var(--font-mono);
     pointer-events: none;
     z-index: 15;
     white-space: nowrap;
     box-shadow: var(--shadow-sm);
-    border: 1px solid #444;
+    border: 1px solid var(--color-border-soft);
 }
 
 /* Ruler */
@@ -195,11 +193,11 @@
 }
 
 .grid-line.major {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--color-on-video) 8%, transparent);
 }
 
 .grid-line.minor {
-    background: rgba(255, 255, 255, 0.03);
+    background: color-mix(in srgb, var(--color-on-video) 3%, transparent);
 }
 
 .timeline-main-segment {
@@ -208,15 +206,14 @@
     background: var(--color-accent);
     opacity: 0.7;
     border-radius: 2px;
-    border-right: 1px solid rgba(0, 0, 0, 0.2);
-    /* Improve performance for many segments */
+    border-right: 1px solid color-mix(in srgb, var(--color-video) 20%, transparent);
     will-change: width, left;
     min-width: 1px;
     display: flex;
     justify-content: space-between;
     padding: 0;
-    font-size: 11px;
-    color: #fff;
+    font-size: var(--text-2xs);
+    color: var(--color-on-video);
     overflow: hidden;
 }
 
@@ -226,7 +223,7 @@
     width: 8px;
     height: 100%;
     cursor: col-resize;
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, var(--color-on-video) 20%, transparent);
     opacity: 0;
     transition: opacity var(--transition-fast);
     z-index: 2;
@@ -242,7 +239,7 @@
 }
 
 .trim-handle:hover {
-    background: rgba(255, 255, 255, 0.5);
+    background: color-mix(in srgb, var(--color-on-video) 50%, transparent);
 }
 
 .trim-handle.start {
@@ -269,7 +266,7 @@
     width: 2px;
     background: var(--color-text-primary);
     z-index: 10;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-sm);
     pointer-events: none;
 }
 
@@ -279,7 +276,7 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, var(--color-on-video) 30%, transparent);
     pointer-events: none;
     display: none;
 }
@@ -308,7 +305,7 @@
     bottom: 8px;
     left: 0;
     right: 0;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--color-on-video) 5%, transparent);
     border-radius: 2px;
 }
 
@@ -328,7 +325,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--color-overlay);
     pointer-events: none;
     z-index: 5;
 }
@@ -382,8 +379,8 @@
     display: block;
     height: 12px;
     width: 2px;
-    background: rgba(0, 0, 0, 0.3);
-    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, var(--color-video) 30%, transparent);
+    border-left: 1px solid color-mix(in srgb, var(--color-on-video) 30%, transparent);
 }
 
 .timeline-handle.left {
@@ -409,12 +406,12 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: #fff;
+    background: var(--color-on-video);
     z-index: 4;
     /* Below overlay, or above? Usually playhead is visible everywhere */
     z-index: 8;
     pointer-events: none;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Media duration limit line */

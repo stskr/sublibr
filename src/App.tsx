@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings } from './components/Settings';
+import { Settings, type SettingsTab } from './components/Settings';
 import { FileUpload } from './components/FileUpload';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { ShortcutsModal } from './components/ShortcutsModal';
@@ -26,14 +26,14 @@ import type { Subtitle, AppSettings, ProjectSummary, ScreenSize } from './types'
 import { layoutSubtitles, reflowSubtitles } from './services/subtitleLayout';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { DEFAULT_SUBTITLE_STYLE } from './types';
-import { PROVIDER_LABELS, resolveSavedModel, resolveSavedTranslatorModel, TRANSLATOR_MODEL_OPTIONS, isTranscriptionReady, CLOUD_PROVIDERS, transcriptionModelLabel } from './services/providers';
+import { PROVIDER_LABELS, resolveSavedModel, resolveSavedTranslatorModel, TRANSLATOR_MODEL_OPTIONS, isTranscriptionReady, CLOUD_PROVIDERS, transcriptionModelLabel, testApiKey } from './services/providers';
 import { SubtitleStylePanel } from './components/SubtitleStylePanel';
 import { ResolutionPicker } from './components/ResolutionPicker';
 
 import './App.css';
 import { bindSessionLog, describeClickTarget, logSession } from './services/sessionLog';
 import { settingsSnapshot } from './services/sessionSanitize';
-import logoWhite from './assets/Logo/logo-white.svg';
+import logoFull from './assets/Logo/logo-full-white.svg';
 
 const DEFAULT_SETTINGS: AppSettings = {
   activeProvider: 'gemini',
@@ -58,6 +58,8 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [folderSetup, setFolderSetup] = useState<'loading' | 'needed' | 'done'>('loading');
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
+  const [localWhisperOk, setLocalWhisperOk] = useState<boolean | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showStylePanel, setShowStylePanel] = useState(false);
@@ -208,7 +210,6 @@ function App() {
     processFile: coreProcessFile,
     handleLoadRecent: coreLoadRecent,
     handleCreateEmpty,
-    handleLoadExisting,
     handleAddOrReplaceMedia,
     handleRelink,
     dismissMissing,
@@ -283,10 +284,6 @@ function App() {
   const wrappedStartFromScratch = useCallback(async () => {
     await applyOpened(await handleCreateEmpty());
   }, [handleCreateEmpty, applyOpened]);
-
-  const wrappedLoadExisting = useCallback(async () => {
-    await applyOpened(await handleLoadExisting());
-  }, [handleLoadExisting, applyOpened]);
 
   const wrappedAddMedia = useCallback(async () => {
     if (!window.electronAPI) return;
@@ -490,7 +487,7 @@ function App() {
   const handleOpenFileShortcut = useCallback(async () => {
     if (currentProject) return;
     if (!window.electronAPI) return;
-    const filePath = await window.electronAPI.openFileDialog();
+    const filePath = await (window.electronAPI.openImportDialog ?? window.electronAPI.openFileDialog)();
     if (filePath) {
       wrappedProcessFile(filePath);
     }
@@ -539,6 +536,30 @@ function App() {
     setHighlightedRecentIndex(null);
   }, [setHighlightedRecentIndex, setShowGenerator, setShowTranslator]);
 
+  const openSettings = useCallback((tab: SettingsTab = 'general') => {
+    setSettingsTab(tab);
+    setShowSettings(true);
+  }, []);
+
+  useEffect(() => {
+    if (settings.activeProvider !== 'local') {
+      setLocalWhisperOk(null);
+      return;
+    }
+    if (!window.electronAPI) {
+      setLocalWhisperOk(false);
+      return;
+    }
+    let cancelled = false;
+    setLocalWhisperOk(null);
+    testApiKey('local', '').then((result) => {
+      if (!cancelled) setLocalWhisperOk(Boolean(result.ok) && !result.error);
+    }).catch(() => {
+      if (!cancelled) setLocalWhisperOk(false);
+    });
+    return () => { cancelled = true };
+  }, [settings.activeProvider, showSettings]);
+
   useKeyboardShortcuts({
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -557,16 +578,17 @@ function App() {
   });
 
   const activeConfig = settings.providers[settings.activeProvider];
-  const canGenerate = mediaFile && isTranscriptionReady(settings.activeProvider, activeConfig) && processing.status === 'idle';
   const isProcessing = processing.status !== 'idle' && processing.status !== 'done' && processing.status !== 'error';
+  const transcribeReady = isTranscriptionReady(settings.activeProvider, activeConfig, localWhisperOk);
+  const canGenerate = Boolean(mediaFile) && transcribeReady && processing.status === 'idle';
+  const showGeneratePanel = !isProcessing && (showGenerator || subtitles.length === 0) && !showTranslator;
 
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-left">
           <div className="header-brand">
-            <img src={logoWhite} alt="" className="header-brand-logo" />
-            <span className="header-brand-name">SUBLIBR</span>
+            <img src={logoFull} alt="Sublibr" className="header-brand-logo" />
           </div>
         </div>
 
@@ -596,7 +618,7 @@ function App() {
           <button className="btn-icon" onClick={() => setShowAbout(true)} title="About Sublibr" aria-label="About Sublibr">
             <span className="icon">info</span>
           </button>
-          <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
+          <button className="btn-icon" onClick={() => openSettings('general')} title="Settings" aria-label="Settings">
             <span className="icon">settings</span>
           </button>
         </div>
@@ -612,7 +634,6 @@ function App() {
             highlightedRecentIndex={highlightedRecentIndex}
             onProcessFile={wrappedProcessFile}
             onStartFromScratch={wrappedStartFromScratch}
-            onLoadExisting={wrappedLoadExisting}
             onRequestDelete={requestDelete}
             onDuplicateProject={handleDuplicate}
             onRenameProject={requestRename}
@@ -662,7 +683,7 @@ function App() {
                 )}
               </div>
               )}
-              {!isProcessing && (showGenerator || subtitles.length === 0) && !showTranslator && (
+              {!isProcessing && showGeneratePanel && (
                 <div className="sidebar-section">
                   {versions.length > 0 && (
                     <button
@@ -690,25 +711,41 @@ function App() {
                     }}
                   />
 
+                  <TranscriptionModelButton
+                    settings={settings}
+                    onClick={() => openSettings('models')}
+                  />
+
                   <button
                     className="btn-primary sidebar-action-btn"
                     onClick={handleGenerate}
                     disabled={!canGenerate}
-                    title={!mediaFile
-                      ? 'Add video or audio first'
-                      : !isTranscriptionReady(settings.activeProvider, activeConfig)
-                        ? 'Set up transcription in Settings'
-                        : undefined}
+                    title={generateBlockedReason({
+                      hasMedia: Boolean(mediaFile),
+                      transcribeReady,
+                      local: settings.activeProvider === 'local',
+                      localWhisperOk,
+                    })}
                   >
                     <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'auto_awesome'}</span>
                     Generate subtitles
                   </button>
                   {!canGenerate && (
-                    <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
-                      {!mediaFile
-                        ? 'Add video or audio first.'
-                        : 'Set up transcription in Settings.'}
-                    </p>
+                    <>
+                      <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
+                        {generateBlockedReason({
+                          hasMedia: Boolean(mediaFile),
+                          transcribeReady,
+                          local: settings.activeProvider === 'local',
+                          localWhisperOk,
+                        })}
+                      </p>
+                      {mediaFile && !transcribeReady && !(settings.activeProvider === 'local' && localWhisperOk === null) && (
+                        <button type="button" className="text-link-btn" onClick={() => openSettings('models')}>
+                          Open Models
+                        </button>
+                      )}
+                    </>
                   )}
                   {canGenerate && settings.activeProvider === 'local' && (
                     <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
@@ -805,7 +842,7 @@ function App() {
                     className="btn-secondary sidebar-action-btn"
                     onClick={handleRegenerate}
                     style={{ marginBottom: '0.5rem', width: '100%' }}
-                    title="Transcribe again and keep this version"
+                    title="Go back to change language or model, then transcribe again. This version is kept."
                   >
                     <span className="icon icon-sm">refresh</span> Regenerate
                   </button>
@@ -985,25 +1022,12 @@ function App() {
               />
               <div className="footer-info-row">
                 <div className="footer-left-group">
-                  <button
-                    className={`active-model-badge${settings.activeProvider === 'local' ? ' is-local' : ' is-cloud'}`}
-                    onClick={() => setShowSettings(true)}
-                    title="Change transcription model"
-                  >
-                    <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'cloud'}</span>
-                    <span className={`run-location-chip ${settings.activeProvider === 'local' ? 'is-offline' : 'is-cloud'}`}>
-                      {settings.activeProvider === 'local' ? 'Offline' : 'Online'}
-                    </span>
-                    <span className="active-model-label">
-                      Transcription
-                    </span>
-                    {settings.activeProvider !== 'local' && (
-                      <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
-                    )}
-                    <span className="active-model-name">
-                      {transcriptionModelLabel(settings.activeProvider, activeConfig.model)}
-                    </span>
-                  </button>
+                  {!showGeneratePanel && (
+                    <TranscriptionModelButton
+                      settings={settings}
+                      onClick={() => openSettings('models')}
+                    />
+                  )}
                   <TokenUsageDisplay stats={tokenStats} />
                 </div>
 
@@ -1054,6 +1078,7 @@ function App() {
             settings={settings}
             onSettingsChange={handleSettingsChange}
             onClose={() => setShowSettings(false)}
+            initialTab={settingsTab}
           />
         )
       }
@@ -1120,6 +1145,54 @@ function App() {
         />
       )}
     </div >
+  );
+}
+
+function generateBlockedReason({
+  hasMedia,
+  transcribeReady,
+  local,
+  localWhisperOk,
+}: {
+  hasMedia: boolean;
+  transcribeReady: boolean;
+  local: boolean;
+  localWhisperOk: boolean | null;
+}): string {
+  if (!hasMedia) return 'Add video or audio first.';
+  if (local && localWhisperOk === null) return 'Checking offline setup…';
+  if (local && localWhisperOk === false) return 'Offline transcription isn’t ready.';
+  if (!transcribeReady) return 'Add an API key in Settings.';
+  return 'Set up transcription in Settings.';
+}
+
+function TranscriptionModelButton({
+  settings,
+  onClick,
+}: {
+  settings: AppSettings;
+  onClick: () => void;
+}) {
+  const activeConfig = settings.providers[settings.activeProvider];
+  return (
+    <button
+      type="button"
+      className={`active-model-badge${settings.activeProvider === 'local' ? ' is-local' : ' is-cloud'}`}
+      onClick={onClick}
+      title="Change transcription model"
+    >
+      <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'cloud'}</span>
+      <span className={`run-location-chip ${settings.activeProvider === 'local' ? 'is-offline' : 'is-cloud'}`}>
+        {settings.activeProvider === 'local' ? 'Offline' : 'Online'}
+      </span>
+      <span className="active-model-label">Transcription</span>
+      {settings.activeProvider !== 'local' && (
+        <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
+      )}
+      <span className="active-model-name">
+        {transcriptionModelLabel(settings.activeProvider, activeConfig.model)}
+      </span>
+    </button>
   );
 }
 

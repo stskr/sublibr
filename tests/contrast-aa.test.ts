@@ -68,6 +68,11 @@ describe('WCAG AA contrast tokens', () => {
         expect(contrast(t['color-on-accent'], t['color-accent-hover'])).toBeGreaterThanOrEqual(AA_TEXT);
     });
 
+    it('chip labels meet 4.5:1 on success and warning fills', () => {
+        expect(contrast(t['color-on-success'], t['color-success'])).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(contrast(t['color-on-warning'], t['color-warning'])).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
     it('danger button text meets 4.5:1 on the error fill', () => {
         expect(contrast(t['color-on-error'], t['color-error'])).toBeGreaterThanOrEqual(AA_TEXT);
     });

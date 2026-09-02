@@ -149,8 +149,9 @@ export function transcriptionChoiceLabel(provider: AIProvider, modelLabel: strin
 export function isTranscriptionReady(
     provider: AIProvider,
     config: { enabled: boolean; apiKey: string },
+    localWhisperOk?: boolean | null,
 ): boolean {
-    if (!providerNeedsApiKey(provider)) return true;
+    if (provider === 'local') return localWhisperOk === true;
     return Boolean(config.apiKey.trim());
 }
 

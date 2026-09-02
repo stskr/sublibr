@@ -227,7 +227,7 @@ export function useMediaManager() {
 
         const asProject = await window.electronAPI.openProject(filePath);
         if (asProject) return openLoaded(asProject);
-        throw new Error('Drop a media file, a subtitle file, or a Sublibr project.');
+        throw new Error('Drop a video, audio, subtitle, or Sublibr project.');
     }, [collectInto, currentProject, handleOpenProject, inspectMedia, openLoaded]);
 
     const processFile = useCallback(async (filePath: string) => {

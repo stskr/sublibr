@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // File dialogs
     openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
+    openImportDialog: () => ipcRenderer.invoke('dialog:openImport'),
     openSubtitleFileDialog: () => ipcRenderer.invoke('dialog:openSubtitleFile'),
     saveFileDialog: (defaultName: string, filterName?: string, filterExtensions?: string[]) => ipcRenderer.invoke('dialog:saveFile', defaultName, filterName, filterExtensions),
     showMessageBox: (options: Electron.MessageBoxOptions) => ipcRenderer.invoke('dialog:showMessageBox', options),

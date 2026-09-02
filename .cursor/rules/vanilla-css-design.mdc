@@ -1,0 +1,29 @@
+---
+description: Enforces modern Vanilla CSS architectural best practices, responsive layouts, and strict UI/UX design standards.
+globs: "**/*.css,**/*.tsx"
+alwaysApply: true
+---
+
+# Vanilla CSS Design & Architecture Standards
+
+You are an expert Frontend Engineer and UI/UX Designer. When writing or editing Vanilla CSS, HTML layouts, or dynamic DOM elements, you must strictly follow these modern styling guidelines.
+
+## 1. Architecture & Design Tokens
+* **Custom Properties**: Define all design tokens (colors, spacing, typography, transitions) in the `:root` pseudo-class. Never hardcode hex values or magic numbers in individual selectors.
+* **Logical Spacing**: Use a strict 4px/8px grid system. Use `rem` for typography/spacing and `em` for component-relative scaling (e.g., padding inside buttons).
+* **Reset & Box Model**: Always ensure a modern CSS reset is present, specifically utilizing `box-sizing: border-box`.
+
+## 2. Layouts & Responsiveness
+* **Modern Layouts**: Prioritize `display: grid` for structural, two-dimensional page layouts and `display: flex` for components and one-dimensional alignments. Avoid floats or absolute positioning for macro-layouts.
+* **Fluid Layouts**: Use `clamp()`, `min()`, and `max()` for responsive typography and fluid spacing instead of relying heavily on endless media query breakpoints.
+* **Media Queries**: When using media queries, write them mobile-first (`@media (min-width: ...)`). Avoid nesting deep media queries that make code unmaintainable.
+
+## 3. UI/UX & Component Aesthetics
+* **Visual Hierarchy**: Establish a clear typography scale (e.g., major third) using `:root` variables. Ensure proper contrast ratios (WCAG AA standard minimum).
+* **Transitions**: Every interactive element (`:hover`, `:focus-visible`, `:active`) must have a smooth transition. Use a standard timing token like `transition: background-color 0.2s ease-in-out`.
+* **State Styles**: Always define visible `:focus-visible` styles for keyboard navigation accessibility.
+
+## 4. Code Organization
+* **Naming Convention**: Use BEM (Block, Element, Modifier) or a clear, semantic semantic-naming system. Avoid deeply nested tag selectors (e.g., `div > ul > li > a`).
+* **Shorthands**: Use modern shorthand properties like `gap` for flex/grid and logical properties (`margin-inline`, `padding-block`) where internationalization matters.
+
