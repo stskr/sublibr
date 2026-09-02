@@ -55,8 +55,34 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
                         <img src={logoFull} alt="Sublibr" className="about-logo" />
                         <div className="about-version">Version {version}</div>
                         <p className="about-description">
-                            Transcribe video and audio into timed subtitles, on this computer or in the cloud. Edit on a timeline, style the text, and export files or a burned-in video.
+                            Desktop app for timed subtitles. Transcribe locally or in the cloud, edit on a timeline, style the text, and export files or a burned-in video.
                         </p>
+                    </div>
+
+                    <div className="about-section">
+                        <div className="about-section-title">What it does</div>
+                        <ul className="about-feature-list">
+                            <li>
+                                <strong>Projects</strong>
+                                Each job is a folder (default Documents/Sublibr). Media is copied in so you can move the folder. Home: drop or browse video, audio, SRT/VTT/ASS, or a project — or start from scratch. Open, rename, duplicate, delete, or relink missing media.
+                            </li>
+                            <li>
+                                <strong>Transcribe</strong>
+                                Only models that return timestamps. Local: Whisper Large v3 Turbo via whisper-cli (99 languages). Optional Hebrew (ivrit.ai) and smaller Whisper files are in Settings → Models. Cloud: Gemini 3.5 Transcribe or OpenAI Whisper. Long files are split, stitched, then gaps are filled. Pause and resume. Cloud runs show token usage.
+                            </li>
+                            <li>
+                                <strong>Translate</strong>
+                                Rewrites cue text and keeps the times. Local: Qwen2.5 via llama-server (7B default, optional 3B, or your own instruct GGUF). Cloud: Gemini or GPT. Whisper does not translate. Each run is saved as a new version.
+                            </li>
+                            <li>
+                                <strong>Edit</strong>
+                                Subtitle list and Preview, two-tier timeline with scissors and trim, search and replace, undo/redo, bold/italic/underline and per-word color. RTL for Hebrew and similar scripts. Style: font, size, color, outline, box, position. Reformat lines for 16:9, square, or vertical.
+                            </li>
+                            <li>
+                                <strong>Export</strong>
+                                Download SRT, WebVTT, or ASS. Burn styled subtitles into a video at the chosen frame size.
+                            </li>
+                        </ul>
                     </div>
 
                     {/* Author */}
@@ -119,6 +145,14 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
                                 <span className="about-credit-name">FFmpeg</span>
                                 <span className="about-credit-license">LGPL 2.1+</span>
                             </a>
+                            <a href="https://github.com/ggml-org/whisper.cpp" target="_blank" rel="noopener noreferrer" className="about-credit-item">
+                                <span className="about-credit-name">whisper.cpp</span>
+                                <span className="about-credit-license">MIT</span>
+                            </a>
+                            <a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener noreferrer" className="about-credit-item">
+                                <span className="about-credit-name">llama.cpp</span>
+                                <span className="about-credit-license">MIT</span>
+                            </a>
                             <a href="https://github.com/fluent-ffmpeg/node-fluent-ffmpeg" target="_blank" rel="noopener noreferrer" className="about-credit-item">
                                 <span className="about-credit-name">fluent-ffmpeg</span>
                                 <span className="about-credit-license">MIT</span>
@@ -146,7 +180,10 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
                     <div className="about-section">
                         <div className="about-section-title">AI services</div>
                         <p className="about-legal-text">
-                            Online transcription and translation send audio to Google Gemini or OpenAI, under those providers’ terms. Offline models stay on this computer. Sublibr does not store your audio on its own servers.
+                            Settings → General picks Local or Cloud for transcription and for translation. Cloud sends audio to Google Gemini or OpenAI under those providers’ terms. Local Whisper and Qwen stay on this computer. API keys live in OS-encrypted electron-store, never in the project folder. Sublibr does not store your audio on its own servers.
+                        </p>
+                        <p className="about-legal-text">
+                            Local runtimes (whisper-cli, llama-server) install through Homebrew only after you consent in Set up offline. Model files download from Hugging Face into this app’s models folder. Adding your own Whisper or translator file registers the path; Sublibr does not copy multi-GB weights. Request templates are not user-editable.
                         </p>
                     </div>
 

@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     renameProject: (payload: { projectDir: string; name: string; renameFolder?: boolean }) =>
         ipcRenderer.invoke('projects:rename', payload),
     openProjectDialog: () => ipcRenderer.invoke('dialog:openProject'),
+    openModelFileDialog: (runtime: 'whisper' | 'llama') => ipcRenderer.invoke('dialog:openModelFile', runtime),
     bindSession: (payload: { projectDir?: string; sourcePath?: string; name: string; media?: unknown; settings?: unknown }) =>
         ipcRenderer.invoke('session:bind', payload),
     logSession: (payload: { event: string; data?: unknown; level?: 'info' | 'warn' | 'error' }) =>
@@ -59,6 +60,49 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopLocalLlm: () => ipcRenderer.invoke('ai:stopLocalLlm'),
     callLocalTranscribe: (filePath: string, language?: string | null, model?: string) =>
         ipcRenderer.invoke('ai:callLocalTranscribe', filePath, language, model),
+
+    getLocalModelStatus: () => ipcRenderer.invoke('models:status'),
+    downloadLocalModel: (id: string) => ipcRenderer.invoke('models:download', id),
+    cancelLocalModelDownload: (id: string) => ipcRenderer.invoke('models:cancelDownload', id),
+    getOfflineSetupStatus: () => ipcRenderer.invoke('deps:status'),
+    installOfflineDeps: (ids: string[]) => ipcRenderer.invoke('deps:install', ids),
+    cancelOfflineSetup: () => ipcRenderer.invoke('deps:cancel'),
+    onOfflineSetupProgress: (callback: (progress: {
+        id: string;
+        status: 'waiting' | 'installing' | 'downloading' | 'ready' | 'error' | 'cancelled';
+        percent?: number;
+        detail?: string;
+        error?: string;
+    }) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, progress: {
+            id: string;
+            status: 'waiting' | 'installing' | 'downloading' | 'ready' | 'error' | 'cancelled';
+            percent?: number;
+            detail?: string;
+            error?: string;
+        }) => callback(progress);
+        ipcRenderer.on('deps:progress', listener);
+        return () => { ipcRenderer.removeListener('deps:progress', listener); };
+    },
+    onLocalModelDownloadProgress: (callback: (progress: {
+        id: string;
+        received: number;
+        total: number;
+        percent: number;
+        status: 'downloading' | 'done' | 'error' | 'cancelled';
+        error?: string;
+    }) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, progress: {
+            id: string;
+            received: number;
+            total: number;
+            percent: number;
+            status: 'downloading' | 'done' | 'error' | 'cancelled';
+            error?: string;
+        }) => callback(progress);
+        ipcRenderer.on('models:download-progress', listener);
+        return () => { ipcRenderer.removeListener('models:download-progress', listener); };
+    },
 
     // FFmpeg operations
     extractAudio: (inputPath: string, outputPath: string, format?: string) => ipcRenderer.invoke('ffmpeg:extractAudio', inputPath, outputPath, format),

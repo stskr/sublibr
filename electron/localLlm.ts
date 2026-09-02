@@ -1,13 +1,13 @@
 import { spawn, type ChildProcess } from 'child_process';
-import fs from 'fs';
 import path from 'path';
-import { app, net } from 'electron';
+import { net } from 'electron';
 import { fileURLToPath } from 'url';
 import { killTrackedChild, trackChild } from './childProcesses';
+import { firstExisting } from './localModelPaths';
+import { anyLlamaFilePresent, resolveLlamaModelFile } from './importedModels';
 import { makeTokenUsage, resolveTokenUsage } from '../src/services/tokenCount';
 
 const ELECTRON_DIR = path.dirname(fileURLToPath(import.meta.url));
-const LLM_FILE = 'Qwen2.5-7B-Instruct-Q4_K_M.gguf';
 const LLM_PORT = 18742;
 const LLM_HOST = '127.0.0.1';
 
@@ -17,6 +17,7 @@ let startPromise: Promise<void> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let idleMinutes = 5;
 let inFlight = 0;
+let loadedLlmPath: string | null = null;
 
 export function setLlmIdleMinutes(minutes: number): void {
   idleMinutes = Number.isFinite(minutes) ? Math.max(0, Math.min(60, Math.round(minutes))) : 5;
@@ -40,24 +41,10 @@ function scheduleIdleUnload(): void {
   }, idleMinutes * 60_000);
 }
 
-function firstExisting(paths: string[]): string | null {
-  for (const candidate of paths) {
-    if (candidate && fs.existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-function modelsDirCandidates(): string[] {
-  return [
-    path.join(process.cwd(), 'models'),
-    path.join(ELECTRON_DIR, '..', 'models'),
-    path.join(app.getAppPath(), 'models'),
-    path.join(process.resourcesPath, 'models'),
-  ];
-}
-
-export function resolveLocalLlmPath(): string | null {
-  return firstExisting(modelsDirCandidates().map(dir => path.join(dir, LLM_FILE)));
+export function resolveLocalLlmPath(modelId?: string): string | null {
+  if (modelId) return resolveLlamaModelFile(modelId);
+  return resolveLlamaModelFile('qwen2.5-7b-instruct')
+    ?? resolveLlamaModelFile('qwen-translator-3b');
 }
 
 export function resolveLlamaServer(): string | null {
@@ -80,14 +67,13 @@ export async function probeLocalLlm(): Promise<{ ok: boolean; error?: string }> 
   if (!server) {
     return {
       ok: false,
-      error: 'llama-server not found. Install llama.cpp with: brew install llama.cpp',
+      error: 'llama-server not found. Set up offline in Settings → General.',
     };
   }
-  const model = resolveLocalLlmPath();
-  if (!model) {
+  if (!anyLlamaFilePresent()) {
     return {
       ok: false,
-      error: `Local translator model not found. Put ${LLM_FILE} in the models/ folder.`,
+      error: 'Local translator model not found. Set up offline in Settings → General, or add a GGUF in Models.',
     };
   }
   return { ok: true };
@@ -125,39 +111,57 @@ export function stopLocalLlm(): void {
   }
   serverProc = null;
   serverReady = false;
+  loadedLlmPath = null;
 }
 
-async function ensureLlamaServer(): Promise<void> {
-  if (serverReady && serverProc && !serverProc.killed) return;
+async function ensureLlamaServer(modelId: string): Promise<void> {
+  const model = resolveLocalLlmPath(modelId);
+  if (!model) {
+    throw new Error(
+      modelId.startsWith('imp_')
+        ? 'Imported translator GGUF is missing. Add it again in Settings → Models.'
+        : 'Local translator model not found. Set up offline in Settings → General, or add a GGUF in Models.',
+    );
+  }
+
+  if (serverReady && serverProc && !serverProc.killed && loadedLlmPath === model) return;
+  if (loadedLlmPath && loadedLlmPath !== model) {
+    stopLocalLlm();
+  }
   if (startPromise) return startPromise;
 
   startPromise = (async () => {
-    if (serverReady && serverProc && !serverProc.killed) return;
+    if (serverReady && serverProc && !serverProc.killed && loadedLlmPath === model) return;
 
-    try {
-      const existing = await net.fetch(`http://${LLM_HOST}:${LLM_PORT}/health`);
-      if (existing.ok) {
-        serverReady = true;
-        return;
+    if (loadedLlmPath === model) {
+      try {
+        const existing = await net.fetch(`http://${LLM_HOST}:${LLM_PORT}/health`);
+        if (existing.ok) {
+          serverReady = true;
+          return;
+        }
+      } catch {
+        // nothing listening yet
       }
-    } catch {
-      // nothing listening yet
     }
 
     const probe = await probeLocalLlm();
     if (!probe.ok) throw new Error(probe.error || 'Local translator is not available');
 
-    if (serverProc && !serverProc.killed) {
+    if (serverProc && !serverProc.killed && loadedLlmPath === model) {
       await waitForHealth(180_000);
       serverReady = true;
       return;
     }
 
     const bin = resolveLlamaServer()!;
-    const model = resolveLocalLlmPath()!;
+    const modelPath = resolveLocalLlmPath(modelId);
+    if (!modelPath) {
+      throw new Error('Local translator model not found. Set up offline in Settings → General, or add a GGUF in Models.');
+    }
 
     serverProc = trackChild(spawn(bin, [
-      '-m', model,
+      '-m', modelPath,
       '--host', LLM_HOST,
       '--port', String(LLM_PORT),
       '-ngl', '99',
@@ -177,10 +181,12 @@ async function ensureLlamaServer(): Promise<void> {
     serverProc.on('exit', () => {
       serverProc = null;
       serverReady = false;
+      loadedLlmPath = null;
     });
 
     await waitForHealth(180_000);
     serverReady = true;
+    loadedLlmPath = modelPath;
   })().finally(() => {
     startPromise = null;
   });
@@ -192,7 +198,7 @@ export async function callLocalText(model: string, prompt: string) {
   inFlight += 1;
   clearIdleTimer();
   try {
-    await ensureLlamaServer();
+    await ensureLlamaServer(model);
 
     const res = await net.fetch(`http://${LLM_HOST}:${LLM_PORT}/v1/chat/completions`, {
       method: 'POST',

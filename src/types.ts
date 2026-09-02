@@ -223,6 +223,14 @@ export const SCREEN_SIZE_FONT_DEFAULTS: Record<ScreenSize, number> = {
     original: 56,
 };
 
+export interface ImportedLocalModel {
+    id: string;
+    label: string;
+    path: string;
+    runtime: 'whisper' | 'llama';
+    architecture: string;
+}
+
 export interface TranslatorConfig {
     provider: AIProvider;
     model: string;
@@ -243,6 +251,8 @@ export interface AppSettings {
     projectsFolder: string;
     /** True after the user has confirmed a projects folder on first run or in Settings. */
     projectsFolderSet: boolean;
+    /** User-added whisper.cpp / llama.cpp files that passed inspection. */
+    importedLocalModels: ImportedLocalModel[];
 }
 
 // File info

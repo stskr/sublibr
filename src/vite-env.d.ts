@@ -35,6 +35,11 @@ export interface ElectronAPI {
     duplicateProject: (projectDir: string) => Promise<import('./types').LoadedProject>;
     renameProject: (payload: { projectDir: string; name: string; renameFolder?: boolean }) => Promise<import('./types').LoadedProject>;
     openProjectDialog: () => Promise<string | null>;
+    openModelFileDialog: (runtime: 'whisper' | 'llama') => Promise<
+        | { cancelled: true }
+        | { ok: true; model: import('./types').ImportedLocalModel }
+        | { ok: false; error: string }
+    >;
     bindSession: (payload: { projectDir?: string; sourcePath?: string; name: string; media?: unknown; settings?: unknown }) => Promise<{ sessionId: string; file: string; dir: string }>;
     logSession: (payload: { event: string; data?: unknown; level?: 'info' | 'warn' | 'error' }) => Promise<void>;
 
@@ -74,6 +79,59 @@ export interface ElectronAPI {
             estimated?: boolean;
         };
     }>;
+    getLocalModelStatus: () => Promise<{
+        dir: string;
+        whisperCli: boolean;
+        llamaServer: boolean;
+        files: Array<{
+            id: string;
+            file: string;
+            present: boolean;
+            bytesOnDisk: number;
+            bytesExpected: number;
+            dest: string;
+        }>;
+    }>;
+    downloadLocalModel: (id: string) => Promise<{
+        id: string;
+        file: string;
+        present: boolean;
+        bytesOnDisk: number;
+        bytesExpected: number;
+        dest: string;
+    }>;
+    cancelLocalModelDownload: (id: string) => Promise<boolean>;
+    getOfflineSetupStatus: () => Promise<{
+        brew: { present: boolean; path: string | null };
+        items: Array<{
+            id: string;
+            label: string;
+            why: string;
+            present: boolean;
+            install: 'none' | 'brew' | 'download';
+            formula?: string;
+            detail: string;
+            bytes?: number;
+            neededFor: 'transcribe' | 'translate';
+        }>;
+    }>;
+    installOfflineDeps: (ids: string[]) => Promise<unknown>;
+    cancelOfflineSetup: () => Promise<boolean>;
+    onOfflineSetupProgress: (callback: (progress: {
+        id: string;
+        status: 'waiting' | 'installing' | 'downloading' | 'ready' | 'error' | 'cancelled';
+        percent?: number;
+        detail?: string;
+        error?: string;
+    }) => void) => () => void;
+    onLocalModelDownloadProgress: (callback: (progress: {
+        id: string;
+        received: number;
+        total: number;
+        percent: number;
+        status: 'downloading' | 'done' | 'error' | 'cancelled';
+        error?: string;
+    }) => void) => () => void;
     extractAudio: (inputPath: string, outputPath: string, format?: string) => Promise<string>;
     getDuration: (filePath: string) => Promise<number>;
     detectSilences: (filePath: string, threshold: number, minDuration: number) => Promise<{ start: number; end: number }[]>;

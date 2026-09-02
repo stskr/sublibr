@@ -1,9 +1,10 @@
-import type { AIProvider, TokenUsage } from '../types';
+import type { AIProvider, TokenUsage, ImportedLocalModel } from '../types';
+import { catalogWeightId, LOCAL_WEIGHTS, persistedLocalId } from './localModelCatalog';
 
 export const PROVIDER_LABELS: Record<AIProvider, string> = {
     gemini: 'Google Gemini',
     openai: 'OpenAI',
-    local: 'Offline',
+    local: 'Local',
 };
 
 export const CLOUD_PROVIDERS: AIProvider[] = ['gemini', 'openai'];
@@ -34,7 +35,7 @@ export const TRANSLATOR_MODEL_OPTIONS: Record<AIProvider, { value: string; label
         { value: 'gpt-4o', label: 'GPT-4o (Powerful)' },
     ],
     local: [
-        { value: 'qwen2.5-7b-instruct', label: 'Qwen2.5 7B (offline translator)' },
+        { value: 'qwen2.5-7b-instruct', label: 'Qwen2.5 7B (local translator)' },
     ],
 };
 
@@ -63,7 +64,6 @@ export const LEGACY_MODEL_MAP: Record<string, string> = {
     'gpt-4o-audio-preview': 'whisper-1',
     'gpt-4o-mini-audio-preview': 'whisper-1',
     'gpt-audio-1.5': 'whisper-1',
-    'ivrit-whisper-large-v3-turbo': 'whisper-large-v3-turbo',
 };
 
 /** If the preferred ID 404s, try these in order (AI Studio vs Vertex naming). */
@@ -92,36 +92,107 @@ export function isAsrModel(model: string): boolean {
 export const LOCAL_WHISPER_MULTILINGUAL = 'whisper-large-v3-turbo';
 export const LOCAL_WHISPER_HEBREW = 'ivrit-whisper-large-v3-turbo';
 
-/** Official turbo for most languages; ivrit.ai weights when Hebrew is selected. */
-export function resolveLocalWhisperModel(language: string): string {
-    return language === 'Hebrew' ? LOCAL_WHISPER_HEBREW : LOCAL_WHISPER_MULTILINGUAL;
+export function isKnownLocalWhisperId(model: string, imported: ImportedLocalModel[] = []): boolean {
+    const weight = catalogWeightId(model);
+    if (weight && LOCAL_WEIGHTS[weight].for === 'transcribe') return true;
+    return imported.some((item) => item.id === model && item.runtime === 'whisper');
 }
 
-export function transcriptionModelLabel(provider: AIProvider, model: string): string {
+export function isKnownLocalTranslatorId(model: string, imported: ImportedLocalModel[] = []): boolean {
+    const weight = catalogWeightId(model);
+    if (weight && LOCAL_WEIGHTS[weight].for === 'translate') return true;
+    return imported.some((item) => item.id === model && item.runtime === 'llama');
+}
+
+/** Turbo for every language. Optional Hebrew weights are a Models-tab pick, not an automatic switch. */
+export function resolveLocalWhisperModel(_language: string, selected?: string): string {
+    return selected || LOCAL_WHISPER_MULTILINGUAL;
+}
+
+export function localWhisperSelectOptions(
+    imported: ImportedLocalModel[],
+    presentIds: Set<string>,
+    selected: string,
+): { value: string; label: string }[] {
+    return localSelectOptions('transcribe', imported, presentIds, selected);
+}
+
+export function localTranslatorSelectOptions(
+    imported: ImportedLocalModel[],
+    presentIds: Set<string>,
+    selected: string,
+): { value: string; label: string }[] {
+    return localSelectOptions('translate', imported, presentIds, selected);
+}
+
+function localSelectOptions(
+    kind: 'transcribe' | 'translate',
+    imported: ImportedLocalModel[],
+    presentIds: Set<string>,
+    selected: string,
+): { value: string; label: string }[] {
+    const selectedWeight = catalogWeightId(selected);
+    const options: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+
+    for (const spec of Object.values(LOCAL_WEIGHTS)) {
+        if (spec.for !== kind) continue;
+        const value = persistedLocalId(spec.id);
+        if (seen.has(value)) continue;
+        const isSelected = selected === value || selectedWeight === spec.id;
+        if (spec.tier === 'recommended' || presentIds.has(spec.id) || isSelected) {
+            seen.add(value);
+            options.push({ value, label: spec.label });
+        }
+    }
+
+    for (const item of imported) {
+        if ((kind === 'transcribe' ? 'whisper' : 'llama') !== item.runtime) continue;
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        options.push({ value: item.id, label: `${item.label} (added)` });
+    }
+
+    return options;
+}
+
+export function transcriptionModelLabel(provider: AIProvider, model: string, imported: ImportedLocalModel[] = []): string {
+    if (provider === 'local') {
+        const weight = catalogWeightId(model);
+        if (weight) return LOCAL_WEIGHTS[weight].label;
+        const hit = imported.find((item) => item.id === model);
+        if (hit) return hit.label;
+    }
     if (model === LOCAL_WHISPER_HEBREW || model === LOCAL_WHISPER_MULTILINGUAL) {
         return 'Whisper Large v3 Turbo';
     }
     return MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label ?? model;
 }
 
-export function sessionModelLabel(provider: AIProvider, model: string): string {
+export function sessionModelLabel(provider: AIProvider, model: string, imported: ImportedLocalModel[] = []): string {
     const stt = MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label;
     if (stt) return stt;
     const translator = TRANSLATOR_MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label;
-    if (translator) return translator.replace(' (offline translator)', '');
-    return transcriptionModelLabel(provider, model);
+    if (translator) return translator.replace(' (local translator)', '').replace(' (offline translator)', '');
+    return transcriptionModelLabel(provider, model, imported);
 }
 
-export function resolveSavedModel(provider: AIProvider, model: string): string {
+export function resolveSavedModel(provider: AIProvider, model: string, imported: ImportedLocalModel[] = []): string {
     const mapped = LEGACY_MODEL_MAP[model] ?? model;
+    if (provider === 'local') {
+        return isKnownLocalWhisperId(mapped, imported) ? mapped : MODEL_OPTIONS.local[0].value;
+    }
     const valid = MODEL_OPTIONS[provider].some(m => m.value === mapped);
     return valid ? mapped : MODEL_OPTIONS[provider][0].value;
 }
 
-export function resolveSavedTranslatorModel(provider: AIProvider, model: string): string {
+export function resolveSavedTranslatorModel(provider: AIProvider, model: string, imported: ImportedLocalModel[] = []): string {
     const options = TRANSLATOR_MODEL_OPTIONS[provider];
     if (!options.length) {
         return TRANSLATOR_MODEL_OPTIONS.gemini[0].value;
+    }
+    if (provider === 'local') {
+        return isKnownLocalTranslatorId(model, imported) ? model : options[0].value;
     }
     const valid = options.some(m => m.value === model);
     return valid ? model : options[0].value;
@@ -142,8 +213,8 @@ export function textFallbackModel(provider: AIProvider, model: string): string {
 }
 
 export function transcriptionChoiceLabel(provider: AIProvider, modelLabel: string): string {
-    if (provider === 'local') return `Offline — ${modelLabel}`;
-    return `${PROVIDER_LABELS[provider]} (online) — ${modelLabel}`;
+    if (provider === 'local') return `Local — ${modelLabel}`;
+    return `${PROVIDER_LABELS[provider]} (cloud) — ${modelLabel}`;
 }
 
 export function isTranscriptionReady(

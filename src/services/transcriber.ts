@@ -146,8 +146,8 @@ export async function transcribeChunk(
     previousTranscript?: string,
     screenSize: ScreenSize = 'wide'
 ): Promise<TranscriptionResult> {
-    const sttModel = provider === 'local' ? resolveLocalWhisperModel(language) : model;
-    if (!isAsrModel(sttModel)) {
+    const sttModel = provider === 'local' ? resolveLocalWhisperModel(language, model) : model;
+    if (provider !== 'local' && !isAsrModel(sttModel)) {
         throw new Error(
             `${sttModel} does not return timestamps and cannot be used for subtitles.`,
         );

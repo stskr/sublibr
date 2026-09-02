@@ -11,8 +11,15 @@ import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 import { callGeminiAudio, callGeminiText, callOpenAiAudio, callOpenAiText } from './ai';
 import { mainFetch } from './httpFetch';
-import { probeLocalWhisper, transcribeLocal } from './localWhisper';
-import { callLocalText, probeLocalLlm, setLlmIdleMinutes, stopLocalLlm } from './localLlm';
+import { probeLocalWhisper, transcribeLocal, resolveWhisperCli } from './localWhisper';
+import { callLocalText, probeLocalLlm, setLlmIdleMinutes, stopLocalLlm, resolveLlamaServer } from './localLlm';
+import { cancelModelDownload, downloadModelWeight, listModelFiles, onModelDownloadProgress } from './modelDownload';
+import { getWritableModelsDir } from './localModelPaths';
+import { bindImportedModelStore, getImportedLocalModels } from './importedModels';
+import { inspectImportedModelFile } from './inspectModelFile';
+import { sanitizeImportedLocalModels } from '../src/services/importedLocalModels';
+import { cancelOfflineSetup, getOfflineSetupStatus, installMissingOfflineDeps, onOfflineSetupProgress } from './offlineSetup';
+import { OFFLINE_DEPS, type OfflineDepId } from '../src/services/offlineSetup';
 import { killAllChildren, killFfmpegJobs, trackFfmpeg } from './childProcesses';
 import {
   assembleLibraryMap,
@@ -44,6 +51,11 @@ import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SCREENSHOTS = process.env.SUBLIBR_SCREENSHOTS === '1';
+if (SCREENSHOTS) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9333');
+  app.commandLine.appendSwitch('remote-allow-origins', '*');
+}
 
 // ============== Security: Path Validation ==============
 
@@ -62,6 +74,14 @@ protocol.registerSchemesAsPrivileged([
 
 // Track file paths the user explicitly selected via native dialogs
 const allowedPaths = new Set<string>();
+const allowedProjectDirs = new Set<string>();
+
+function rememberProjectDir(dir: string | null | undefined): void {
+  if (!dir) return;
+  const resolved = path.resolve(dir);
+  allowedPaths.add(resolved);
+  allowedProjectDirs.add(resolved);
+}
 
 function validatePath(filePath: string, ...allowedDirs: string[]): string {
   if (typeof filePath !== 'string') throw new Error('Invalid path: must be a string');
@@ -88,6 +108,7 @@ function getAllowedDirs(): string[] {
     peekProjectsFolder(),
     app.getPath('userData'),
     app.getPath('temp'),
+    ...allowedProjectDirs,
   ];
 }
 
@@ -110,13 +131,14 @@ if (app.isPackaged) {
 
 // Initialize store for settings
 const store = new Store();
+bindImportedModelStore(store);
 
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: SCREENSHOTS ? 1440 : 1200,
+    height: SCREENSHOTS ? 900 : 800,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
@@ -141,13 +163,19 @@ function createWindow() {
     const appUrl = process.env.VITE_DEV_SERVER_URL || 'file://';
     if (!url.startsWith(appUrl)) {
       event.preventDefault();
-      shell.openExternal(url);
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        shell.openExternal(url);
+      }
     }
   });
 
+  if (SCREENSHOTS) {
+    mainWindow.setAlwaysOnTop(true);
+  }
+
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools();
+    if (!SCREENSHOTS) mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
@@ -297,6 +325,15 @@ function applyIdleMinutesFromSettings(value: unknown): void {
   if (typeof minutes === 'number') setLlmIdleMinutes(minutes);
 }
 
+function registerImportedModelPaths(value?: unknown): void {
+  const models = value
+    ? sanitizeImportedLocalModels((value as { importedLocalModels?: unknown }).importedLocalModels)
+    : getImportedLocalModels();
+  for (const model of models) {
+    allowedPaths.add(path.resolve(model.path));
+  }
+}
+
 function applyProjectsFolderFromSettings(value: unknown): void {
   if (!value || typeof value !== 'object') return;
   const folder = (value as { projectsFolder?: unknown }).projectsFolder;
@@ -357,6 +394,7 @@ app.whenReady().then(async () => {
   }
   await startMediaServer();
   applyIdleMinutesFromSettings(savedSettings);
+  registerImportedModelPaths(savedSettings);
 
   // Register media:// protocol for streaming files
   protocol.handle('media', async (request) => {
@@ -538,6 +576,7 @@ ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
     store.set(key, encryptApiKeys(value as Record<string, unknown>));
     applyIdleMinutesFromSettings(value);
     applyProjectsFolderFromSettings(value);
+    registerImportedModelPaths(value);
   } else {
     store.set(key, value);
   }
@@ -675,7 +714,9 @@ ipcMain.handle('projects:list', () => {
 
 ipcMain.handle('projects:create', (_event, name: unknown) => {
   const label = typeof name === 'string' && name.trim() ? name.trim() : 'Untitled Project';
-  return createProject(label);
+  const created = createProject(label);
+  rememberProjectDir(created.dir);
+  return created;
 });
 
 ipcMain.handle('projects:open', async (_event, ref: unknown) => {
@@ -685,7 +726,7 @@ ipcMain.handle('projects:open', async (_event, ref: unknown) => {
   allowedPaths.add(path.resolve(ref));
   const loaded = await openProjectAndCollect(ref);
   if (loaded?.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
-  if (loaded?.dir) allowedPaths.add(path.resolve(loaded.dir));
+  rememberProjectDir(loaded?.dir);
   return loaded;
 });
 
@@ -714,6 +755,7 @@ ipcMain.handle('projects:createFromMedia', async (_event, payload: unknown) => {
     isVideo: typeof isVideo === 'boolean' ? isVideo : undefined,
   });
   if (loaded.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
+  rememberProjectDir(loaded.dir);
   return loaded;
 });
 
@@ -739,6 +781,7 @@ ipcMain.handle('projects:collectMedia', async (_event, payload: unknown) => {
     isVideo: typeof isVideo === 'boolean' ? isVideo : undefined,
   });
   if (loaded.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
+  rememberProjectDir(loaded.dir);
   return loaded;
 });
 
@@ -753,7 +796,10 @@ ipcMain.handle('projects:duplicate', async (_event, projectDir: unknown) => {
   if (typeof projectDir !== 'string' || !projectDir.trim()) {
     throw new Error('Invalid project folder');
   }
-  return duplicateProject(projectDir);
+  const copied = await duplicateProject(projectDir);
+  rememberProjectDir(copied.dir);
+  if (copied.mediaPath) allowedPaths.add(path.resolve(copied.mediaPath));
+  return copied;
 });
 
 ipcMain.handle('projects:rename', (_event, payload: unknown) => {
@@ -769,7 +815,10 @@ ipcMain.handle('projects:rename', (_event, payload: unknown) => {
   if (typeof name !== 'string' || !name.trim()) {
     throw new Error('Enter a project name');
   }
-  return renameProject(projectDir, name, { renameFolder: renameFolder !== false });
+  const renamed = renameProject(projectDir, name, { renameFolder: renameFolder !== false });
+  rememberProjectDir(renamed.dir);
+  if (renamed.mediaPath) allowedPaths.add(path.resolve(renamed.mediaPath));
+  return renamed;
 });
 
 ipcMain.handle('dialog:openProject', async () => {
@@ -804,11 +853,13 @@ ipcMain.handle('projects:save', (_event, payload: unknown) => {
     versions?: unknown;
   };
   if (typeof projectDir === 'string' && projectDir.trim()) {
-    return saveProjectData(projectDir, {
+    const saved = saveProjectData(projectDir, {
       name: typeof name === 'string' ? name : undefined,
       subtitles,
       versions,
     });
+    rememberProjectDir(saved);
+    return saved;
   }
   if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
     throw new Error('Invalid source path');
@@ -1220,5 +1271,76 @@ ipcMain.handle('ai:stopLocalLlm', () => {
 ipcMain.handle('ai:callLocalTranscribe', async (_event, filePath: string, language?: string | null, model?: string) => {
   const safePath = validatePath(filePath, ...getAllowedDirs());
   return transcribeLocal(safePath, language, model);
+});
+
+onModelDownloadProgress((progress) => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('models:download-progress', progress);
+  }
+});
+
+onOfflineSetupProgress((progress) => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('deps:progress', progress);
+  }
+});
+
+ipcMain.handle('dialog:openModelFile', async (_event, runtime: string) => {
+  if (runtime !== 'whisper' && runtime !== 'llama') {
+    return { ok: false as const, error: 'Unknown model type.' };
+  }
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    filters: runtime === 'whisper'
+      ? [
+          { name: 'Whisper models', extensions: ['bin', 'gguf'] },
+          { name: 'All files', extensions: ['*'] },
+        ]
+      : [
+          { name: 'llama.cpp GGUF', extensions: ['gguf'] },
+          { name: 'All files', extensions: ['*'] },
+        ],
+  });
+  const filePath = result.filePaths[0];
+  if (!filePath) return { cancelled: true as const };
+  const resolved = path.resolve(filePath);
+  allowedPaths.add(resolved);
+  try {
+    const model = inspectImportedModelFile(validatePath(resolved), runtime);
+    return { ok: true as const, model };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : 'Could not read that model file.' };
+  }
+});
+
+ipcMain.handle('models:status', () => ({
+  dir: getWritableModelsDir(),
+  whisperCli: Boolean(resolveWhisperCli()),
+  llamaServer: Boolean(resolveLlamaServer()),
+  files: listModelFiles(),
+}));
+
+ipcMain.handle('models:download', async (_event, id: string) => {
+  return downloadModelWeight(id as Parameters<typeof downloadModelWeight>[0]);
+});
+
+ipcMain.handle('models:cancelDownload', (_event, id: string) => {
+  return cancelModelDownload(id as Parameters<typeof cancelModelDownload>[0]);
+});
+
+ipcMain.handle('deps:status', () => getOfflineSetupStatus());
+
+ipcMain.handle('deps:install', async (_event, ids: unknown) => {
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
+    throw new Error('Invalid setup list.');
+  }
+  const allowed = new Set(OFFLINE_DEPS.map((dep) => dep.id));
+  const wanted = ids.filter((id): id is OfflineDepId => allowed.has(id as OfflineDepId));
+  return installMissingOfflineDeps(wanted);
+});
+
+ipcMain.handle('deps:cancel', () => {
+  cancelOfflineSetup();
+  return true;
 });
 

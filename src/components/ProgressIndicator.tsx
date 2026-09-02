@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ProcessingState } from '../types';
+import { StableLabel } from './StableLabelButton';
 
 interface ProgressIndicatorProps {
     state: ProcessingState;
@@ -149,32 +150,24 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                         </button>
                     )}
 
-                    {/* Pause / Pausing... */}
-                    {showPause && (
+                    {(showPause || showPausingIndicator) && (
                         <button
                             className="btn btn-sm btn-ghost"
                             onClick={onPause}
-                            aria-label="Pause transcription"
-                            title="Pause — you can resume later"
+                            disabled={showPausingIndicator}
+                            aria-label={showPausingIndicator ? 'Pausing transcription' : 'Pause transcription'}
+                            title={showPausingIndicator
+                                ? 'Waiting for current chunk to finish before pausing'
+                                : 'Pause — you can resume later'}
+                            style={showPausingIndicator ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                         >
-                            <span className="icon icon-sm">pause</span>
-                            Pause
-                        </button>
-                    )}
-                    {showPausingIndicator && (
-                        <button
-                            className="btn btn-sm btn-ghost"
-                            disabled
-                            aria-label="Pausing transcription"
-                            title="Waiting for current chunk to finish before pausing"
-                            style={{ opacity: 0.6, cursor: 'not-allowed' }}
-                        >
-                            <span className="icon icon-sm">hourglass_empty</span>
-                            Pausing…
+                            <span className="icon icon-sm">{showPausingIndicator ? 'hourglass_empty' : 'pause'}</span>
+                            <StableLabel labels={['Pause', 'Pausing…']}>
+                                {showPausingIndicator ? 'Pausing…' : 'Pause'}
+                            </StableLabel>
                         </button>
                     )}
 
-                    {/* Resume */}
                     {showResume && (
                         <button
                             className="btn btn-sm btn-accent"
@@ -185,23 +178,27 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                             style={!resumeReady ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                         >
                             <span className="icon icon-sm">{resumeReady ? 'play_arrow' : 'hourglass_empty'}</span>
-                            {resumeReady ? 'Resume' : 'Saving…'}
+                            <StableLabel labels={['Resume', 'Saving…']}>
+                                {resumeReady ? 'Resume' : 'Saving…'}
+                            </StableLabel>
                         </button>
                     )}
 
-                    {/* Stop — two-step confirmation */}
                     {showStop && (
-                        confirmingStop ? (
-                            <>
-                                <button
-                                    className="btn btn-sm btn-ghost"
-                                    onClick={handleStopClick}
-                                    aria-label="Confirm stop processing"
-                                    style={{ color: 'var(--color-error)' }}
-                                >
-                                    <span className="icon icon-sm">stop</span>
-                                    Confirm stop
-                                </button>
+                        <>
+                            <button
+                                className="btn btn-sm btn-ghost"
+                                onClick={handleStopClick}
+                                aria-label={confirmingStop ? 'Confirm stop processing' : 'Stop processing'}
+                                title={confirmingStop ? undefined : 'Stop and discard progress'}
+                                style={{ color: 'var(--color-error)' }}
+                            >
+                                <span className="icon icon-sm">stop</span>
+                                <StableLabel labels={['Stop', 'Confirm stop']}>
+                                    {confirmingStop ? 'Confirm stop' : 'Stop'}
+                                </StableLabel>
+                            </button>
+                            {confirmingStop && (
                                 <button
                                     className="btn btn-sm btn-ghost"
                                     onClick={() => setConfirmingStop(false)}
@@ -209,19 +206,8 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                                 >
                                     Keep going
                                 </button>
-                            </>
-                        ) : (
-                            <button
-                                className="btn btn-sm btn-ghost"
-                                onClick={handleStopClick}
-                                aria-label="Stop processing"
-                                title="Stop and discard progress"
-                                style={{ color: 'var(--color-error)' }}
-                            >
-                                <span className="icon icon-sm">stop</span>
-                                Stop
-                            </button>
-                        )
+                            )}
+                        </>
                     )}
                 </div>
             )}

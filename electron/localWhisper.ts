@@ -2,49 +2,20 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { app } from 'electron';
 import { fileURLToPath } from 'url';
 import { trackChild } from './childProcesses';
+import { catalogWeightId } from '../src/services/localModelCatalog';
+import { anyWhisperFilePresent, resolveWhisperModelFile } from './importedModels';
+import { firstExisting } from './localModelPaths';
 import { getWorkDir } from './projects';
 import { audioDurationFromWords, makeTokenUsage, resolveTokenUsage } from '../src/services/tokenCount';
 
 const ELECTRON_DIR = path.dirname(fileURLToPath(import.meta.url));
 
-export type LocalWhisperId = 'ivrit-whisper-large-v3-turbo' | 'whisper-large-v3-turbo';
-
-const LOCAL_MODELS: Record<LocalWhisperId, { file: string; defaultLanguage: string }> = {
-  'ivrit-whisper-large-v3-turbo': {
-    file: 'ggml-large-v3-turbo.bin',
-    defaultLanguage: 'he',
-  },
-  'whisper-large-v3-turbo': {
-    file: 'ggml-large-v3-turbo-official.bin',
-    defaultLanguage: 'auto',
-  },
-};
-
 type Word = { start: number; end: number; word: string };
 
-function firstExisting(paths: string[]): string | null {
-  for (const candidate of paths) {
-    if (candidate && fs.existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-function modelsDirCandidates(): string[] {
-  return [
-    path.join(process.cwd(), 'models'),
-    path.join(ELECTRON_DIR, '..', 'models'),
-    path.join(app.getAppPath(), 'models'),
-    path.join(process.resourcesPath, 'models'),
-  ];
-}
-
 export function resolveLocalModelPath(modelId: string): string | null {
-  const spec = LOCAL_MODELS[modelId as LocalWhisperId];
-  if (!spec) return null;
-  return firstExisting(modelsDirCandidates().map(dir => path.join(dir, spec.file)));
+  return resolveWhisperModelFile(modelId);
 }
 
 export function resolveWhisperCli(): string | null {
@@ -63,11 +34,13 @@ export function resolveWhisperCli(): string | null {
 }
 
 function missingModelMessage(modelId: string): string {
-  const spec = LOCAL_MODELS[modelId as LocalWhisperId];
-  if (modelId === 'whisper-large-v3-turbo') {
-    return `Multilingual Whisper not found. Put ${spec?.file ?? 'ggml-large-v3-turbo-official.bin'} in the models/ folder (ggml conversion of openai/whisper-large-v3-turbo).`;
+  if (modelId.startsWith('imp_')) {
+    return 'Imported Whisper file is missing. Add it again in Settings → Models.';
   }
-  return 'Hebrew model not found. Put ggml-large-v3-turbo.bin in the models/ folder (ivrit.ai).';
+  if (catalogWeightId(modelId) === 'whisper-hebrew') {
+    return 'Hebrew model not found. Download Hebrew Whisper in Settings → Models.';
+  }
+  return 'Whisper weights not found. Set up offline in Settings → General, or add a file in Models.';
 }
 
 export async function probeLocalWhisper(): Promise<{ ok: boolean; error?: string }> {
@@ -75,15 +48,14 @@ export async function probeLocalWhisper(): Promise<{ ok: boolean; error?: string
   if (!cli) {
     return {
       ok: false,
-      error: 'whisper-cli not found. Install whisper.cpp with: brew install whisper-cpp',
+      error: 'whisper-cli not found. Set up offline in Settings → General.',
     };
   }
 
-  const found = Object.keys(LOCAL_MODELS).filter(id => resolveLocalModelPath(id));
-  if (found.length === 0) {
+  if (!anyWhisperFilePresent()) {
     return {
       ok: false,
-      error: 'No local Whisper weights in models/. Add ggml-large-v3-turbo.bin (Hebrew) and/or ggml-large-v3-turbo-official.bin (99 languages).',
+      error: 'No local Whisper weights yet. Set up offline in Settings → General.',
     };
   }
   return { ok: true };
@@ -91,7 +63,7 @@ export async function probeLocalWhisper(): Promise<{ ok: boolean; error?: string
 
 function whisperLanguage(modelId: string, language?: string | null): string {
   if (language && language !== 'auto') return language;
-  return LOCAL_MODELS[modelId as LocalWhisperId]?.defaultLanguage ?? 'auto';
+  return catalogWeightId(modelId) === 'whisper-hebrew' ? 'he' : 'auto';
 }
 
 function parseWhisperJson(payload: unknown): Word[] {
@@ -138,16 +110,15 @@ function runWhisper(cli: string, args: string[]): Promise<void> {
 export async function transcribeLocal(
   audioPath: string,
   language?: string | null,
-  modelId: string = 'ivrit-whisper-large-v3-turbo',
+  modelId: string = 'whisper-large-v3-turbo',
 ) {
-  const resolvedId = LOCAL_MODELS[modelId as LocalWhisperId] ? modelId : 'whisper-large-v3-turbo';
-  const model = resolveLocalModelPath(resolvedId);
+  const model = resolveLocalModelPath(modelId);
   const cli = resolveWhisperCli();
   if (!cli) {
-    throw new Error('whisper-cli not found. Install whisper.cpp with: brew install whisper-cpp');
+    throw new Error('whisper-cli not found. Set up offline in Settings → General.');
   }
   if (!model) {
-    throw new Error(missingModelMessage(resolvedId));
+    throw new Error(missingModelMessage(modelId));
   }
 
   const outPrefix = path.join(getWorkDir(), `sublibr-whisper-${Date.now()}-${process.pid}`);
@@ -158,7 +129,7 @@ export async function transcribeLocal(
     await runWhisper(cli, [
       '-m', model,
       '-f', audioPath,
-      '-l', whisperLanguage(resolvedId, language),
+      '-l', whisperLanguage(modelId, language),
       '-ml', '1',
       '-sow',
       '-oj',
@@ -184,7 +155,7 @@ export async function transcribeLocal(
       text: JSON.stringify({ text, words }),
       tokenUsage: makeTokenUsage(
         'local',
-        resolvedId,
+        modelId,
         resolveTokenUsage({ transcript: text, durationSec: audioDurationFromWords(words) }),
       ),
     };

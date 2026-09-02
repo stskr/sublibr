@@ -14,6 +14,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { CustomSelect } from './components/CustomSelect';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { UpdateNotification } from './components/UpdateNotification';
+import { StableLabelButton } from './components/StableLabelButton';
 
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -27,6 +28,7 @@ import { layoutSubtitles, reflowSubtitles } from './services/subtitleLayout';
 import { parseSubtitleFile } from './services/subtitleParser';
 import { DEFAULT_SUBTITLE_STYLE } from './types';
 import { PROVIDER_LABELS, resolveSavedModel, resolveSavedTranslatorModel, TRANSLATOR_MODEL_OPTIONS, isTranscriptionReady, CLOUD_PROVIDERS, transcriptionModelLabel, testApiKey } from './services/providers';
+import { sanitizeImportedLocalModels } from './services/importedLocalModels';
 import { SubtitleStylePanel } from './components/SubtitleStylePanel';
 import { ResolutionPicker } from './components/ResolutionPicker';
 
@@ -50,6 +52,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   unloadAfterMinutes: 5,
   projectsFolder: '',
   projectsFolderSet: false,
+  importedLocalModels: [],
 };
 
 const DEFAULT_SUBTITLE_DURATION = 2; // seconds
@@ -136,7 +139,8 @@ function App() {
           };
           mergedProviders.gemini.model = resolveSavedModel('gemini', mergedProviders.gemini.model);
           mergedProviders.openai.model = resolveSavedModel('openai', mergedProviders.openai.model);
-          mergedProviders.local.model = resolveSavedModel('local', mergedProviders.local.model);
+          const importedLocalModels = sanitizeImportedLocalModels(savedSettings.importedLocalModels);
+          mergedProviders.local.model = resolveSavedModel('local', mergedProviders.local.model, importedLocalModels);
           let translatorProvider = savedSettings.translator?.provider ?? DEFAULT_SETTINGS.translator.provider;
           const translatorUsable = (p: typeof translatorProvider) => {
             if (TRANSLATOR_MODEL_OPTIONS[p]?.length === 0) return false;
@@ -149,6 +153,7 @@ function App() {
           const translatorModel = resolveSavedTranslatorModel(
             translatorProvider,
             savedSettings.translator?.model ?? TRANSLATOR_MODEL_OPTIONS[translatorProvider][0].value,
+            importedLocalModels,
           );
           const chosenFolder = savedSettings.projectsFolder?.trim() || '';
           const folderSet = Boolean(savedSettings.projectsFolderSet);
@@ -157,6 +162,7 @@ function App() {
             ...savedSettings,
             providers: mergedProviders,
             translator: { provider: translatorProvider, model: translatorModel },
+            importedLocalModels,
             subtitleStyle: mergedSubtitleStyle,
             projectsFolder: chosenFolder || suggestedFolder,
             projectsFolderSet: folderSet,
@@ -226,6 +232,15 @@ function App() {
     clearMedia,
     refreshProjects,
   } = mediaManager;
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const filePath = (event as CustomEvent<string>).detail;
+      if (typeof filePath === 'string' && filePath.trim()) void coreProcessFile(filePath);
+    };
+    window.addEventListener('sublibr-open-media', onOpen);
+    return () => window.removeEventListener('sublibr-open-media', onOpen);
+  }, [coreProcessFile]);
 
   // 2. Version History
   const versionHistory = useVersionHistory({
@@ -713,7 +728,7 @@ function App() {
 
                   <TranscriptionModelButton
                     settings={settings}
-                    onClick={() => openSettings('models')}
+                    onClick={() => openSettings('general')}
                   />
 
                   <button
@@ -741,8 +756,8 @@ function App() {
                         })}
                       </p>
                       {mediaFile && !transcribeReady && !(settings.activeProvider === 'local' && localWhisperOk === null) && (
-                        <button type="button" className="text-link-btn" onClick={() => openSettings('models')}>
-                          Open Models
+                        <button type="button" className="text-link-btn" onClick={() => openSettings('general')}>
+                          Open Settings
                         </button>
                       )}
                     </>
@@ -1025,7 +1040,7 @@ function App() {
                   {!showGeneratePanel && (
                     <TranscriptionModelButton
                       settings={settings}
-                      onClick={() => openSettings('models')}
+                      onClick={() => openSettings('general')}
                     />
                   )}
                   <TokenUsageDisplay stats={tokenStats} />
@@ -1128,9 +1143,9 @@ function App() {
                 : 'This cannot be undone. The project folder and copied media will be deleted.'}
             </p>
             <div className="project-dialog-actions">
-              <button className="btn-danger" onClick={confirmDelete}>
+              <StableLabelButton className="btn-danger" onClick={confirmDelete} labels={['Delete', 'Delete permanently']}>
                 {deleteStep === 1 ? 'Delete' : 'Delete permanently'}
-              </button>
+              </StableLabelButton>
               <button className="btn-secondary" onClick={cancelDelete}>Cancel</button>
             </div>
           </div>
@@ -1161,7 +1176,7 @@ function generateBlockedReason({
 }): string {
   if (!hasMedia) return 'Add video or audio first.';
   if (local && localWhisperOk === null) return 'Checking offline setup…';
-  if (local && localWhisperOk === false) return 'Offline transcription isn’t ready.';
+  if (local && localWhisperOk === false) return 'Local transcription isn’t ready.';
   if (!transcribeReady) return 'Add an API key in Settings.';
   return 'Set up transcription in Settings.';
 }
@@ -1183,14 +1198,14 @@ function TranscriptionModelButton({
     >
       <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'cloud'}</span>
       <span className={`run-location-chip ${settings.activeProvider === 'local' ? 'is-offline' : 'is-cloud'}`}>
-        {settings.activeProvider === 'local' ? 'Offline' : 'Online'}
+        {settings.activeProvider === 'local' ? 'Local' : 'Cloud'}
       </span>
       <span className="active-model-label">Transcription</span>
       {settings.activeProvider !== 'local' && (
         <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
       )}
       <span className="active-model-name">
-        {transcriptionModelLabel(settings.activeProvider, activeConfig.model)}
+        {transcriptionModelLabel(settings.activeProvider, activeConfig.model, settings.importedLocalModels)}
       </span>
     </button>
   );

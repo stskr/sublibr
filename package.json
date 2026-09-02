@@ -2,7 +2,7 @@
   "name": "sublibr",
   "private": true,
   "version": "1.0.0",
-  "description": "Local subtitle generator using Gemini AI",
+  "description": "Desktop app for timed subtitles. Transcribe locally or in the cloud, edit, and export.",
   "author": "Stas Krylov",
   "license": "MIT",
   "main": "dist-electron/main.js",

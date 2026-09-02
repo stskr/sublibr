@@ -170,20 +170,41 @@ function listProjectDirs(): string[] {
     .map((entry) => path.join(root, entry.name));
 }
 
-function assertProjectDir(dir: string): string {
-  const resolved = path.resolve(dir);
-  const root = getProjectsFolder();
-  if (!isPathInside(resolved, root, path.sep)) {
-    throw new Error('Access denied: not a project folder');
+function samePath(a: string, b: string): boolean {
+  return isPathInside(a, b, path.sep) && isPathInside(b, a, path.sep);
+}
+
+function isReservedLayoutDir(resolved: string): boolean {
+  const root = path.resolve(getProjectsFolder());
+  if (samePath(resolved, root)) return true;
+  for (const name of RESERVED_DIRS) {
+    if (samePath(resolved, path.join(root, name))) return true;
   }
-  if (RESERVED_DIRS.has(path.basename(resolved))) {
-    throw new Error('Access denied: reserved folder');
-  }
-  return resolved;
+  return false;
 }
 
 function manifestPath(dir: string): string {
   return path.join(dir, MANIFEST_FILENAME);
+}
+
+function looksLikeProjectDir(dir: string): boolean {
+  if (parseManifest(readJsonFile(manifestPath(dir)))) return true;
+  return Boolean(readJsonFile(path.join(dir, LEGACY_META_FILE)));
+}
+
+/** A writable project is a real Sublibr folder, including portable copies outside the library. */
+function assertProjectDir(dir: string): string {
+  const resolved = path.resolve(dir);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+    throw new Error('Access denied: not a project folder');
+  }
+  if (isReservedLayoutDir(resolved)) {
+    throw new Error('Access denied: reserved folder');
+  }
+  if (!looksLikeProjectDir(resolved)) {
+    throw new Error('Access denied: not a project folder');
+  }
+  return resolved;
 }
 
 function resolveMediaAbs(dir: string, relativePath: string | null | undefined): string | null {
@@ -254,19 +275,20 @@ export function listProjects(): ProjectSummary[] {
   return summaries.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-function siblingFolderNames(exceptDir?: string): string[] {
-  const root = getProjectsFolder();
-  if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !RESERVED_DIRS.has(entry.name))
-    .filter((entry) => path.join(root, entry.name) !== exceptDir)
+function siblingFolderNames(parentDir: string, exceptDir?: string): string[] {
+  if (!fs.existsSync(parentDir)) return [];
+  const reservedHere = samePath(parentDir, getProjectsFolder());
+  return fs.readdirSync(parentDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .filter((entry) => !reservedHere || !RESERVED_DIRS.has(entry.name))
+    .filter((entry) => path.join(parentDir, entry.name) !== exceptDir)
     .map((entry) => entry.name);
 }
 
 function allocateProjectDir(displayName: string): string {
   const root = getProjectsFolder();
   ensureProjectsLayout(root);
-  const folderName = uniqueName(siblingFolderNames(), sanitizeProjectName(displayName));
+  const folderName = uniqueName(siblingFolderNames(root), sanitizeProjectName(displayName));
   const dir = path.join(root, folderName);
   fs.mkdirSync(dir, { recursive: true });
   fs.mkdirSync(path.join(dir, MEDIA_DIR_NAME), { recursive: true });
@@ -492,8 +514,9 @@ export async function duplicateProject(projectDir: string): Promise<LoadedProjec
   const manifest = readOrMigrateManifest(dir);
   if (!manifest) throw new Error('Not a Sublibr project');
 
-  const copyName = uniqueName(siblingFolderNames(), `${sanitizeProjectName(manifest.name)} copy`);
-  const dest = path.join(getProjectsFolder(), copyName);
+  const parent = path.dirname(dir);
+  const copyName = uniqueName(siblingFolderNames(parent), `${sanitizeProjectName(manifest.name)} copy`);
+  const dest = path.join(parent, copyName);
   fs.cpSync(dir, dest, {
     recursive: true,
     filter: (src) => {
@@ -529,8 +552,8 @@ export function renameProject(
     return toLoaded(dir, { ...next, updatedAt: Date.now() });
   }
 
-  const destName = uniqueName(siblingFolderNames(dir), cleaned);
-  const dest = path.join(getProjectsFolder(), destName);
+  const destName = uniqueName(siblingFolderNames(path.dirname(dir), dir), cleaned);
+  const dest = path.join(path.dirname(dir), destName);
   if (path.resolve(dest) === dir) {
     return toLoaded(dir, { ...next, updatedAt: Date.now() });
   }

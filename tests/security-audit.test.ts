@@ -72,7 +72,6 @@ describe('Electron BrowserWindow security', () => {
 describe('IPC handler path validation', () => {
   const fileHandlers = [
     'file:read',
-    'file:readAsDataUrl',
     'file:write',
     'file:getInfo',
   ];
@@ -203,9 +202,10 @@ describe('Content Security Policy', () => {
     expect(defaultSrc).not.toContain("'unsafe-eval'");
   });
 
-  it('should not use wildcard (*) in connect-src', () => {
+  it('should not use a scheme-wide wildcard in connect-src', () => {
     const connectSrc = indexHtml.match(/connect-src\s+([^;]+)/)?.[1] || '';
-    expect(connectSrc).not.toContain('*');
+    expect(connectSrc).not.toMatch(/(?:^|\s)\*(?:\s|$)/);
+    expect(connectSrc).not.toMatch(/https?:\/\/\*(?:\/|$|\s)/);
   });
 
   it('should restrict connect-src to known APIs only', () => {
@@ -213,6 +213,10 @@ describe('Content Security Policy', () => {
     const allowedDomains = [
       "'self'",
       'https://generativelanguage.googleapis.com',
+      'http://localhost:*',
+      'http://127.0.0.1:*',
+      'ws://localhost:*',
+      'ws://127.0.0.1:*',
     ];
 
     const parts = connectSrc.trim().split(/\s+/);
@@ -407,9 +411,13 @@ describe('Navigation security', () => {
     }
   });
 
-  it('should not have shell.openExternal with unsanitized URLs', () => {
-    // shell.openExternal can be used to launch arbitrary executables
-    expect(mainSource).not.toContain('shell.openExternal');
+  it('should only open http(s) URLs in the system browser', () => {
+    const openCalls = [...mainSource.matchAll(/shell\.openExternal\(([^)]+)\)/g)];
+    expect(openCalls.length).toBeGreaterThan(0);
+    for (const match of openCalls) {
+      const before = mainSource.slice(Math.max(0, match.index - 400), match.index);
+      expect(before).toMatch(/startsWith\(['"]https?:\/\//);
+    }
   });
 
   it('should use loadFile for production', () => {
