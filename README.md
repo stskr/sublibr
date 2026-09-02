@@ -6,7 +6,6 @@
 
 A desktop app that turns video and audio into **timed subtitles**. Transcribe locally or in the cloud, edit on a timeline, style the text, and export files or a burned-in video.
 
-תוכנה שולחנית לתמלול וידאו ואודיו לכתוביות עם חותמות זמן. אפשר לעבוד לגמרי במחשב (Whisper, כולל משקלי ivrit.ai לעברית) או בענן (Gemini / OpenAI).
 
 ## Screenshots
 
