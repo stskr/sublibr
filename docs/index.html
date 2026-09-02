@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#081420">
+    <title>Sublibr — timed subtitles, local or cloud</title>
+    <meta name="description" content="A desktop app for timed subtitles. Transcribe locally or in the cloud, edit on a timeline, style the text, export files or a burned-in video.">
+    <link rel="canonical" href="https://stskr.github.io/sublibr/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Sublibr — timed subtitles, local or cloud">
+    <meta property="og:description" content="Transcribe, edit, and burn in — on your machine. Clone the repo and run npm run dev.">
+    <meta property="og:url" content="https://stskr.github.io/sublibr/">
+    <meta property="og:image" content="https://stskr.github.io/sublibr/assets/9-preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Sublibr — timed subtitles, local or cloud">
+    <meta name="twitter:description" content="A desktop editor for subtitles that keep their times.">
+    <meta name="twitter:image" content="https://stskr.github.io/sublibr/assets/9-preview.png">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Signika:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <div class="site-header__inner">
+        <a class="site-header__brand" href="#top">
+          <img src="assets/logo-full-white.svg" alt="Sublibr" width="246" height="54">
+        </a>
+        <nav class="site-nav" data-nav aria-label="Primary">
+          <a class="site-nav__link" href="#features">Features</a>
+          <a class="site-nav__link" href="#install">Install</a>
+          <a class="site-nav__link" href="https://github.com/stskr/sublibr">GitHub</a>
+        </nav>
+        <div class="site-header__actions">
+          <a class="btn btn--ghost btn--compact" href="https://github.com/stskr/sublibr">View on GitHub</a>
+          <a class="btn btn--primary btn--compact" href="#install">
+            <span class="btn__full">Install from the terminal</span>
+            <span class="btn__short">Install</span>
+          </a>
+          <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">
+            <span class="visually-hidden">Menu</span>
+            <span class="nav-toggle__bars" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+      <div class="mobile-nav" id="mobile-nav" data-mobile-nav hidden>
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/stskr/sublibr">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="wrap wrap--narrow">
+          <p class="badge">Desktop · MIT · Node 18+</p>
+          <h1 class="hero__title">Timed subtitles.<br>Local or cloud.</h1>
+          <p class="hero__lede">Transcribe locally or in the cloud, edit on a timeline, style the text, and export files or a burned-in video.</p>
+          <div class="hero__ctas">
+            <a class="btn btn--primary" href="#install">Install from the terminal</a>
+            <a class="btn btn--ghost" href="https://github.com/stskr/sublibr">View on GitHub</a>
+          </div>
+          <p class="hero__links">
+            <a href="#features">Features</a>
+            <a href="https://github.com/stskr/sublibr#readme">Readme</a>
+            <a href="https://github.com/stskr/sublibr/blob/main/LICENSE">License</a>
+          </p>
+        </div>
+      </section>
+
+      <section class="shot" aria-label="Product preview">
+        <div class="wrap">
+          <figure class="shot__frame">
+            <img
+              src="assets/9-preview.png"
+              alt="Sublibr preview: burned-in German cues on video, two-tier timeline, Local Whisper in the footer."
+              width="1440"
+              height="900"
+              fetchpriority="high"
+            >
+          </figure>
+        </div>
+      </section>
+
+      <section class="features" id="features">
+        <article class="feature">
+          <div class="feature__copy">
+            <p class="feature__num"><span>01</span> Transcribe</p>
+            <h2 class="feature__title">Speech models that return times.</h2>
+            <p class="feature__body">Sublibr only transcribes with models that stamp cues. Generate from the sidebar, or import SRT, VTT, or ASS.</p>
+            <ul class="feature__list">
+              <li>Local: Whisper Large v3 Turbo via <code>whisper-cli</code> (99 languages). Optional ivrit.ai for Hebrew.</li>
+              <li>Cloud: Gemini 3.5 Transcribe, or OpenAI Whisper (<code>whisper-1</code>).</li>
+              <li>Long files split into overlapping parts, stitch at boundaries, then fill gaps.</li>
+            </ul>
+          </div>
+          <figure class="feature__media">
+            <img src="assets/5-transcribe-done.png" alt="Editor list of English cues with timestamps after local Whisper transcription." width="1440" height="900" loading="lazy">
+          </figure>
+        </article>
+
+        <article class="feature feature--reverse">
+          <div class="feature__copy">
+            <p class="feature__num"><span>02</span> Translate</p>
+            <h2 class="feature__title">Rewrite text. Keep the cues.</h2>
+            <p class="feature__body">Each translation is a new version. Whisper does not translate — a separate model rewrites the lines.</p>
+            <ul class="feature__list">
+              <li>Cloud: Gemini Flash or Pro, GPT-4o or GPT-4o Mini.</li>
+              <li>Local: Qwen2.5 via <code>llama-server</code> (7B default, optional 3B).</li>
+              <li>Add an instruct GGUF (Qwen, Llama, or Gemma) in Settings → Models.</li>
+            </ul>
+          </div>
+          <figure class="feature__media">
+            <img src="assets/8-translate-done.png" alt="German translation version in the subtitle list, same timestamps as the English pass." width="1440" height="900" loading="lazy">
+          </figure>
+        </article>
+
+        <article class="feature">
+          <div class="feature__copy">
+            <p class="feature__num"><span>03</span> Generate</p>
+            <h2 class="feature__title">Pick a language. Then generate.</h2>
+            <p class="feature__body">Drop a file, choose Local or Cloud, pick a language or auto-detect. Local is enabled only when Whisper is installed and probed.</p>
+            <ul class="feature__list">
+              <li>Audio stays on this computer in Local mode.</li>
+              <li>Import SRT, VTT, or ASS if you already have cues.</li>
+              <li>List, preview, and a two-tier timeline once the pass finishes.</li>
+            </ul>
+          </div>
+          <figure class="feature__media">
+            <img src="assets/3-generate.png" alt="Generate panel with Local transcription, language picker, and an empty subtitle list ready for the first pass." width="1440" height="900" loading="lazy">
+          </figure>
+        </article>
+
+        <article class="feature feature--reverse">
+          <div class="feature__copy">
+            <p class="feature__num"><span>04</span> Local / Cloud</p>
+            <h2 class="feature__title">One toggle for transcription. Another for translation.</h2>
+            <p class="feature__body">Settings → General. Cloud options appear after you test a key. Local is enabled only when Whisper is installed and probed.</p>
+            <div class="mode-row">
+              <div class="mode-card">
+                <span class="pill pill--local">Local</span>
+                <p>Audio stays on this computer. Homebrew <code>whisper-cpp</code> / <code>llama.cpp</code>, weights in <code>models/</code>.</p>
+              </div>
+              <div class="mode-card">
+                <span class="pill pill--cloud">Cloud</span>
+                <p>Gemini or OpenAI after a tested key. Keys live in OS-encrypted electron-store, never in the project folder.</p>
+              </div>
+            </div>
+          </div>
+          <figure class="feature__media">
+            <img src="assets/2-settings-local.png" alt="Settings General tab with Local and Cloud pickers for transcription and translation." width="1440" height="900" loading="lazy">
+          </figure>
+        </article>
+
+        <article class="feature">
+          <div class="feature__copy">
+            <p class="feature__num"><span>05</span> Projects</p>
+            <h2 class="feature__title">Folders you can move.</h2>
+            <p class="feature__body">Each job is a folder (default <code>~/Documents/Sublibr</code>). Media is copied into <code>media/</code>. Identity is the folder, not an absolute path. Files up to 3 GB.</p>
+            <ul class="feature__list">
+              <li>Drop video, audio, SRT/VTT/ASS, or a Sublibr project. Or start from scratch.</li>
+              <li>Latest projects: open, rename, duplicate, delete, or relink missing media.</li>
+              <li>Download SRT, WebVTT, or ASS. Burn styled subtitles into a video.</li>
+            </ul>
+          </div>
+          <figure class="feature__media">
+            <img src="assets/1-home.png" alt="Home screen with a drop zone and latest projects list." width="1440" height="900" loading="lazy">
+          </figure>
+        </article>
+      </section>
+
+      <section class="terminal" id="install">
+        <div class="wrap wrap--narrow">
+          <h2 class="section-title">Try it in your terminal</h2>
+          <p class="section-lede">There is no packaged installer. Clone the repo. Node 18 or newer.</p>
+          <div class="code-block">
+            <pre><code data-copy-source>git clone https://github.com/stskr/sublibr.git
+cd sublibr
+npm install
+npm run dev</code></pre>
+            <button class="code-block__copy" type="button" data-copy>
+              Copy
+            </button>
+          </div>
+          <p class="terminal__note">If Electron exits immediately in Cursor, the shell is injecting <code>ELECTRON_RUN_AS_NODE=1</code>. Clear it:</p>
+          <div class="code-block code-block--compact">
+            <pre><code data-copy-source>ELECTRON_RUN_AS_NODE= npm run dev</code></pre>
+            <button class="code-block__copy" type="button" data-copy>
+              Copy
+            </button>
+          </div>
+          <p class="terminal__note">First launch asks where to store projects. Then Settings → API keys to test a cloud key, or General → Local and Set up offline.</p>
+        </div>
+      </section>
+
+      <section class="grid-section">
+        <div class="wrap">
+          <div class="grid-section__intro">
+            <h2 class="section-title">Everything on the machine</h2>
+            <p class="section-lede">Specific models, formats, and folder paths — not a feature wall of adjectives.</p>
+          </div>
+          <ul class="cap-grid">
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 10h10M7 14h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>Timed transcription</h3>
+              <p>Only models that return timestamps. Pause and resume. Session token usage on cloud runs.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h6M5 12h10M5 16h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16 7l3 5-3 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <h3>Translation versions</h3>
+              <p>Keep the transcription. Each rewrite is a new version you can switch back to.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4zM9 8V6h6v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              <h3>Portable projects</h3>
+              <p>A folder with <code>project.sublibr</code>, <code>media/</code>, cues, versions, and logs.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M4 14h10M8 6v8M16 10v8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>Timeline + style</h3>
+              <p>Detail track and minimap. Title-safe position. Screen format drives line length.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM10 19h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>SRT / VTT / ASS</h3>
+              <p>Download the current version. Import an existing file if you already have cues.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 15h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>Burn-in</h3>
+              <p>Render a video with the styled track. Preview is the same canvas as the export.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a7 7 0 0 1 7 7v2l1.5 3h-17L5 13v-2a7 7 0 0 1 7-7zM10 20h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              <h3>Local Whisper</h3>
+              <p>whisper.cpp on this machine. Turbo is the default for every language, including Hebrew.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 12h18M12 4c2.5 2.8 2.5 13.2 0 16M12 4c-2.5 2.8-2.5 13.2 0 16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              <h3>Cloud Gemini / OpenAI</h3>
+              <p>Options appear after you test a key on the API keys tab. Usage under those providers’ terms.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H8l-4 4 4 4h11a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 12h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>RTL / Hebrew</h3>
+              <p>Typography for RTL scripts. Optional ivrit.ai Whisper weights in Settings → Models.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <h3>Long files</h3>
+              <p>Overlapping chunks, stitch, then a pass that fills gaps the model skipped.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 11h6M9 15h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <h3>Encrypted keys</h3>
+              <p>API keys in OS-encrypted electron-store. Session logs (no secrets) in each project’s <code>logs/</code>.</p>
+            </li>
+            <li class="cap-grid__item">
+              <svg class="cap-grid__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 10l3 3 5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <h3>Set up offline</h3>
+              <p>Consent checkbox, then Homebrew packages and Hugging Face weights. Already-present files are skipped.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="wrap wrap--narrow">
+          <h2 class="hero__title hero__title--cta">Timed subtitles.<br>Local or cloud.</h2>
+          <p class="section-lede">Clone the repo. There is no .dmg.</p>
+          <div class="hero__ctas">
+            <a class="btn btn--ghost" href="https://github.com/stskr/sublibr">View on GitHub</a>
+            <a class="btn btn--primary" href="#install">Install from the terminal</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap site-footer__grid">
+        <div class="site-footer__brand">
+          <img src="assets/logo-full-white.svg" alt="Sublibr" width="246" height="54">
+          <p>© 2026 Stas Krylov — MIT</p>
+          <p>
+            <a href="https://github.com/stskr">GitHub</a>
+            ·
+            <a href="https://x.com/StasKrylov">X</a>
+          </p>
+        </div>
+        <div class="site-footer__cols">
+          <div>
+            <h2>Product</h2>
+            <ul>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#install">Install</a></li>
+              <li><a href="https://github.com/stskr/sublibr">Repository</a></li>
+            </ul>
+          </div>
+          <div>
+            <h2>Credits</h2>
+            <ul>
+              <li>Signika — SIL OFL</li>
+              <li>JetBrains Mono — SIL OFL</li>
+              <li>FFmpeg is LGPL 2.1+</li>
+            </ul>
+          </div>
+          <div>
+            <h2>Models</h2>
+            <ul>
+              <li>Local: whisper.cpp, llama.cpp</li>
+              <li>Cloud: Gemini, OpenAI</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="wrap">
+        <p class="site-footer__fine">You are responsible for having the right to transcribe, subtitle, and distribute any media you process. FFmpeg source at <a href="https://ffmpeg.org/download.html">ffmpeg.org/download</a>.</p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
