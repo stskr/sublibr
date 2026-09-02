@@ -183,7 +183,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(({
                                 zIndex: 1,
                                 opacity: 0.5
                             }}
-                            title="End of Audio"
+                            title="End of audio"
                         />
                     )}
 

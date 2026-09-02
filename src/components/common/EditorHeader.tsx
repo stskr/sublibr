@@ -44,7 +44,7 @@ export function EditorHeader({
                     <button
                         className={`btn-icon ${showSearch ? 'active' : ''}`}
                         onClick={onToggleSearch}
-                        title="Search and Replace (Cmd/Ctrl+F)"
+                        title="Search and replace"
                     >
                         <span className="icon icon-sm">search</span>
                     </button>
@@ -113,7 +113,7 @@ export function EditorHeader({
             </div>
 
             <div className="editor-header-right">
-                <span className="subtitle-count">{entryCount} entries</span>
+                <span className="subtitle-count">{entryCount} {entryCount === 1 ? 'subtitle' : 'subtitles'}</span>
             </div>
         </div>
     );

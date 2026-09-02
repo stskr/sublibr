@@ -144,6 +144,31 @@ export function detectDirection(text: string): 'rtl' | 'ltr' {
     return rtlChars.test(text) ? 'rtl' : 'ltr';
 }
 
+/** Leading sentence punctuation that models often put on the LTR side of RTL text. */
+const LEADING_PUNCT = /^([!?.:;,…،؛؟]+)\s*/;
+
+/**
+ * Put sentence punctuation at the end of each RTL line (logical order).
+ * `"!שלום"` → `"שלום!"` so `dir=rtl` shows the mark on the trailing side.
+ */
+export function applyRtlTypography(text: string): string {
+    if (!text || detectDirection(text) !== 'rtl') return text;
+    return text.split('\n').map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return line;
+        const match = trimmed.match(LEADING_PUNCT);
+        if (!match) return trimmed;
+        const rest = trimmed.slice(match[0].length);
+        if (!rest || detectDirection(rest) !== 'rtl') return trimmed;
+        return `${rest}${match[1]}`;
+    }).join('\n');
+}
+
+/** Isolate an RTL line for CSS/ASS so punctuation follows the line direction. */
+export function wrapRtlIsolate(line: string): string {
+    return `\u2067${line}\u2069`;
+}
+
 export function formatTimeAgo(timestamp: number): string {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
 

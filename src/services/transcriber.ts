@@ -1,7 +1,14 @@
 import type { Subtitle, AudioChunk, AIProvider, TokenUsage, ScreenSize, SubtitleStyle, MediaFile } from '../types';
-import { DEFAULT_SUBTITLE_STYLE, getPlayRes } from '../types';
-import { generateId, formatSrtTime, formatVttTime, formatAssTime } from '../utils';
+import { DEFAULT_SUBTITLE_STYLE, getPlayRes, fontSizeForPlayRes, effectiveSubtitlePositionY } from '../types';
+import { generateId, formatSrtTime, formatVttTime, formatAssTime, detectDirection, applyRtlTypography, wrapRtlIsolate, getIsoLanguage } from '../utils';
 import { callProvider, callTextProvider, isAsrModel, callLocalTranscribe, resolveLocalWhisperModel } from './providers';
+import { getTranslationPrompt } from '../prompts/shared/translation';
+import {
+    applyParsedTranslations,
+    formatTranslationInput,
+    parseTranslationResponse,
+    translationHitCount,
+} from './translationParse';
 
 export interface TranscriptionResult {
     subtitles: Subtitle[];
@@ -24,7 +31,7 @@ async function audioToBase64(filePath: string): Promise<string> {
 // Build standard subtitles from individual word-level timestamps (native Whisper)
 function buildSubtitlesFromWords(words: { start: number; end: number; word: string }[], startOffset: number, maxLines: number, maxCharsPerLine: number): Subtitle[] {
     const subtitles: Subtitle[] = [];
-    const MAX_CHARS_TOTAL = maxLines * maxCharsPerLine;
+    const maxWords = LAYOUT.maxWordsPerCue;
 
     let currentText = "";
     let currentStart = 0;
@@ -47,27 +54,22 @@ function buildSubtitlesFromWords(words: { start: number; end: number; word: stri
         const duration = w.end - currentStart;
         const isEndPunctuation = /[.!?]$/.test(currentText);
         const isComma = /[,]$/.test(currentText);
+        const nextWordCount = tokenize(potentialText).length;
 
-        // Break if:
-        // - Exceeds total allowed chars
-        // - Exceeds max comfortable duration (e.g. 5.5 seconds)
-        // - Natural sentence end (. ! ?)
-        // - Moderate conversational gap (> 0.5s)
-        // - Minor gap (> 0.2s) IF we already have a reasonably long text
         let shouldBreak = false;
 
-        if (potentialText.length > MAX_CHARS_TOTAL) {
+        if (nextWordCount > maxWords || potentialText.length > maxLines * maxCharsPerLine) {
             shouldBreak = true;
         } else if (duration >= 5.5) {
-            shouldBreak = true; // Enforce max 5.5s length
+            shouldBreak = true;
         } else if (gap >= 0.5) {
-            shouldBreak = true; // Natural conversational pause
-        } else if (isEndPunctuation && currentText.length > 15) {
-            shouldBreak = true; // Natural break at end of sentence
-        } else if (gap >= 0.2 && currentText.length >= maxCharsPerLine) {
-            shouldBreak = true; // Minor pause and we already have a full line of text
-        } else if (isComma && currentText.length >= maxCharsPerLine * 0.8) {
-            shouldBreak = true; // Natural break at comma
+            shouldBreak = true;
+        } else if (isEndPunctuation && tokenize(currentText).length >= 4) {
+            shouldBreak = true;
+        } else if (gap >= 0.2 && tokenize(currentText).length >= LAYOUT.maxWordsPerLine) {
+            shouldBreak = true;
+        } else if (isComma && tokenize(currentText).length >= LAYOUT.maxWordsPerLine - 1) {
+            shouldBreak = true;
         }
 
         if (shouldBreak) {
@@ -76,7 +78,7 @@ function buildSubtitlesFromWords(words: { start: number; end: number; word: stri
                 index: subtitles.length + 1,
                 startTime: startOffset + currentStart,
                 endTime: startOffset + currentEnd,
-                text: currentText,
+                text: layoutCueText(currentText),
             });
             currentText = cleanWord;
             currentStart = w.start;
@@ -93,7 +95,7 @@ function buildSubtitlesFromWords(words: { start: number; end: number; word: stri
             index: subtitles.length + 1,
             startTime: startOffset + currentStart,
             endTime: startOffset + currentEnd,
-            text: currentText,
+            text: layoutCueText(currentText),
         });
     }
 
@@ -121,7 +123,7 @@ import { getStandardTranscriptionPrompt as getGeminiTranscriptionPrompt } from '
 import { getHealingTranscriptionPrompt as getGeminiHealingPrompt } from '../prompts/gemini/healing';
 import { getOpenAITranscriptionPrompt } from '../prompts/openai/transcription';
 import { getOpenAIHealingPrompt } from '../prompts/openai/healing';
-import { getIsoLanguage } from '../utils';
+import { layoutCueText, layoutSubtitles, LAYOUT, tokenize } from './subtitleLayout';
 
 export function getScreenSizeConstraints(screenSize: ScreenSize) {
     switch (screenSize) {
@@ -205,64 +207,7 @@ export async function transcribeChunk(
         );
     }
 
-    // Post-processing: Split long subtitles (Safety Net)
-    // We'll set a safe limit to allow for full lines.
-    const MAX_CHARS = maxLines * maxCharsPerLine + 10;
-
-    const splitSubtitles: Subtitle[] = [];
-
-    for (const sub of subtitles) {
-        if (sub.text.length <= MAX_CHARS) {
-            splitSubtitles.push(sub);
-            continue;
-        }
-
-        // Split long subtitle linearly
-        const words = sub.text.split(' ');
-        const duration = sub.endTime - sub.startTime;
-        const totalLen = sub.text.length;
-
-        // Determine number of splits needed
-        const splitCount = Math.ceil(sub.text.length / MAX_CHARS);
-        const charsPerSplit = Math.ceil(totalLen / splitCount);
-
-        let currentStart = sub.startTime;
-        let currentTextParts: string[] = [];
-        let currentLen = 0;
-
-        for (let i = 0; i < words.length; i++) {
-            const word = words[i];
-            currentTextParts.push(word);
-            currentLen += word.length + 1; // +1 for space
-
-            // Check if we reached the limit or it's the last word
-            const isLast = i === words.length - 1;
-            const nextWordLen = !isLast ? words[i + 1].length : 0;
-
-            if (currentLen + nextWordLen > charsPerSplit || isLast) {
-                // Finalize this segment
-                const segmentText = currentTextParts.join(' ');
-                const segmentDuration = (segmentText.length / totalLen) * duration;
-
-                splitSubtitles.push({
-                    ...sub,
-                    id: generateId(),
-                    startTime: currentStart,
-                    endTime: currentStart + segmentDuration,
-                    text: segmentText,
-                    index: 0 // re-index later
-                });
-
-                currentStart += segmentDuration;
-                currentTextParts = [];
-                currentLen = 0;
-            }
-        }
-
-    }
-
-    // Re-index
-    subtitles = splitSubtitles.map((s, i) => ({ ...s, index: i + 1 }));
+    subtitles = layoutSubtitles(subtitles, screenSize);
 
     return {
         subtitles,
@@ -410,37 +355,28 @@ export function enforceSubtitleQuality(subtitles: Subtitle[], screenSize: Screen
         .filter(s => s.text.trim().length > 0 && s.endTime > s.startTime)
         .sort((a, b) => a.startTime - b.startTime);
 
-    const { maxLines, maxCharsPerLine } = getScreenSizeConstraints(screenSize);
-    const MAX_CHARS_TOTAL = maxLines * maxCharsPerLine;
-
-    // Phase 1: Merge consecutive subtitles that are too short to read
-    subs = mergeShortSubtitles(subs, MAX_CHARS_TOTAL);
-
-    // Phase 2: Extend short subtitles into available gaps
+    subs = mergeShortSubtitles(subs);
     subs = extendShortDurations(subs);
 
-    // Phase 3: Cap maximum duration
     for (const sub of subs) {
         if (sub.endTime - sub.startTime > QUALITY.MAX_DURATION) {
             sub.endTime = sub.startTime + QUALITY.MAX_DURATION;
         }
     }
 
-    // Phase 4: Ensure minimum gaps between subtitles
     for (let i = 0; i < subs.length - 1; i++) {
         if (subs[i].endTime > subs[i + 1].startTime - QUALITY.MIN_GAP) {
             subs[i].endTime = subs[i + 1].startTime - QUALITY.MIN_GAP;
         }
-        // Safety: if this made duration negative, floor it
         if (subs[i].endTime <= subs[i].startTime) {
             subs[i].endTime = subs[i].startTime + QUALITY.MIN_DURATION;
         }
     }
 
-    return subs.map((s, i) => ({ ...s, index: i + 1 }));
+    return layoutSubtitles(subs, screenSize);
 }
 
-function mergeShortSubtitles(subs: Subtitle[], maxCharsTotal: number): Subtitle[] {
+function mergeShortSubtitles(subs: Subtitle[]): Subtitle[] {
     const merged: Subtitle[] = [];
     let i = 0;
 
@@ -449,26 +385,20 @@ function mergeShortSubtitles(subs: Subtitle[], maxCharsTotal: number): Subtitle[
         const duration = current.endTime - current.startTime;
         const minNeeded = minReadingDuration(current.text);
 
-        // If this subtitle is too short, try merging with next
         if (duration < minNeeded && i + 1 < subs.length) {
             const next = subs[i + 1];
             const gap = next.startTime - current.endTime;
+            const combinedWords = tokenize(`${current.text} ${next.text}`);
 
-            // Only merge if they're close together
-            if (gap < QUALITY.MERGE_GAP_LIMIT) {
-                const combinedText = current.text + '\n' + next.text;
-
-                // Only merge if combined text fits within subtitle limits
-                if (combinedText.length <= maxCharsTotal) {
-                    merged.push({
-                        ...current,
-                        id: current.id,
-                        endTime: next.endTime,
-                        text: combinedText,
-                    });
-                    i += 2; // Skip next since we merged it
-                    continue;
-                }
+            if (gap < QUALITY.MERGE_GAP_LIMIT && combinedWords.length <= LAYOUT.maxWordsPerCue) {
+                merged.push({
+                    ...current,
+                    id: current.id,
+                    endTime: next.endTime,
+                    text: combinedWords.join(' '),
+                });
+                i += 2;
+                continue;
             }
         }
 
@@ -506,7 +436,7 @@ function stripSourceTags(text: string): string {
 // Generate SRT file content
 export function generateSrt(subtitles: Subtitle[]): string {
     return subtitles.map((sub, i) => {
-        const cleanText = stripSourceTags(sub.text);
+        const cleanText = applyRtlTypography(stripSourceTags(sub.text));
         return `${i + 1}\n${formatSrtTime(sub.startTime)} --> ${formatSrtTime(sub.endTime)}\n${cleanText}\n`;
     }).join('\n'); // Exactly one blank line between sequences due to the trailing \n in the map combined with \n in the join
 }
@@ -515,7 +445,7 @@ export function generateSrt(subtitles: Subtitle[]): string {
 export function generateWebVtt(subtitles: Subtitle[]): string {
     return `WEBVTT\n\n` + subtitles.map((sub, i) => {
         // VTT specifies no blank lines inside the cue text
-        const cleanText = stripSourceTags(sub.text).replace(/\n\s*\n/g, '\n');
+        const cleanText = applyRtlTypography(stripSourceTags(sub.text)).replace(/\n\s*\n/g, '\n');
         return `${i + 1}\n${formatVttTime(sub.startTime)} --> ${formatVttTime(sub.endTime)}\n${cleanText}\n`;
     }).join('\n'); // Exactly one blank line between cues
 }
@@ -557,7 +487,7 @@ export function generateAss(
     const fontName = style.fontFamily.replace(/^'|'$/g, '');
 
     const [playResX, playResY] = getPlayRes(renderResolution, mediaFile?.width, mediaFile?.height);
-    const fontSize = Math.round(style.fontSize ?? 56);
+    const fontSize = fontSizeForPlayRes(style.fontSize ?? 56, renderResolution, mediaFile?.width, mediaFile?.height);
 
     const header = `[Script Info]
 ScriptType: v4.00+
@@ -576,72 +506,108 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     // \an2 = bottom-center anchor; \pos(x,y) places that anchor at the given coords
     const posX = Math.round((style.positionX ?? 50) / 100 * playResX);
-    const posY = Math.round((style.positionY ?? 85) / 100 * playResY);
+    const posY = Math.round(effectiveSubtitlePositionY(style, renderResolution, mediaFile?.width, mediaFile?.height) / 100 * playResY);
     const posTag = `{\\an2\\pos(${posX},${posY})}`;
 
     const events = subtitles.map((sub) => {
-        const cleanText = stripSourceTags(sub.text);
-        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${posTag}${cleanText.replace(/\n/g, '\\N')}`;
+        const cleanText = applyRtlTypography(stripSourceTags(sub.text));
+        const directed = detectDirection(cleanText) === 'rtl'
+            ? cleanText.split('\n').map(wrapRtlIsolate).join('\\N')
+            : cleanText.replace(/\n/g, '\\N');
+        return `Dialogue: 0,${formatAssTime(sub.startTime)},${formatAssTime(sub.endTime)},Default,,0,0,0,,${posTag}${directed}`;
     }).join('\n');
 
     return header + events;
 }
 
-// Translate subtitles via text-only AI model
-import { getTranslationPrompt } from '../prompts/shared/translation';
+function chunkSubtitles(subtitles: Subtitle[], maxItems: number, maxChars: number): Subtitle[][] {
+    const chunks: Subtitle[][] = [];
+    let current: Subtitle[] = [];
+    let chars = 0;
+
+    for (const sub of subtitles) {
+        const nextLen = chars + sub.text.length;
+        if (current.length > 0 && (current.length >= maxItems || nextLen > maxChars)) {
+            chunks.push(current);
+            current = [];
+            chars = 0;
+        }
+        current.push(sub);
+        chars += sub.text.length;
+    }
+    if (current.length > 0) chunks.push(current);
+    return chunks;
+}
+
 export async function translateSubtitles(
     subtitles: Subtitle[],
     targetLanguage: string,
     provider: AIProvider,
     apiKey: string,
     model: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    signal?: AbortSignal,
 ): Promise<TranscriptionResult> {
     if (subtitles.length === 0) return { subtitles: [], tokenUsage: { inputTokens: 0, outputTokens: 0, provider, model, timestamp: Date.now() } };
 
-    const promptBase = getTranslationPrompt(targetLanguage);
-
-    // Group subtitles into chunks (approx 1000 tokens ~ 3000 chars)
-    const MAX_CHARS_PER_CHUNK = 3000;
-    const subtitleChunks: Subtitle[][] = [];
-    let currentChunk: Subtitle[] = [];
-    let currentLen = 0;
-
-    for (const sub of subtitles) {
-        currentChunk.push(sub);
-        currentLen += sub.text.length;
-
-        if (currentLen > MAX_CHARS_PER_CHUNK) {
-            subtitleChunks.push(currentChunk);
-            currentChunk = [];
-            currentLen = 0;
+    const throwIfAborted = () => {
+        if (signal?.aborted) {
+            const err = new Error('Translation cancelled');
+            err.name = 'AbortError';
+            throw err;
         }
-    }
-    if (currentChunk.length > 0) {
-        subtitleChunks.push(currentChunk);
-    }
+    };
+
+    const promptBase = getTranslationPrompt(targetLanguage);
+    const maxItems = provider === 'local' ? 8 : 40;
+    const maxChars = provider === 'local' ? 900 : 3000;
+    const subtitleChunks = chunkSubtitles(subtitles, maxItems, maxChars);
 
     const translatedSubtitles: Subtitle[] = [];
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-
     const totalChunks = subtitleChunks.length;
 
+    const translateChunk = async (chunk: Subtitle[]): Promise<Subtitle[]> => {
+        throwIfAborted();
+        const prompt = `${promptBase}\n\n${formatTranslationInput(chunk.map(s => s.text))}`;
+        const response = await callTextProvider(provider, apiKey, model, prompt);
+        throwIfAborted();
+        totalInputTokens += response.tokenUsage.inputTokens;
+        totalOutputTokens += response.tokenUsage.outputTokens;
+
+        const parsed = parseTranslationResponse(response.text);
+        const hits = translationHitCount(chunk, parsed);
+        const minHits = chunk.length === 1 ? 1 : Math.ceil(chunk.length * 0.6);
+
+        if (hits < minHits && chunk.length > 1) {
+            const mid = Math.ceil(chunk.length / 2);
+            const left = await translateChunk(chunk.slice(0, mid));
+            const right = await translateChunk(chunk.slice(mid));
+            return [...left, ...right];
+        }
+
+        if (hits < chunk.length) {
+            console.warn(
+                `Translation recovered ${hits}/${chunk.length} cues in a chunk; keeping originals for the rest.`,
+            );
+        }
+
+        const texts = applyParsedTranslations(chunk, parsed);
+        return chunk.map((sub, i) => ({ ...sub, text: texts[i] }));
+    };
+
     for (let i = 0; i < totalChunks; i++) {
+        throwIfAborted();
         const baseProgress = (i / totalChunks) * 100;
         const nextProgress = ((i + 1) / totalChunks) * 100;
         const targetSimulatedProgress = baseProgress + (nextProgress - baseProgress) * 0.85;
 
-        if (onProgress) {
-            onProgress(baseProgress);
-        }
-
-        const chunk = subtitleChunks[i];
-        const inputText = JSON.stringify(chunk.map(s => ({ id: s.id, text: s.text })));
-        const prompt = `${promptBase}\n\n${inputText}`;
+        if (onProgress) onProgress(baseProgress);
 
         let simulatedProgress = baseProgress;
         const progressInterval = onProgress ? setInterval(() => {
+            if (signal?.aborted) return;
             simulatedProgress += (targetSimulatedProgress - simulatedProgress) * 0.05;
             if (simulatedProgress > targetSimulatedProgress - 0.5) {
                 simulatedProgress = targetSimulatedProgress;
@@ -650,46 +616,33 @@ export async function translateSubtitles(
         }, 500) : undefined;
 
         try {
-            const response = await callTextProvider(provider, apiKey, model, prompt);
-            totalInputTokens += response.tokenUsage.inputTokens;
-            totalOutputTokens += response.tokenUsage.outputTokens;
-
-            let resultText = response.text.trim();
-
-            // Extract the JSON array portion robustly
-            const startIdx = resultText.indexOf('[');
-            const endIdx = resultText.lastIndexOf(']');
-            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                resultText = resultText.substring(startIdx, endIdx + 1);
-            }
-
-            const parsed = JSON.parse(resultText) as { id: string; text: string }[];
-
-            // Map translated text back to the original subtitle metadata
-            for (const sub of chunk) {
-                const translated = parsed.find(p => p.id === sub.id);
-                if (translated) {
-                    translatedSubtitles.push({
-                        ...sub,
-                        text: translated.text
-                    });
-                } else {
-                    // Fallback to original text if ID is missing (should be rare)
-                    translatedSubtitles.push(sub);
-                }
-            }
+            translatedSubtitles.push(...await translateChunk(subtitleChunks[i]));
         } catch (error) {
+            if (error instanceof Error && (error.name === 'AbortError' || /was stopped|cancelled/i.test(error.message))) {
+                const abort = new Error('Translation cancelled');
+                abort.name = 'AbortError';
+                throw abort;
+            }
             console.error('Translation chunk failed, falling back to original:', error);
-            // Fallback to original
-            translatedSubtitles.push(...chunk);
+            if (subtitleChunks[i].length > 1) {
+                try {
+                    const mid = Math.ceil(subtitleChunks[i].length / 2);
+                    translatedSubtitles.push(...await translateChunk(subtitleChunks[i].slice(0, mid)));
+                    translatedSubtitles.push(...await translateChunk(subtitleChunks[i].slice(mid)));
+                } catch (retryError) {
+                    if (retryError instanceof Error && retryError.name === 'AbortError') throw retryError;
+                    console.error('Translation retry failed, keeping originals:', retryError);
+                    translatedSubtitles.push(...subtitleChunks[i]);
+                }
+            } else {
+                translatedSubtitles.push(...subtitleChunks[i]);
+            }
         } finally {
             if (progressInterval) clearInterval(progressInterval);
         }
     }
 
-    if (onProgress) {
-        onProgress(100);
-    }
+    if (onProgress) onProgress(100);
 
     return {
         subtitles: translatedSubtitles.sort((a, b) => a.startTime - b.startTime),

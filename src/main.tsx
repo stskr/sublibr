@@ -1,8 +1,13 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
 import App from './App.tsx'
 
-createRoot(document.getElementById('root')!).render(
+const container = document.getElementById('root')!
+const g = globalThis as typeof globalThis & { __sublibrRoot?: Root }
+g.__sublibrRoot ??= createRoot(container)
+g.__sublibrRoot.render(
   <StrictMode>
     <App />
   </StrictMode>,

@@ -41,13 +41,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange, mode 
 
     return (
         <div className="language-selection-inline">
-            <label>{mode === 'transcription' ? 'Language' : 'Target Language'}</label>
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px', lineHeight: '1.4' }}>
-                {mode === 'transcription'
-                    ? 'Choose the source language or select Auto-Detect'
-                    : 'Choose the language to translate to'}
-            </p>
-
+            <label>{mode === 'transcription' ? 'Spoken language' : 'Translate to'}</label>
             {mode === 'transcription' && (
                 <div className="language-toggle">
                     <button
@@ -57,7 +51,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange, mode 
                             setSearchTerm(language);
                         }}
                     >
-                        Select Language
+                        Select language
                     </button>
                     <button
                         className={`toggle-btn ${autoDetect ? 'active' : ''}`}
@@ -78,7 +72,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange, mode 
                     color: 'var(--color-warning)',
                     fontSize: '12px'
                 }}>
-                    Auto-detect may be less accurate. Select a specific language for best results.
+                    Auto-detect is less accurate. Pick a language when you can.
                 </div>
             )}
 
@@ -95,7 +89,7 @@ export function LanguageSelector({ language, autoDetect, onLanguageChange, mode 
                             setShowDropdown(true);
                         }}
                         onBlur={handleBlur}
-                        placeholder="Search languages..."
+                        placeholder="Search languages"
                     />
                     {showDropdown && filteredLanguages.length > 0 && (
                         <ul className="language-dropdown">

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, net, safeStorage, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, protocol } from 'electron';
 import http from 'http';
 
 
@@ -10,25 +10,36 @@ import Store from 'electron-store';
 import ffmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 import { callGeminiAudio, callGeminiText, callOpenAiAudio, callOpenAiText } from './ai';
+import { mainFetch } from './httpFetch';
 import { probeLocalWhisper, transcribeLocal } from './localWhisper';
 import { callLocalText, probeLocalLlm, setLlmIdleMinutes, stopLocalLlm } from './localLlm';
 import { killAllChildren, killFfmpegJobs, trackFfmpeg } from './childProcesses';
 import {
   assembleLibraryMap,
+  collectMedia,
+  createProject,
+  createProjectFromMedia,
   defaultProjectsFolder,
+  deleteProject,
+  duplicateProject,
+  renameProject,
   getProjectsFolder,
   getWorkDir,
   isLibraryKey,
+  listProjects,
   loadProject,
   migrateLibraryIntoProjects,
   migrateLibraryTo,
+  openProjectAndCollect,
   peekProjectsFolder,
   readLibraryJson,
   saveProject,
+  saveProjectData,
   setProjectsFolderPath,
   writeLibraryJson,
   writeLibraryMap,
 } from './projects';
+import { bindSession, installIpcLogging, appendSessionEvent } from './sessionLog';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 
@@ -115,7 +126,7 @@ function createWindow() {
       sandbox: true,
     },
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#081420',
   });
 
   // Open external links in the system default browser
@@ -169,9 +180,23 @@ function getMimeType(ext: string): string {
 let mediaServer: http.Server | null = null;
 let mediaServerPort = 0;
 
-function startMediaServer() {
-  if (mediaServer) return;
-  mediaServer = http.createServer(async (req, res) => {
+const MEDIA_SERVER_PORT = 18741;
+
+function startMediaServer(): Promise<void> {
+  if (mediaServer && mediaServerPort) return Promise.resolve();
+
+  if (mediaServer && !mediaServerPort) {
+    return new Promise((resolve) => {
+      mediaServer?.once('listening', () => {
+        const address = mediaServer?.address();
+        if (address && typeof address !== 'string') mediaServerPort = address.port;
+        resolve();
+      });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    mediaServer = http.createServer(async (req, res) => {
     try {
       // CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -184,7 +209,7 @@ function startMediaServer() {
         return;
       }
 
-      const url = new URL(req.url || '', `http://localhost:${mediaServerPort}`);
+      const url = new URL(req.url || '', `http://127.0.0.1:${mediaServerPort || MEDIA_SERVER_PORT}`);
       if (url.pathname !== '/stream') {
         res.writeHead(404);
         res.end('Not Found');
@@ -239,12 +264,23 @@ function startMediaServer() {
     }
   });
 
-  mediaServer.listen(0, '127.0.0.1', () => {
+  const onListen = () => {
     const address = mediaServer?.address();
     if (address && typeof address !== 'string') {
       mediaServerPort = address.port;
       console.log(`Media server listening on port ${mediaServerPort}`);
     }
+    resolve();
+  };
+
+  mediaServer.once('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      mediaServer?.listen(0, '127.0.0.1', onListen);
+      return;
+    }
+    reject(err);
+  });
+  mediaServer.listen(MEDIA_SERVER_PORT, '127.0.0.1', onListen);
   });
 }
 
@@ -310,7 +346,7 @@ function shutdownSublibrServices(): void {
 }
 
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const savedSettings = store.get('settings');
   const savedFolder = savedSettings && typeof savedSettings === 'object'
     ? (savedSettings as { projectsFolder?: unknown }).projectsFolder
@@ -319,14 +355,15 @@ app.whenReady().then(() => {
     setProjectsFolderPath(savedFolder);
     migrateLegacyLibraryFromStore();
   }
-  startMediaServer();
+  await startMediaServer();
   applyIdleMinutesFromSettings(savedSettings);
 
   // Register media:// protocol for streaming files
-  protocol.handle('media', (request) => {
+  protocol.handle('media', async (request) => {
     const url = request.url.replace('media://', '');
     try {
-      // Just redirect to the local server
+      if (!mediaServerPort) await startMediaServer();
+      if (!mediaServerPort) return new Response('Media server not ready', { status: 503 });
       const redirectUrl = `http://localhost:${mediaServerPort}/stream?file=${url}`;
 
       return new Response(null, {
@@ -371,9 +408,12 @@ function cleanupTempAudioFiles() {
 }
 
 app.on('before-quit', () => {
+  appendSessionEvent({ source: 'main', event: 'app.beforeQuit' });
   shutdownSublibrServices();
   cleanupTempAudioFiles();
 });
+
+installIpcLogging(ipcMain);
 
 ipcMain.handle('file:cleanupTempAudio', () => cleanupTempAudioFiles());
 
@@ -606,6 +646,122 @@ ipcMain.handle('projects:chooseFolder', async () => {
   return persistProjectsFolder(folder);
 });
 
+ipcMain.handle('projects:list', () => {
+  return listProjects();
+});
+
+ipcMain.handle('projects:create', (_event, name: unknown) => {
+  const label = typeof name === 'string' && name.trim() ? name.trim() : 'Untitled Project';
+  return createProject(label);
+});
+
+ipcMain.handle('projects:open', async (_event, ref: unknown) => {
+  if (typeof ref !== 'string' || !ref.trim()) {
+    throw new Error('Invalid project');
+  }
+  allowedPaths.add(path.resolve(ref));
+  const loaded = await openProjectAndCollect(ref);
+  if (loaded?.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
+  if (loaded?.dir) allowedPaths.add(path.resolve(loaded.dir));
+  return loaded;
+});
+
+ipcMain.handle('projects:createFromMedia', async (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') throw new Error('Invalid media payload');
+  const { sourcePath, name, duration, width, height, size, isVideo } = payload as {
+    sourcePath?: unknown;
+    name?: unknown;
+    duration?: unknown;
+    width?: unknown;
+    height?: unknown;
+    size?: unknown;
+    isVideo?: unknown;
+  };
+  if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
+    throw new Error('Invalid source path');
+  }
+  const resolved = path.resolve(sourcePath);
+  allowedPaths.add(resolved);
+  const loaded = await createProjectFromMedia(resolved, {
+    name: typeof name === 'string' ? name : undefined,
+    duration: typeof duration === 'number' ? duration : undefined,
+    width: typeof width === 'number' ? width : undefined,
+    height: typeof height === 'number' ? height : undefined,
+    size: typeof size === 'number' ? size : undefined,
+    isVideo: typeof isVideo === 'boolean' ? isVideo : undefined,
+  });
+  if (loaded.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
+  return loaded;
+});
+
+ipcMain.handle('projects:collectMedia', async (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') throw new Error('Invalid collect payload');
+  const { projectDir, sourcePath, duration, width, height, size, isVideo } = payload as {
+    projectDir?: unknown;
+    sourcePath?: unknown;
+    duration?: unknown;
+    width?: unknown;
+    height?: unknown;
+    size?: unknown;
+    isVideo?: unknown;
+  };
+  if (typeof projectDir !== 'string' || !projectDir.trim()) throw new Error('Invalid project folder');
+  if (typeof sourcePath !== 'string' || !sourcePath.trim()) throw new Error('Invalid source path');
+  allowedPaths.add(path.resolve(sourcePath));
+  const loaded = await collectMedia(projectDir, sourcePath, {
+    duration: typeof duration === 'number' ? duration : undefined,
+    width: typeof width === 'number' ? width : undefined,
+    height: typeof height === 'number' ? height : undefined,
+    size: typeof size === 'number' ? size : undefined,
+    isVideo: typeof isVideo === 'boolean' ? isVideo : undefined,
+  });
+  if (loaded.mediaPath) allowedPaths.add(path.resolve(loaded.mediaPath));
+  return loaded;
+});
+
+ipcMain.handle('projects:delete', async (_event, projectDir: unknown) => {
+  if (typeof projectDir !== 'string' || !projectDir.trim()) {
+    throw new Error('Invalid project folder');
+  }
+  await deleteProject(projectDir);
+});
+
+ipcMain.handle('projects:duplicate', async (_event, projectDir: unknown) => {
+  if (typeof projectDir !== 'string' || !projectDir.trim()) {
+    throw new Error('Invalid project folder');
+  }
+  return duplicateProject(projectDir);
+});
+
+ipcMain.handle('projects:rename', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') throw new Error('Invalid rename payload');
+  const { projectDir, name, renameFolder } = payload as {
+    projectDir?: unknown;
+    name?: unknown;
+    renameFolder?: unknown;
+  };
+  if (typeof projectDir !== 'string' || !projectDir.trim()) {
+    throw new Error('Invalid project folder');
+  }
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('Enter a project name');
+  }
+  return renameProject(projectDir, name, { renameFolder: renameFolder !== false });
+});
+
+ipcMain.handle('dialog:openProject', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile', 'openDirectory'],
+    filters: [
+      { name: 'Sublibr Project', extensions: ['sublibr'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  const filePath = result.filePaths[0] || null;
+  if (filePath) allowedPaths.add(path.resolve(filePath));
+  return filePath;
+});
+
 ipcMain.handle('projects:load', (_event, sourcePath: unknown) => {
   if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
     throw new Error('Invalid source path');
@@ -617,12 +773,20 @@ ipcMain.handle('projects:save', (_event, payload: unknown) => {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid project payload');
   }
-  const { sourcePath, name, subtitles, versions } = payload as {
+  const { projectDir, sourcePath, name, subtitles, versions } = payload as {
+    projectDir?: unknown;
     sourcePath?: unknown;
     name?: unknown;
     subtitles?: unknown;
     versions?: unknown;
   };
+  if (typeof projectDir === 'string' && projectDir.trim()) {
+    return saveProjectData(projectDir, {
+      name: typeof name === 'string' ? name : undefined,
+      subtitles,
+      versions,
+    });
+  }
   if (typeof sourcePath !== 'string' || !sourcePath.trim()) {
     throw new Error('Invalid source path');
   }
@@ -632,18 +796,75 @@ ipcMain.handle('projects:save', (_event, payload: unknown) => {
   return saveProject(sourcePath, name, { subtitles, versions });
 });
 
+ipcMain.handle('session:bind', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid session payload');
+  }
+  const { projectDir, sourcePath, name, media, settings } = payload as {
+    projectDir?: unknown;
+    sourcePath?: unknown;
+    name?: unknown;
+    media?: unknown;
+    settings?: unknown;
+  };
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('Invalid project name');
+  }
+  if ((typeof projectDir !== 'string' || !projectDir.trim())
+    && (typeof sourcePath !== 'string' || !sourcePath.trim())) {
+    throw new Error('Invalid project folder');
+  }
+  return bindSession({
+    projectDir: typeof projectDir === 'string' ? projectDir : undefined,
+    sourcePath: typeof sourcePath === 'string' ? sourcePath : undefined,
+    name,
+    media,
+    settings,
+  });
+});
+
+ipcMain.handle('session:log', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return;
+  const { event, data, level } = payload as {
+    event?: unknown;
+    data?: unknown;
+    level?: unknown;
+  };
+  if (typeof event !== 'string' || !event.trim()) return;
+  const safeLevel = level === 'error' || level === 'warn' || level === 'info' ? level : 'info';
+  appendSessionEvent({
+    source: 'renderer',
+    event,
+    data,
+    level: safeLevel,
+  });
+});
+
 // Only allow registering paths to supported media files (for drag-and-drop)
 const ALLOWED_MEDIA_EXTENSIONS = new Set([
   '.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts', '.mts', '.m2ts',
   '.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.alac', '.aiff',
 ]);
+const ALLOWED_DROP_EXTENSIONS = new Set([
+  ...ALLOWED_MEDIA_EXTENSIONS,
+  '.sublibr',
+  '.srt', '.vtt', '.ass', '.ssa',
+]);
 
 ipcMain.handle('file:registerPath', (_event, filePath: string) => {
   if (typeof filePath !== 'string') return;
   const resolved = path.resolve(filePath);
+  try {
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      allowedPaths.add(resolved);
+      return;
+    }
+  } catch {
+    // fall through to extension check
+  }
   const ext = path.extname(resolved).toLowerCase();
-  if (!ALLOWED_MEDIA_EXTENSIONS.has(ext)) {
-    throw new Error('Only media files can be registered');
+  if (!ALLOWED_DROP_EXTENSIONS.has(ext)) {
+    throw new Error('Only media, subtitle, or project files can be registered');
   }
   allowedPaths.add(resolved);
 });
@@ -854,11 +1075,21 @@ ipcMain.handle('app:installUpdate', () => {
 
 type AIProvider = 'gemini' | 'anthropic' | 'openai' | 'local';
 
+function describeApiNetworkError(error: unknown): string {
+  const err = error as { message?: string; cause?: { message?: string; code?: string } };
+  const msg = [err?.message, err?.cause?.message, err?.cause?.code].filter(Boolean).join(' ');
+  console.error('[ai:testApiKey] network error', error);
+  if (/could not reach the api|net::|ERR_FAILED|Failed to fetch|fetch failed|ENOTFOUND|ENETUNREACH|ECONNRESET|ETIMEDOUT|ECONNREFUSED|certificate|CERT_/i.test(msg)) {
+    return 'Could not reach the API. Check your internet connection, then tap Test again.';
+  }
+  return err?.message || 'Network error';
+}
+
 ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: string) => {
   try {
     switch (provider) {
       case 'gemini': {
-        const res = await net.fetch(
+        const res = await mainFetch(
           'https://generativelanguage.googleapis.com/v1beta/models',
           { headers: { 'x-goog-api-key': apiKey } },
         );
@@ -869,7 +1100,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
         return { ok: true };
       }
       case 'anthropic': {
-        const res = await net.fetch('https://api.anthropic.com/v1/messages', {
+        const res = await mainFetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -889,7 +1120,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
         return { ok: true };
       }
       case 'openai': {
-        const res = await net.fetch('https://api.openai.com/v1/models', {
+        const res = await mainFetch('https://api.openai.com/v1/models', {
           headers: { 'Authorization': `Bearer ${apiKey}` },
         });
         if (!res.ok) {
@@ -913,7 +1144,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
       }
     }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Network error' };
+    return { ok: false, error: describeApiNetworkError(e) };
   }
 });
 
@@ -955,6 +1186,10 @@ ipcMain.handle('ai:callTextProvider', async (
     case 'local':
       return callLocalText(model, prompt);
   }
+});
+
+ipcMain.handle('ai:stopLocalLlm', () => {
+  stopLocalLlm();
 });
 
 ipcMain.handle('ai:callLocalTranscribe', async (_event, filePath: string, language?: string | null, model?: string) => {

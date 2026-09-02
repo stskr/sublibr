@@ -22,10 +22,12 @@ import {
     generateAss,
     translateSubtitles
 } from '../services/transcriber';
+import { layoutSubtitles } from '../services/subtitleLayout';
 import { healSubtitles } from '../services/healer';
 import { parseSubtitleFile } from '../services/subtitleParser';
 import { callTextProvider, providerNeedsApiKey } from '../services/providers';
 import { generateId, formatDisplayTime } from '../utils';
+import { logSession } from '../services/sessionLog';
 
 const DONE_STATUS_DELAY_MS = 2000;
 
@@ -71,7 +73,8 @@ interface UseTranscriptionPipelineProps {
     /** Like setSubtitles but does NOT add to undo history — used for live chunk previews */
     resetSubtitles: (subs: Subtitle[]) => void;
     addVersion: (v: SubtitleVersion) => void;
-    addToRecents: (file: MediaFile, action: 'generated' | 'opened', subtitleCount?: number) => void;
+    projectDir: string | null;
+    onProjectTouched: () => void;
     setShowGenerator: (show: boolean) => void;
 }
 
@@ -84,7 +87,8 @@ export function useTranscriptionPipeline({
     setSubtitles,
     resetSubtitles,
     addVersion,
-    addToRecents,
+    projectDir,
+    onProjectTouched,
     setShowGenerator
 }: UseTranscriptionPipelineProps) {
     const transcriptionConcurrency = settings.activeProvider === 'local' ? 1 : 3;
@@ -93,7 +97,7 @@ export function useTranscriptionPipeline({
     const [showTranslator, setShowTranslator] = useState(false);
     const [translateTargetLang, setTranslateTargetLang] = useState('Spanish');
     const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ass'>('srt');
-    const [renderResolution, setRenderResolution] = useState<ScreenSize>(settings.screenSize);
+    const [renderResolution, setRenderResolution] = useState<ScreenSize>('original');
     const [tokenStats, setTokenStats] = useState<SessionTokenStats>({
         totalInputTokens: 0,
         totalOutputTokens: 0,
@@ -104,6 +108,7 @@ export function useTranscriptionPipeline({
     const stopRequestedRef = useRef(false);
     const pauseRequestedRef = useRef(false);
     const skipHealingRef = useRef(false);
+    const translateAbortRef = useRef<AbortController | null>(null);
     const checkpointRef = useRef<ChunkCheckpoint | null>(null);
     // Becomes true only once the checkpoint is fully saved (safe to call handleResume)
     const [checkpointReady, setCheckpointReady] = useState(false);
@@ -143,6 +148,14 @@ export function useTranscriptionPipeline({
                 console.error(
                     `[Chunk ${chunk.index + 1}] Attempt ${attempt}/${MAX_RETRIES} failed: ${lastErr.message}`
                 );
+                logSession('pipeline.chunk.retry', {
+                    chunk: chunk.index + 1,
+                    attempt,
+                    maxAttempts: MAX_RETRIES,
+                    start: chunk.start,
+                    end: chunk.end,
+                    error: lastErr.message,
+                }, 'warn');
                 if (attempt < MAX_RETRIES) {
                     const delay = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
                     console.log(`[Chunk ${chunk.index + 1}] Retrying in ${delay}ms…`);
@@ -233,7 +246,7 @@ export function useTranscriptionPipeline({
         screenSize: 'wide' | 'square' | 'vertical',
         currentSettings: AppSettings,
         currentVersionsCount: number,
-        currentMediaFile: MediaFile | null,
+        _currentMediaFile: MediaFile | null,
     ) {
         setProcessing({ status: 'merging', progress: 90 });
         let merged = mergeSubtitles(chunkResults.filter(Boolean) as Subtitle[][]);
@@ -262,12 +275,16 @@ export function useTranscriptionPipeline({
             );
             merged = healResult.subtitles;
             healResult.tokenUsages.forEach(addTokenUsage);
+            logSession('pipeline.heal.done', { cues: merged.length, usages: healResult.tokenUsages.length });
         } catch (err) {
             console.error('[Healing] Healing step failed:', err);
             healingFailed = true;
+            logSession('pipeline.heal.error', {
+                message: err instanceof Error ? err.message : String(err),
+            }, 'error');
         }
 
-        merged = enforceSubtitleQuality(merged, screenSize);
+        merged = enforceSubtitleQuality(merged, renderResolution);
 
         let finalLanguage = currentSettings.language;
         if (currentSettings.autoDetectLanguage && merged.length > 0) {
@@ -313,15 +330,14 @@ export function useTranscriptionPipeline({
         setProcessing({
             status: 'done',
             progress: 100,
-            warning: healingFailed ? 'Healing step failed — subtitle quality may be lower.' : undefined,
+            warning: healingFailed ? 'Could not fill some gaps — quality may be lower.' : undefined,
         });
         setShowGenerator(false);
 
-        if (currentMediaFile && window.electronAPI) {
-            addToRecents(currentMediaFile, 'generated', merged.length);
+        if (projectDir && window.electronAPI) {
+            onProjectTouched();
             window.electronAPI.saveProject({
-                sourcePath: currentMediaFile.path,
-                name: currentMediaFile.name,
+                projectDir,
                 subtitles: merged,
             }).catch(() => { });
         }
@@ -339,13 +355,13 @@ export function useTranscriptionPipeline({
         model: string,
         currentSettings: AppSettings,
         currentVersionsCount: number,
-        currentMediaFile: MediaFile | null,
+        _currentMediaFile: MediaFile | null,
     ) {
         const valid = chunkResults.filter(Boolean) as Subtitle[][];
         if (valid.length === 0) return;
 
         let merged = mergeSubtitles(valid);
-        merged = enforceSubtitleQuality(merged, screenSize);
+        merged = enforceSubtitleQuality(merged, renderResolution);
 
         const versionNumber = currentVersionsCount + 1;
         const labelStr = `V${versionNumber}-Partial (${valid.length}/${chunkResults.length} chunks), ${model}`;
@@ -361,8 +377,8 @@ export function useTranscriptionPipeline({
         });
         setSubtitles(merged);
 
-        if (currentMediaFile) {
-            addToRecents(currentMediaFile, 'generated', merged.length);
+        if (projectDir) {
+            onProjectTouched();
         }
 
         console.log(`[Error recovery] Saved ${valid.length}/${chunkResults.length} chunks as partial version "${labelStr}"`);
@@ -383,6 +399,18 @@ export function useTranscriptionPipeline({
 
         const { apiKey, model } = activeConfig;
         const provider = settings.activeProvider;
+        logSession('pipeline.generate.start', {
+            provider,
+            model,
+            language: settings.language,
+            autoDetect: settings.autoDetectLanguage,
+            media: {
+                path: mediaFile.path,
+                duration: mediaFile.duration,
+                size: mediaFile.size,
+                isVideo: mediaFile.isVideo,
+            },
+        });
 
         try {
             if (!window.electronAPI) throw new Error('Electron API not found');
@@ -418,6 +446,12 @@ export function useTranscriptionPipeline({
             setProcessing({ status: 'detecting-silences', progress: 15 });
             const { chunks, silences } = await createAudioChunks(processAudioPath, tempDir, audioFormat, provider);
             console.log(`[Transcription] ${chunks.length} chunks detected, concurrency=${transcriptionConcurrency}`);
+            logSession('pipeline.chunks', {
+                count: chunks.length,
+                silences: silences.length,
+                concurrency: transcriptionConcurrency,
+                chunks: chunks.map(c => ({ index: c.index, start: c.start, end: c.end })),
+            });
 
             const effectiveScreenSize = settings.screenSize === 'original' && mediaFile.width && mediaFile.height
                 ? inferEffectiveScreenSize(mediaFile.width, mediaFile.height)
@@ -434,7 +468,7 @@ export function useTranscriptionPipeline({
                     // Show processed chunks in the editor in real-time (no undo entry)
                     const completed = results.filter(Boolean) as Subtitle[][];
                     if (completed.length > 0) {
-                        resetSubtitles(mergeSubtitles(completed));
+                        resetSubtitles(layoutSubtitles(mergeSubtitles(completed), renderResolution, mediaFile?.width, mediaFile?.height));
                     }
                 },
             );
@@ -484,6 +518,10 @@ export function useTranscriptionPipeline({
 
         } catch (error) {
             console.error('[Pipeline] Fatal error:', error);
+            logSession('pipeline.generate.error', {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+            }, 'error');
             window.electronAPI?.cleanupTempAudio().catch(() => { });
             setProcessing({
                 status: 'error',
@@ -491,32 +529,41 @@ export function useTranscriptionPipeline({
                 error: error instanceof Error ? error.message : 'Transcription failed',
             });
         }
-    }, [mediaFile, settings, addTokenUsage, addToRecents, setSubtitles, resetSubtitles, addVersion, setShowGenerator, versions.length]);
+    }, [mediaFile, settings, renderResolution, addTokenUsage, onProjectTouched, projectDir, setSubtitles, resetSubtitles, addVersion, setShowGenerator, versions.length]);
 
     // ─────────────────────── pause / resume / stop ───────────────────────
 
     const handleSkipHealing = useCallback(() => {
         skipHealingRef.current = true;
+        logSession('pipeline.heal.skip');
     }, []);
 
     const handlePause = useCallback(() => {
         pauseRequestedRef.current = true;
+        logSession('pipeline.pause');
         // Show "Pausing…" immediately while in-flight API calls finish (can take up to ~60s).
         setIsPausing(true);
     }, []);
 
     const handleStop = useCallback(() => {
         stopRequestedRef.current = true;
+        pauseRequestedRef.current = false;
+        translateAbortRef.current?.abort();
+        window.electronAPI?.stopLocalLlm?.().catch(() => {});
         checkpointRef.current = null;
         setCheckpointReady(false);
         setIsPausing(false);
-        // Give immediate visual feedback — background cleanup happens when in-flight chunks finish
         setProcessing({ status: 'idle', progress: 0 });
+        logSession('pipeline.stop');
     }, []);
 
     const handleResume = useCallback(async () => {
         const checkpoint = checkpointRef.current;
         if (!checkpoint) return;
+        logSession('pipeline.resume', {
+            nextChunk: checkpoint.nextChunkIndex,
+            total: checkpoint.chunks.length,
+        });
 
         const activeConfig = settings.providers[settings.activeProvider];
         if (providerNeedsApiKey(settings.activeProvider) && !activeConfig.apiKey) return;
@@ -546,7 +593,7 @@ export function useTranscriptionPipeline({
                 (results) => {
                     const completed = results.filter(Boolean) as Subtitle[][];
                     if (completed.length > 0) {
-                        resetSubtitles(mergeSubtitles(completed));
+                        resetSubtitles(layoutSubtitles(mergeSubtitles(completed), renderResolution, mediaFile?.width, mediaFile?.height));
                     }
                 },
             );
@@ -601,7 +648,7 @@ export function useTranscriptionPipeline({
                 error: err instanceof Error ? err.message : 'Transcription failed',
             });
         }
-    }, [settings, mediaFile, addTokenUsage, addToRecents, setSubtitles, resetSubtitles, addVersion, setShowGenerator, versions.length]);
+    }, [settings, mediaFile, renderResolution, addTokenUsage, onProjectTouched, projectDir, setSubtitles, resetSubtitles, addVersion, setShowGenerator, versions.length]);
 
     // ─────────────────────── translation ───────────────────────
 
@@ -620,16 +667,28 @@ export function useTranscriptionPipeline({
             if (window.electronAPI) {
                 await window.electronAPI.showMessageBox({
                     type: 'warning',
-                    title: 'Translation Error',
-                    message: `You are trying to translate to the same language (${translateTargetLang}).`,
-                    detail: 'Please select a different target language for translation.',
+                    title: 'Same language',
+                    message: `That’s already ${translateTargetLang}.`,
+                    detail: 'Pick a different language to translate into.',
                     buttons: ['OK']
                 });
             }
             return;
         }
 
-        setProcessing({ status: 'transcribing', progress: 0 });
+        stopRequestedRef.current = false;
+        translateAbortRef.current?.abort();
+        const abort = new AbortController();
+        translateAbortRef.current = abort;
+
+        setProcessing({ status: 'translating', progress: 0 });
+        logSession('pipeline.translate.start', {
+            provider: settings.translator.provider,
+            model: settings.translator.model,
+            from: sourceLanguage,
+            to: translateTargetLang,
+            cues: subtitles.length,
+        });
 
         try {
             const result = await translateSubtitles(
@@ -638,10 +697,21 @@ export function useTranscriptionPipeline({
                 settings.translator.provider,
                 settings.providers[settings.translator.provider].apiKey,
                 settings.translator.model,
-                (progress) => setProcessing({ status: 'transcribing', progress })
+                (progress) => {
+                    if (stopRequestedRef.current || abort.signal.aborted) return;
+                    setProcessing({ status: 'translating', progress });
+                },
+                abort.signal,
             );
 
+            if (stopRequestedRef.current || abort.signal.aborted) {
+                setProcessing({ status: 'idle', progress: 0 });
+                return;
+            }
+
             addTokenUsage(result.tokenUsage);
+
+            const laidOut = layoutSubtitles(result.subtitles, renderResolution, mediaFile?.width, mediaFile?.height);
 
             const versionNumber = versions.length + 1;
             const labelStr = isAutoDetect
@@ -655,21 +725,20 @@ export function useTranscriptionPipeline({
                 provider: settings.translator.provider,
                 model: settings.translator.model,
                 language: translateTargetLang,
-                subtitles: result.subtitles,
+                subtitles: laidOut,
                 label: labelStr,
             };
 
             addVersion(newVersion);
-            setSubtitles(result.subtitles);
+            setSubtitles(laidOut);
             setProcessing({ status: 'done', progress: 100 });
             setShowTranslator(false);
 
-            if (mediaFile) {
-                addToRecents(mediaFile, 'generated', result.subtitles.length);
+            if (projectDir) {
+                onProjectTouched();
                 window.electronAPI?.saveProject({
-                    sourcePath: mediaFile.path,
-                    name: mediaFile.name,
-                    subtitles: result.subtitles,
+                    projectDir,
+                    subtitles: laidOut,
                 }).catch(() => { });
             }
 
@@ -678,14 +747,23 @@ export function useTranscriptionPipeline({
             }, DONE_STATUS_DELAY_MS);
 
         } catch (error) {
+            if (stopRequestedRef.current || abort.signal.aborted
+                || (error instanceof Error && (error.name === 'AbortError' || /was stopped|cancelled/i.test(error.message)))) {
+                setProcessing({ status: 'idle', progress: 0 });
+                return;
+            }
             console.error('[Translation] Error:', error);
+            logSession('pipeline.translate.error', {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+            }, 'error');
             setProcessing({
                 status: 'error',
                 progress: 0,
                 error: error instanceof Error ? error.message : 'Translation failed',
             });
         }
-    }, [subtitles, translateTargetLang, settings, mediaFile, addTokenUsage, addToRecents, setSubtitles, addVersion, activeVersionId, versions]);
+    }, [subtitles, translateTargetLang, settings, mediaFile, renderResolution, addTokenUsage, onProjectTouched, projectDir, setSubtitles, addVersion, activeVersionId, versions]);
 
     // ─────────────────────── load subtitles ───────────────────────
 
@@ -699,13 +777,14 @@ export function useTranscriptionPipeline({
             const buffer = await window.electronAPI.readFile(filePath);
             const text = new TextDecoder('utf-8').decode(new Uint8Array(buffer));
             const ext = filePath.split('.').pop() || '';
-            const loaded = parseSubtitleFile(text, ext);
+            const loaded = layoutSubtitles(parseSubtitleFile(text, ext), renderResolution, mediaFile?.width, mediaFile?.height);
 
+            logSession('pipeline.import.subtitles', { path: filePath, count: loaded.length, format: ext });
             if (loaded.length === 0) {
                 setProcessing({
                     status: 'error',
                     progress: 0,
-                    error: 'No subtitles found in the file. Please check the file format.',
+                    error: 'No subtitles in that file. Try SRT, VTT, or ASS.',
                 });
                 return;
             }
@@ -715,12 +794,12 @@ export function useTranscriptionPipeline({
                 if (lastSubtitle.endTime > mediaFile.duration) {
                     const response = await window.electronAPI.showMessageBox({
                         type: 'warning',
-                        buttons: ['Load Anyway', 'Cancel'],
+                        buttons: ['Load anyway', 'Cancel'],
                         defaultId: 0,
                         cancelId: 1,
-                        title: 'Subtitle Duration Warning',
-                        message: 'Subtitles are longer than the media file',
-                        detail: `The text ends at ${formatDisplayTime(lastSubtitle.endTime)}, but the media ends at ${formatDisplayTime(mediaFile.duration)}.\n\nDo you want to continue?`,
+                        title: 'Subtitles are longer than the media',
+                        message: 'Subtitles are longer than the media',
+                        detail: `The text ends at ${formatDisplayTime(lastSubtitle.endTime)}, but the media ends at ${formatDisplayTime(mediaFile.duration)}. Load them anyway?`,
                     });
 
                     if (response.response === 1) {
@@ -730,8 +809,8 @@ export function useTranscriptionPipeline({
             }
 
             setSubtitles(loaded);
-            if (mediaFile) {
-                addToRecents(mediaFile, 'opened');
+            if (projectDir) {
+                onProjectTouched();
             }
         } catch (err) {
             console.error('[Load subtitles] Error:', err);
@@ -741,7 +820,7 @@ export function useTranscriptionPipeline({
                 error: err instanceof Error ? err.message : 'Failed to load subtitle file',
             });
         }
-    }, [setSubtitles, mediaFile, addToRecents]);
+    }, [setSubtitles, mediaFile, onProjectTouched, projectDir, renderResolution]);
 
     // ─────────────────────── render / download ───────────────────────
 
@@ -753,6 +832,13 @@ export function useTranscriptionPipeline({
 
         const savePath = await window.electronAPI.saveFileDialog(defaultName, 'Video File', ['mp4', 'mkv', 'mov']);
         if (!savePath) return;
+
+        logSession('pipeline.render.start', {
+            output: savePath,
+            resolution: renderResolution,
+            cues: subtitles.length,
+            source: mediaFile.path,
+        });
 
         setProcessing({ status: 'rendering', progress: 0 });
 
@@ -770,6 +856,9 @@ export function useTranscriptionPipeline({
         } catch (err) {
             unsubscribe();
             console.error('[Render] Video render error:', err);
+            logSession('pipeline.render.error', {
+                message: err instanceof Error ? err.message : String(err),
+            }, 'error');
             setProcessing({
                 status: 'error',
                 progress: 0,

@@ -184,12 +184,12 @@ export const Minimap: React.FC<MinimapProps> = ({
                 <div
                     className="timeline-handle left"
                     onMouseDown={(e) => handleMouseDown(e, 'left')}
-                    title="Drag Start"
+                    title="Drag start"
                 />
                 <div
                     className="timeline-handle right"
                     onMouseDown={(e) => handleMouseDown(e, 'right')}
-                    title="Drag End"
+                    title="Drag end"
                 />
             </div>
         </div>

@@ -104,6 +104,14 @@ export function transcriptionModelLabel(provider: AIProvider, model: string): st
     return MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label ?? model;
 }
 
+export function sessionModelLabel(provider: AIProvider, model: string): string {
+    const stt = MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label;
+    if (stt) return stt;
+    const translator = TRANSLATOR_MODEL_OPTIONS[provider]?.find(m => m.value === model)?.label;
+    if (translator) return translator.replace(' (offline translator)', '');
+    return transcriptionModelLabel(provider, model);
+}
+
 export function resolveSavedModel(provider: AIProvider, model: string): string {
     const mapped = LEGACY_MODEL_MAP[model] ?? model;
     const valid = MODEL_OPTIONS[provider].some(m => m.value === mapped);

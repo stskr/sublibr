@@ -24,7 +24,18 @@ export interface ElectronAPI {
     confirmProjectsFolder: (folder: string) => Promise<string>;
     chooseProjectsFolder: () => Promise<string | null>;
     loadProject: (sourcePath: string) => Promise<{ dir: string; subtitles: unknown; versions: unknown } | null>;
-    saveProject: (payload: { sourcePath: string; name: string; subtitles?: unknown; versions?: unknown }) => Promise<string>;
+    saveProject: (payload: { projectDir?: string; sourcePath?: string; name?: string; subtitles?: unknown; versions?: unknown }) => Promise<string>;
+    listProjects: () => Promise<import('./types').ProjectSummary[]>;
+    createProject: (name?: string) => Promise<import('./types').LoadedProject>;
+    openProject: (ref: string) => Promise<import('./types').LoadedProject | null>;
+    createProjectFromMedia: (payload: { sourcePath: string; name?: string; duration?: number; width?: number; height?: number; size?: number; isVideo?: boolean }) => Promise<import('./types').LoadedProject>;
+    collectProjectMedia: (payload: { projectDir: string; sourcePath: string; duration?: number; width?: number; height?: number; size?: number; isVideo?: boolean }) => Promise<import('./types').LoadedProject>;
+    deleteProject: (projectDir: string) => Promise<void>;
+    duplicateProject: (projectDir: string) => Promise<import('./types').LoadedProject>;
+    renameProject: (payload: { projectDir: string; name: string; renameFolder?: boolean }) => Promise<import('./types').LoadedProject>;
+    openProjectDialog: () => Promise<string | null>;
+    bindSession: (payload: { projectDir?: string; sourcePath?: string; name: string; media?: unknown; settings?: unknown }) => Promise<{ sessionId: string; file: string; dir: string }>;
+    logSession: (payload: { event: string; data?: unknown; level?: 'info' | 'warn' | 'error' }) => Promise<void>;
 
     // AI API proxy
     testApiKey: (provider: string, apiKey: string) => Promise<{ ok: boolean; error?: string; llm?: boolean; llmError?: string }>;
@@ -36,6 +47,7 @@ export interface ElectronAPI {
             provider: 'gemini' | 'openai' | 'local';
             model: string;
             timestamp: number;
+            estimated?: boolean;
         };
     }>;
     callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) => Promise<{
@@ -46,8 +58,10 @@ export interface ElectronAPI {
             provider: 'gemini' | 'openai' | 'local';
             model: string;
             timestamp: number;
+            estimated?: boolean;
         };
     }>;
+    stopLocalLlm: () => Promise<void>;
     callLocalTranscribe: (filePath: string, language?: string | null, model?: string) => Promise<{
         text: string;
         tokenUsage: {
@@ -56,6 +70,7 @@ export interface ElectronAPI {
             provider: 'gemini' | 'openai' | 'local';
             model: string;
             timestamp: number;
+            estimated?: boolean;
         };
     }>;
     extractAudio: (inputPath: string, outputPath: string, format?: string) => Promise<string>;

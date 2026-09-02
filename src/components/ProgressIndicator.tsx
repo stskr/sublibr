@@ -23,6 +23,7 @@ const STATUS_ICONS: Record<string, string> = {
     'detecting-silences': 'graphic_eq',
     'splitting': 'content_cut',
     'transcribing': 'translate',
+    'translating': 'translate',
     'paused': 'pause_circle',
     'merging': 'merge',
     'healing': 'healing',
@@ -33,16 +34,17 @@ const STATUS_ICONS: Record<string, string> = {
 
 const STATUS_MESSAGES: Record<string, string> = {
     'idle': 'Ready',
-    'extracting': 'Extracting audio...',
-    'detecting-silences': 'Detecting silences...',
-    'splitting': 'Splitting audio into chunks...',
-    'transcribing': 'Transcribing...',
+    'extracting': 'Extracting audio…',
+    'detecting-silences': 'Finding pauses…',
+    'splitting': 'Splitting audio…',
+    'transcribing': 'Transcribing…',
+    'translating': 'Translating…',
     'paused': 'Paused',
-    'merging': 'Merging subtitles...',
-    'healing': 'Healing gaps...',
-    'rendering': 'Burning subtitles into video...',
-    'done': 'Complete!',
-    'error': 'Error occurred',
+    'merging': 'Combining subtitles…',
+    'healing': 'Filling gaps…',
+    'rendering': 'Adding subtitles to the video…',
+    'done': 'Done',
+    'error': 'Something went wrong',
 };
 
 // Stages where real progress cannot be measured — show indeterminate animation instead.
@@ -71,17 +73,21 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
         );
     }
 
-    const message = status === 'transcribing'
+    const message = status === 'translating'
         ? (isLocal
-            ? 'Transcribing locally on this computer — audio stays here'
-            : (providerLabel ? `Transcribing in the cloud with ${providerLabel} — audio is uploaded` : 'Transcribing in the cloud...'))
+            ? 'Translating on this computer'
+            : (providerLabel ? `Translating with ${providerLabel}` : 'Translating…'))
+        : status === 'transcribing'
+        ? (isLocal
+            ? 'Transcribing on this computer'
+            : (providerLabel ? `Transcribing with ${providerLabel} — audio is uploaded` : 'Transcribing in the cloud…'))
         : STATUS_MESSAGES[status] ?? status;
 
     const showPause = status === 'transcribing' && onPause && !isPausing;
     const showPausingIndicator = status === 'transcribing' && isPausing;
     const showResume = status === 'paused' && onResume;
     const resumeReady = canResume !== false;
-    const showStop = (status === 'transcribing' || status === 'paused' || status === 'extracting') && onStop;
+    const showStop = (status === 'transcribing' || status === 'translating' || status === 'paused' || status === 'extracting') && onStop;
     const showSkipHealing = status === 'healing' && onSkipHealing;
 
     const isIndeterminate = INDETERMINATE_STATUSES.has(status);
@@ -135,11 +141,11 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                         <button
                             className="btn btn-sm btn-ghost"
                             onClick={onSkipHealing}
-                            aria-label="Skip healing and finish"
-                            title="Skip healing gaps and finish with current subtitles"
+                            aria-label="Skip filling gaps and finish"
+                            title="Keep the current subtitles and skip filling gaps"
                         >
                             <span className="icon icon-sm">skip_next</span>
-                            Skip healing
+                            Skip this step
                         </button>
                     )}
 
@@ -175,7 +181,7 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
                             onClick={onResume}
                             disabled={!resumeReady}
                             aria-label="Resume transcription"
-                            title={resumeReady ? 'Continue from where you left off' : 'Saving checkpoint, please wait…'}
+                            title={resumeReady ? 'Continue from where you left off' : 'Saving a checkpoint…'}
                             style={!resumeReady ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                         >
                             <span className="icon icon-sm">{resumeReady ? 'play_arrow' : 'hourglass_empty'}</span>
@@ -222,10 +228,10 @@ export function ProgressIndicator({ state, providerLabel, isLocal, onRetry, onDi
 
             {/* Footer: chunk info + percent */}
             <div className="progress-footer">
-                {(status === 'transcribing' || status === 'paused') && totalChunks ? (
+                {(status === 'transcribing' || status === 'translating' || status === 'paused') && totalChunks ? (
                     <span className="progress-chunks">
-                        {status === 'paused' ? 'Paused — ' : ''}Chunk {currentChunk} of {totalChunks}
-                        {status === 'paused' && (resumeReady ? ' — click Resume to continue' : ' — saving checkpoint…')}
+                        {status === 'paused' ? 'Paused — ' : ''}Part {currentChunk} of {totalChunks}
+                        {status === 'paused' && (resumeReady ? ' — resume to continue' : ' — saving checkpoint…')}
                     </span>
                 ) : status === 'healing' && totalChunks ? (
                     <span className="progress-chunks">

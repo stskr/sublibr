@@ -38,7 +38,7 @@
 
 .btn-tool.active {
     background: var(--color-accent);
-    color: #fff;
+    color: var(--color-on-accent);
 }
 
 .btn-tool .icon {
@@ -353,13 +353,13 @@
     border-bottom: 2px solid var(--color-accent);
     cursor: grab;
     z-index: 6;
-    background: rgba(128, 117, 235, 0.05);
+    background: var(--color-accent-dim);
     /* Very subtle tint */
 }
 
 .timeline-window:active {
     cursor: grabbing;
-    background: rgba(128, 117, 235, 0.1);
+    background: var(--color-accent-dim);
 }
 
 /* Handles */

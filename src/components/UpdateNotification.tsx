@@ -83,7 +83,7 @@ export function UpdateNotification() {
                     <>
                         <span className="icon icon-sm update-icon spin">sync</span>
                         <span className="update-message">
-                            Downloading update... {downloadPercent}%
+                            Downloading… {downloadPercent}%
                         </span>
                         <div className="update-progress-bar">
                             <div
@@ -102,7 +102,7 @@ export function UpdateNotification() {
                         </span>
                         <div className="update-actions">
                             <button className="btn-update-primary" onClick={handleInstall}>
-                                Restart Now
+                                Restart now
                             </button>
                             <button className="btn-update-dismiss" onClick={handleDismiss}>
                                 Later

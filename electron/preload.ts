@@ -30,8 +30,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     confirmProjectsFolder: (folder: string) => ipcRenderer.invoke('projects:confirmFolder', folder),
     chooseProjectsFolder: () => ipcRenderer.invoke('projects:chooseFolder'),
     loadProject: (sourcePath: string) => ipcRenderer.invoke('projects:load', sourcePath),
-    saveProject: (payload: { sourcePath: string; name: string; subtitles?: unknown; versions?: unknown }) =>
+    saveProject: (payload: { projectDir?: string; sourcePath?: string; name?: string; subtitles?: unknown; versions?: unknown }) =>
         ipcRenderer.invoke('projects:save', payload),
+    listProjects: () => ipcRenderer.invoke('projects:list'),
+    createProject: (name?: string) => ipcRenderer.invoke('projects:create', name),
+    openProject: (ref: string) => ipcRenderer.invoke('projects:open', ref),
+    createProjectFromMedia: (payload: { sourcePath: string; name?: string; duration?: number; width?: number; height?: number; size?: number; isVideo?: boolean }) =>
+        ipcRenderer.invoke('projects:createFromMedia', payload),
+    collectProjectMedia: (payload: { projectDir: string; sourcePath: string; duration?: number; width?: number; height?: number; size?: number; isVideo?: boolean }) =>
+        ipcRenderer.invoke('projects:collectMedia', payload),
+    deleteProject: (projectDir: string) => ipcRenderer.invoke('projects:delete', projectDir),
+    duplicateProject: (projectDir: string) => ipcRenderer.invoke('projects:duplicate', projectDir),
+    renameProject: (payload: { projectDir: string; name: string; renameFolder?: boolean }) =>
+        ipcRenderer.invoke('projects:rename', payload),
+    openProjectDialog: () => ipcRenderer.invoke('dialog:openProject'),
+    bindSession: (payload: { projectDir?: string; sourcePath?: string; name: string; media?: unknown; settings?: unknown }) =>
+        ipcRenderer.invoke('session:bind', payload),
+    logSession: (payload: { event: string; data?: unknown; level?: 'info' | 'warn' | 'error' }) =>
+        ipcRenderer.invoke('session:log', payload),
 
     // AI API proxy (calls go through main process — keys never exposed in renderer)
     testApiKey: (provider: string, apiKey: string) => ipcRenderer.invoke('ai:testApiKey', provider, apiKey),
@@ -39,6 +55,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('ai:callProvider', provider, apiKey, model, prompt, audioBase64, audioFormat, language, previousTranscript),
     callTextProvider: (provider: string, apiKey: string, model: string, prompt: string) =>
         ipcRenderer.invoke('ai:callTextProvider', provider, apiKey, model, prompt),
+    stopLocalLlm: () => ipcRenderer.invoke('ai:stopLocalLlm'),
     callLocalTranscribe: (filePath: string, language?: string | null, model?: string) =>
         ipcRenderer.invoke('ai:callLocalTranscribe', filePath, language, model),
 

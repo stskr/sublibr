@@ -1,16 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { SubtitleVersion, Subtitle, MediaFile, AppSettings } from '../types';
+import type { SubtitleVersion, Subtitle, AppSettings } from '../types';
 import { generateId } from '../utils';
 
 interface UseVersionHistoryProps {
-    mediaFile: MediaFile | null;
-    subtitles: Subtitle[]; // Current subtitles in editor
+    projectDir: string | null;
+    projectName: string;
+    subtitles: Subtitle[];
     resetSubtitles: (subs: Subtitle[]) => void;
     settings: AppSettings;
 }
 
 export function useVersionHistory({
-    mediaFile,
+    projectDir,
+    projectName,
     subtitles,
     resetSubtitles,
     settings
@@ -21,14 +23,14 @@ export function useVersionHistory({
 
     // Debounced auto-save of versions when they change
     useEffect(() => {
-        if (!mediaFile || !window.electronAPI) return;
+        if (!projectDir || !window.electronAPI) return;
 
         const timeout = setTimeout(async () => {
             if (versions.length === 0 && subtitles.length === 0) return;
             try {
                 await window.electronAPI.saveProject({
-                    sourcePath: mediaFile.path,
-                    name: mediaFile.name,
+                    projectDir,
+                    name: projectName,
                     versions,
                     subtitles,
                 });
@@ -38,20 +40,20 @@ export function useVersionHistory({
         }, 500);
 
         return () => clearTimeout(timeout);
-    }, [versions, mediaFile, subtitles]);
+    }, [versions, projectDir, projectName, subtitles]);
 
     const persistVersions = useCallback((newVersions: SubtitleVersion[]) => {
-        if (mediaFile && window.electronAPI) {
+        if (projectDir && window.electronAPI) {
             window.electronAPI.saveProject({
-                sourcePath: mediaFile.path,
-                name: mediaFile.name,
+                projectDir,
+                name: projectName,
                 versions: newVersions,
                 subtitles,
             }).catch((error) => {
                 console.error('Failed to save versions:', error);
             });
         }
-    }, [mediaFile, subtitles]);
+    }, [projectDir, projectName, subtitles]);
 
     const addVersion = useCallback((newVersion: SubtitleVersion) => {
         setVersions(prev => {

@@ -1,6 +1,7 @@
-import { net } from 'electron';
 import { WHISPER_PUNCTUATION_PROMPT } from '../src/prompts/whisper';
 import { modelsToTry, textFallbackModel } from '../src/services/providers';
+import { audioDurationFromWords, makeTokenUsage, resolveTokenUsage } from '../src/services/tokenCount';
+import { encodeMultipart, mainFetch } from './httpFetch';
 
 type Word = { start: number; end: number; word: string };
 
@@ -157,7 +158,7 @@ async function callGeminiInteractions(
   languageHints: string[],
   requestedModel: string,
 ) {
-  const res = await net.fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+  const res = await mainFetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
     headers: {
       'x-goog-api-key': apiKey,
@@ -188,13 +189,11 @@ async function callGeminiInteractions(
 
   return {
     text: JSON.stringify({ text, words }),
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      provider: 'gemini' as const,
-      model: requestedModel,
-      timestamp: Date.now(),
-    },
+    tokenUsage: makeTokenUsage(
+      'gemini',
+      requestedModel,
+      resolveTokenUsage({ payload, transcript: text, durationSec: audioDurationFromWords(words) }),
+    ),
   };
 }
 
@@ -206,7 +205,7 @@ async function callGeminiGenerateContentTranscribe(
   languageHints: string[],
   requestedModel: string,
 ) {
-  const res = await net.fetch(
+  const res = await mainFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent`,
     {
       method: 'POST',
@@ -240,13 +239,11 @@ async function callGeminiGenerateContentTranscribe(
 
   return {
     text: JSON.stringify({ text, words }),
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      provider: 'gemini' as const,
-      model: requestedModel,
-      timestamp: Date.now(),
-    },
+    tokenUsage: makeTokenUsage(
+      'gemini',
+      requestedModel,
+      resolveTokenUsage({ payload, transcript: text, durationSec: audioDurationFromWords(words) }),
+    ),
   };
 }
 
@@ -261,16 +258,18 @@ export async function callGeminiText(apiKey: string, model: string, prompt: stri
       const geminiModel = genAI.getGenerativeModel({ model: candidate });
       const result = await geminiModel.generateContent(prompt);
       const response = await result.response;
-      const usage = response.usageMetadata;
+      const text = response.text();
       return {
-        text: response.text(),
-        tokenUsage: {
-          inputTokens: usage?.promptTokenCount ?? 0,
-          outputTokens: usage?.candidatesTokenCount ?? 0,
-          provider: 'gemini' as const,
+        text,
+        tokenUsage: makeTokenUsage(
+          'gemini',
           model,
-          timestamp: Date.now(),
-        },
+          resolveTokenUsage({
+            payload: { usageMetadata: response.usageMetadata },
+            prompt,
+            responseText: text,
+          }),
+        ),
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -306,24 +305,33 @@ async function callOpenAiTranscriptions(
   // Only whisper-1 returns word timestamps. gpt-transcribe / gpt-4o-transcribe return text only.
   const candidate = 'whisper-1';
   const buffer = Buffer.from(audioBase64, 'base64');
-  const blob = new Blob([buffer], { type: mimeType });
-  const formData = new FormData();
-  formData.append('file', blob, `audio.${audioFormat}`);
-  formData.append('model', candidate);
-  formData.append('response_format', 'verbose_json');
-  formData.append('timestamp_granularities[]', 'word');
+  const fields: Record<string, string> = {
+    model: candidate,
+    response_format: 'verbose_json',
+    'timestamp_granularities[]': 'word',
+  };
 
   let finalPrompt = WHISPER_PUNCTUATION_PROMPT;
   if (previousTranscript) {
     finalPrompt = `${previousTranscript}\n\n${finalPrompt}`;
   }
-  formData.append('prompt', finalPrompt);
-  if (language) formData.append('language', language);
+  fields.prompt = finalPrompt;
+  if (language) fields.language = language;
 
-  const res = await net.fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const { contentType, body } = encodeMultipart(fields, {
+    fieldName: 'file',
+    filename: `audio.${audioFormat}`,
+    contentType: mimeType,
+    data: new Uint8Array(buffer),
+  });
+
+  const res = await mainFetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-    body: formData,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': contentType,
+    },
+    body,
   });
 
   const payload = await res.json().catch(() => ({}));
@@ -333,21 +341,24 @@ async function callOpenAiTranscriptions(
 
   const data = payload as {
     text: string;
+    duration?: number;
     words?: { start: number; end: number; word: string }[];
     segments?: { start: number; end: number; text: string }[];
+    usage?: unknown;
   };
 
   requireTimedWords(model, data.words ?? [], Boolean(data.segments?.length), data.text ?? '');
+  const durationSec = typeof data.duration === 'number'
+    ? data.duration
+    : audioDurationFromWords(data.words ?? []);
 
   return {
     text: JSON.stringify(data),
-    tokenUsage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      provider: 'openai' as const,
+    tokenUsage: makeTokenUsage(
+      'openai',
       model,
-      timestamp: Date.now(),
-    },
+      resolveTokenUsage({ payload, transcript: data.text ?? '', durationSec }),
+    ),
   };
 }
 
@@ -356,7 +367,7 @@ export async function callOpenAiText(apiKey: string, model: string, prompt: stri
   let lastError: Error | null = null;
 
   for (const candidate of modelsToTry(resolved)) {
-    const res = await net.fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await mainFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -383,13 +394,15 @@ export async function callOpenAiText(apiKey: string, model: string, prompt: stri
 
     return {
       text: data.choices[0]?.message?.content || '',
-      tokenUsage: {
-        inputTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0,
-        provider: 'openai' as const,
+      tokenUsage: makeTokenUsage(
+        'openai',
         model,
-        timestamp: Date.now(),
-      },
+        resolveTokenUsage({
+          payload,
+          prompt,
+          responseText: data.choices[0]?.message?.content || '',
+        }),
+      ),
     };
   }
 

@@ -1,5 +1,5 @@
 import type { SubtitleStyle, ScreenSize } from '../types';
-import { SCREEN_SIZE_FONT_DEFAULTS, DEFAULT_SUBTITLE_STYLE } from '../types';
+import { DEFAULT_SUBTITLE_STYLE, fontSizeForPlayRes, defaultSubtitlePositionY } from '../types';
 import { buildSubtitleTextShadow, hexToRgba } from '../utils';
 import { CustomSelect } from './CustomSelect';
 
@@ -8,6 +8,8 @@ interface SubtitleStylePanelProps {
     onChange: (style: SubtitleStyle) => void;
     onBack: () => void;
     screenSize?: ScreenSize;
+    mediaWidth?: number;
+    mediaHeight?: number;
 }
 
 const FONT_OPTIONS = [
@@ -47,7 +49,7 @@ function StylePreview({ style }: { style: SubtitleStyle }) {
                     lineHeight: 1.4,
                 }}
             >
-                Preview Text
+                Preview text
             </span>
         </div>
     );
@@ -62,13 +64,14 @@ function set<K extends keyof SubtitleStyle>(
     onChange({ ...style, [key]: value });
 }
 
-export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: SubtitleStylePanelProps) {
+export function SubtitleStylePanel({ style, onChange, onBack, screenSize, mediaWidth, mediaHeight }: SubtitleStylePanelProps) {
     const showOutline = style.outlineMode === 'outline' || style.outlineMode === 'both';
     const showShadow = style.outlineMode === 'shadow' || style.outlineMode === 'both';
+    const autoY = defaultSubtitlePositionY(screenSize ?? 'wide', mediaWidth, mediaHeight);
+    const displayY = style.positionYAuto === false ? style.positionY : autoY;
 
     const handleReset = () => {
-        const defaultFontSize = screenSize ? SCREEN_SIZE_FONT_DEFAULTS[screenSize] : DEFAULT_SUBTITLE_STYLE.fontSize;
-        onChange({ ...DEFAULT_SUBTITLE_STYLE, fontSize: defaultFontSize });
+        onChange({ ...DEFAULT_SUBTITLE_STYLE, positionY: autoY, positionYAuto: true });
     };
 
     return (
@@ -98,7 +101,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
 
             {/* Font size */}
             <div className="style-control">
-                <label className="sidebar-label">Font Size</label>
+                <label className="sidebar-label">Font size</label>
                 <div className="style-slider-row">
                     <input
                         type="range" min={20} max={120} step={2}
@@ -107,11 +110,16 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
                     />
                     <span className="style-slider-value">{style.fontSize}</span>
                 </div>
+                {screenSize && (
+                    <p className="sidebar-hint" style={{ marginTop: '0.2rem' }}>
+                        Renders at {fontSizeForPlayRes(style.fontSize, screenSize, mediaWidth, mediaHeight)} on this frame.
+                    </p>
+                )}
             </div>
 
             {/* Text color */}
             <div className="style-control">
-                <label className="sidebar-label">Text Color</label>
+                <label className="sidebar-label">Text color</label>
                 <div className="style-color-row">
                     <input
                         type="color"
@@ -143,7 +151,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
             {showOutline && (
                 <>
                     <div className="style-control">
-                        <label className="sidebar-label">Outline Color</label>
+                        <label className="sidebar-label">Outline color</label>
                         <div className="style-color-row">
                             <input
                                 type="color"
@@ -155,7 +163,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
                         </div>
                     </div>
                     <div className="style-control">
-                        <label className="sidebar-label">Outline Width</label>
+                        <label className="sidebar-label">Outline width</label>
                         <div className="style-slider-row">
                             <input
                                 type="range" min={0.5} max={5} step={0.5}
@@ -172,7 +180,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
             {showShadow && (
                 <>
                     <div className="style-control">
-                        <label className="sidebar-label">Shadow Color</label>
+                        <label className="sidebar-label">Shadow color</label>
                         <div className="style-color-row">
                             <input
                                 type="color"
@@ -223,7 +231,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
             <div className="sidebar-divider" style={{ margin: '0.75rem 0' }} />
             <div className="style-control">
                 <div className="style-toggle-row">
-                    <label className="sidebar-label" style={{ marginBottom: 0 }}>Background Box</label>
+                    <label className="sidebar-label" style={{ marginBottom: 0 }}>Background</label>
                     <button
                         className={`style-toggle-btn${style.backgroundEnabled ? ' active' : ''}`}
                         onClick={() => set(style, 'backgroundEnabled', !style.backgroundEnabled, onChange)}
@@ -236,7 +244,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
             {style.backgroundEnabled && (
                 <>
                     <div className="style-control">
-                        <label className="sidebar-label">Background Color</label>
+                        <label className="sidebar-label">Background color</label>
                         <div className="style-color-row">
                             <input
                                 type="color"
@@ -264,7 +272,7 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
             {/* Position */}
             <div className="sidebar-divider" style={{ margin: '0.75rem 0' }} />
             <div className="style-control">
-                <label className="sidebar-label">Horizontal Position</label>
+                <label className="sidebar-label">Horizontal</label>
                 <div className="style-slider-row">
                     <input
                         type="range" min={0} max={100} step={1}
@@ -275,15 +283,24 @@ export function SubtitleStylePanel({ style, onChange, onBack, screenSize }: Subt
                 </div>
             </div>
             <div className="style-control">
-                <label className="sidebar-label">Vertical Position</label>
+                <label className="sidebar-label">Vertical</label>
                 <div className="style-slider-row">
                     <input
                         type="range" min={0} max={100} step={1}
-                        value={style.positionY}
-                        onChange={(e) => set(style, 'positionY', parseInt(e.target.value), onChange)}
+                        value={displayY}
+                        onChange={(e) => onChange({
+                            ...style,
+                            positionY: parseInt(e.target.value),
+                            positionYAuto: false,
+                        })}
                     />
-                    <span className="style-slider-value">{style.positionY}%</span>
+                    <span className="style-slider-value">{displayY}%</span>
                 </div>
+                <p className="sidebar-hint" style={{ marginTop: '0.2rem' }}>
+                    {style.positionYAuto === false
+                        ? 'Custom. Reset to use the default for this frame.'
+                        : 'Default for this frame (5% up from the bottom).'}
+                </p>
             </div>
         </div>
     );

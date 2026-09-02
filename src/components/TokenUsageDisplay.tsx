@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { SessionTokenStats, AIProvider } from '../types';
-import { PROVIDER_LABELS, transcriptionModelLabel } from '../services/providers';
+import { PROVIDER_LABELS, sessionModelLabel } from '../services/providers';
 
 interface TokenUsageDisplayProps {
     stats: SessionTokenStats;
@@ -24,17 +24,18 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showPopup]);
 
-    if (totalTokens === 0) return null;
+    if (stats.calls.length === 0) return null;
 
     // Group calls by provider+model
-    const grouped = stats.calls.reduce<Record<string, { inputTokens: number; outputTokens: number; calls: number; provider: string; model: string }>>((acc, call) => {
+    const grouped = stats.calls.reduce<Record<string, { inputTokens: number; outputTokens: number; calls: number; provider: string; model: string; estimated: boolean }>>((acc, call) => {
         const key = `${call.provider}:${call.model}`;
         if (!acc[key]) {
-            acc[key] = { inputTokens: 0, outputTokens: 0, calls: 0, provider: call.provider, model: call.model };
+            acc[key] = { inputTokens: 0, outputTokens: 0, calls: 0, provider: call.provider, model: call.model, estimated: false };
         }
         acc[key].inputTokens += call.inputTokens;
         acc[key].outputTokens += call.outputTokens;
         acc[key].calls += 1;
+        if (call.estimated) acc[key].estimated = true;
         return acc;
     }, {});
 
@@ -45,49 +46,55 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
     }
 
     function getModelLabel(provider: string, modelId: string): string {
-        return transcriptionModelLabel(provider as AIProvider, modelId);
+        return sessionModelLabel(provider as AIProvider, modelId);
     }
+
+    function formatCount(n: number, estimated: boolean): string {
+        return `${estimated ? '~' : ''}${formatTokenCount(n)}`;
+    }
+
+    const anyEstimated = stats.calls.some(call => call.estimated);
 
     return (
         <div className="token-usage-wrapper" ref={popupRef}>
             <button
                 className="token-usage-badge"
                 onClick={() => setShowPopup(!showPopup)}
-                title="Session token usage (click for details)"
-                aria-expanded={showPopup}
-                aria-label="Session token usage"
+                    title="Session token usage"
+                    aria-expanded={showPopup}
+                    aria-label="Session token usage"
             >
                 <span className="icon icon-sm">toll</span>
                 <span className="token-usage-text">
-                    {formatTokenCount(totalTokens)} tokens
+                    {formatCount(totalTokens, anyEstimated)} tokens
                 </span>
             </button>
 
             {showPopup && (
                 <div className="token-usage-popup" role="dialog" aria-label="Token usage details">
                     <div className="token-popup-header">
-                        <h3>Session Token Usage</h3>
+                        <h3>Session tokens</h3>
                         <span className="token-popup-calls">{stats.calls.length} API call{stats.calls.length !== 1 ? 's' : ''}</span>
                     </div>
 
                     <div className="token-popup-summary">
                         <div className="token-popup-stat">
                             <span className="token-popup-label">Input</span>
-                            <span className="token-popup-value">{formatTokenCount(stats.totalInputTokens)}</span>
+                            <span className="token-popup-value">{formatCount(stats.totalInputTokens, anyEstimated)}</span>
                         </div>
                         <div className="token-popup-stat">
                             <span className="token-popup-label">Output</span>
-                            <span className="token-popup-value">{formatTokenCount(stats.totalOutputTokens)}</span>
+                            <span className="token-popup-value">{formatCount(stats.totalOutputTokens, anyEstimated)}</span>
                         </div>
                         <div className="token-popup-stat">
                             <span className="token-popup-label">Total</span>
-                            <span className="token-popup-value accent">{formatTokenCount(totalTokens)}</span>
+                            <span className="token-popup-value accent">{formatCount(totalTokens, anyEstimated)}</span>
                         </div>
                     </div>
 
                     {Object.entries(grouped).length > 0 && (
                         <div className="token-popup-breakdown">
-                            <h4>By Provider</h4>
+                            <h4>By model</h4>
                             {Object.entries(grouped).map(([key, group]) => (
                                 <div key={key} className="token-popup-provider">
                                     <div className="token-popup-provider-header">
@@ -99,13 +106,18 @@ export function TokenUsageDisplay({ stats }: TokenUsageDisplayProps) {
                                         </span>
                                     </div>
                                     <div className="token-popup-provider-stats">
-                                        <span>{formatTokenCount(group.inputTokens)} in</span>
-                                        <span>{formatTokenCount(group.outputTokens)} out</span>
+                                        <span>{formatCount(group.inputTokens, group.estimated)} in</span>
+                                        <span>{formatCount(group.outputTokens, group.estimated)} out</span>
                                         <span>{group.calls} call{group.calls !== 1 ? 's' : ''}</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
+                    )}
+                    {anyEstimated && (
+                        <p className="token-popup-footnote">
+                            ~ is an estimate when the API does not return usage.
+                        </p>
                     )}
                 </div>
             )}

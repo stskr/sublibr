@@ -43,7 +43,7 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
             >
                 <div className="modal-header">
                     <h2 id="about-title">About</h2>
-                    <button className="btn-icon" onClick={onClose} aria-label="Close about">
+                    <button className="btn-icon" onClick={onClose} aria-label="Close About">
                         <span className="icon">close</span>
                     </button>
                 </div>
@@ -56,10 +56,7 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
                         <div className="about-app-name">SUBLIBR</div>
                         <div className="about-version">Version {version}</div>
                         <p className="about-description">
-                            AI-powered subtitle generator for video and audio files.
-                            Supports Google Gemini and OpenAI for accurate, multi-language
-                            transcription with a built-in timeline editor, rich styling,
-                            and direct video rendering.
+                            Transcribe video and audio into timed subtitles, on this computer or in the cloud. Edit on a timeline, style the text, and export files or a burned-in video.
                         </p>
                     </div>
 
@@ -101,7 +98,7 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
 
                     {/* Open source credits */}
                     <div className="about-section">
-                        <div className="about-section-title">Built With</div>
+                        <div className="about-section-title">Built with</div>
                         <div className="about-credits-grid">
                             <a href="https://www.electronjs.org" target="_blank" rel="noopener noreferrer" className="about-credit-item">
                                 <span className="about-credit-name">Electron</span>
@@ -148,12 +145,9 @@ export function AboutModal({ onClose, version = '1.0.0' }: AboutModalProps) {
 
                     {/* AI services disclaimer */}
                     <div className="about-section">
-                        <div className="about-section-title">AI Services</div>
+                        <div className="about-section-title">AI services</div>
                         <p className="about-legal-text">
-                            This app connects to third-party AI APIs (Google Gemini, OpenAI) to process audio.
-                            Use of those services is subject to their respective Terms of Service and Privacy Policies.
-                            Audio data is sent directly from your device to the selected provider and is not stored
-                            by this application.
+                            Online transcription and translation send audio to Google Gemini or OpenAI, under those providers’ terms. Offline models stay on this computer. Sublibr does not store your audio on its own servers.
                         </p>
                     </div>
 

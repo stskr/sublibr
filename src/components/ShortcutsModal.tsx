@@ -38,17 +38,17 @@ export function ShortcutsModal({ onClose, view }: ShortcutsModalProps) {
             isCurrent: view === 'editor',
             content: (
                 <>
-                    <div className="shortcut-group-subtitle">Media Control</div>
+                    <div className="shortcut-group-subtitle">Playback</div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Play / Pause</span>
+                        <span className="shortcut-label">Play / pause</span>
                         <kbd>Space</kbd>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Seek Backward 5s</span>
+                        <span className="shortcut-label">Seek back 5 seconds</span>
                         <kbd>←</kbd>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Seek Forward 5s</span>
+                        <span className="shortcut-label">Seek forward 5 seconds</span>
                         <kbd>→</kbd>
                     </div>
 
@@ -66,19 +66,19 @@ export function ShortcutsModal({ onClose, view }: ShortcutsModalProps) {
                         </div>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Insert Subtitle</span>
+                        <span className="shortcut-label">Insert subtitle</span>
                         <div className="keys">
                             <kbd>Alt</kbd> + <kbd>N</kbd>
                         </div>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Delete Subtitle</span>
+                        <span className="shortcut-label">Delete subtitle</span>
                         <div className="keys">
                             <kbd>Alt</kbd> + <kbd>Del</kbd>
                         </div>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Save / Download</span>
+                        <span className="shortcut-label">Download</span>
                         <div className="keys">
                             <kbd>{mod}</kbd> + <kbd>S</kbd>
                         </div>
@@ -88,24 +88,24 @@ export function ShortcutsModal({ onClose, view }: ShortcutsModalProps) {
         },
         {
             id: 'homepage',
-            title: 'Homepage',
+            title: 'Home',
             isCurrent: view === 'homepage',
             content: (
                 <>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Load File</span>
+                        <span className="shortcut-label">Open file</span>
                         <div className="keys">
                             <kbd>{mod}</kbd> + <kbd>O</kbd>
                         </div>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Navigate Recent</span>
+                        <span className="shortcut-label">Latest projects</span>
                         <div className="keys">
                             <kbd>↑</kbd> / <kbd>↓</kbd>
                         </div>
                     </div>
                     <div className="shortcut-row">
-                        <span className="shortcut-label">Select Recent</span>
+                        <span className="shortcut-label">Open selected</span>
                         <kbd>Enter</kbd>
                     </div>
                 </>
@@ -132,7 +132,7 @@ export function ShortcutsModal({ onClose, view }: ShortcutsModalProps) {
                 tabIndex={-1}
             >
                 <div className="modal-header">
-                    <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
+                    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
                     <button className="btn-icon" onClick={onClose} aria-label="Close shortcuts">
                         <span className="icon">close</span>
                     </button>

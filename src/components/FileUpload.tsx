@@ -1,34 +1,38 @@
 import { useState, useCallback, useEffect } from 'react';
-import { RecentFiles } from './RecentFiles';
-import type { MediaFile, AppSettings, RecentFile } from '../types';
-import { isTranscriptionReady } from '../services/providers';
+import { LatestProjects } from './RecentFiles';
+import type { ProjectSummary } from '../types';
 
 interface FileUploadProps {
-    settings: AppSettings;
-    onFileSelect: (file: MediaFile) => void;
-    recentFiles: RecentFile[];
-    onLoadRecent: (file: RecentFile) => void;
-    onClearRecents: () => void;
+    latestProjects: ProjectSummary[];
+    onLoadProject: (project: ProjectSummary) => void;
     highlightedRecentIndex: number | null;
     onProcessFile: (path: string) => Promise<void>;
+    onStartFromScratch: () => void;
+    onLoadExisting: () => void;
+    onRequestDelete: (project: ProjectSummary) => void;
+    onDuplicateProject: (project: ProjectSummary) => void;
+    onRenameProject: (project: ProjectSummary) => void;
     isAnalyzing: boolean;
+    analyzingMessage?: string;
     error: string | null;
 }
 
-
 export function FileUpload({
-    settings,
-    recentFiles,
-    onLoadRecent,
-    onClearRecents,
+    latestProjects,
+    onLoadProject,
     highlightedRecentIndex,
     onProcessFile,
+    onStartFromScratch,
+    onLoadExisting,
+    onRequestDelete,
+    onDuplicateProject,
+    onRenameProject,
     isAnalyzing,
+    analyzingMessage = 'Analyzing file...',
     error: propsError
 }: FileUploadProps) {
     const [isDragOver, setIsDragOver] = useState(false);
 
-    // Prevent default browser behavior of opening dropped files
     useEffect(() => {
         const preventDefaults = (e: DragEvent) => {
             e.preventDefault();
@@ -47,40 +51,33 @@ export function FileUpload({
         e.stopPropagation();
         setIsDragOver(false);
 
-        // Check API key availability
-        const activeProvider = settings.activeProvider;
-        const config = settings.providers[activeProvider];
-        const hasKey = isTranscriptionReady(activeProvider, config);
-
-        if (!hasKey) return;
-
         const file = e.dataTransfer.files[0];
-        if (file) {
-            let filePath: string = '';
-            try {
-                if (window.electronAPI?.getFilePath) {
-                    filePath = window.electronAPI.getFilePath(file);
-                } else {
-                    filePath = (file as File & { path?: string }).path || '';
-                }
-            } catch (err) {
-                console.error('Error getting file path:', err);
+        if (!file) return;
+
+        let filePath = '';
+        try {
+            if (window.electronAPI?.getFilePath) {
+                filePath = window.electronAPI.getFilePath(file);
+            } else {
                 filePath = (file as File & { path?: string }).path || '';
             }
-
-            if (filePath) {
-                if (window.electronAPI?.registerPath) {
-                    window.electronAPI.registerPath(filePath).then(() => {
-                        onProcessFile(filePath);
-                    }).catch(err => {
-                        console.error('Failed to register file path:', err);
-                    });
-                } else {
-                    onProcessFile(filePath);
-                }
-            }
+        } catch (err) {
+            console.error('Error getting file path:', err);
+            filePath = (file as File & { path?: string }).path || '';
         }
-    }, [onProcessFile, settings]);
+
+        if (!filePath) return;
+        if (window.electronAPI?.registerPath) {
+            window.electronAPI.registerPath(filePath).then(() => {
+                onProcessFile(filePath);
+            }).catch(err => {
+                console.error('Failed to register file path:', err);
+                onProcessFile(filePath);
+            });
+        } else {
+            onProcessFile(filePath);
+        }
+    }, [onProcessFile]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -94,32 +91,20 @@ export function FileUpload({
     const handleBrowse = async () => {
         if (!window.electronAPI) return;
         const filePath = await window.electronAPI.openFileDialog();
-        if (filePath) {
-            onProcessFile(filePath);
-        }
+        if (filePath) onProcessFile(filePath);
     };
-
-    const activeConfig = settings.providers[settings.activeProvider];
-    const hasApiKey = isTranscriptionReady(settings.activeProvider, activeConfig);
 
     return (
         <div className="file-upload-container">
-            {/* API Key Warning */}
-            {!hasApiKey && (
-                <div className="api-key-warning" role="alert">
-                    <span className="icon icon-sm warning-icon">warning</span>
-                    <span>Please choose a transcription model in Settings before uploading files</span>
-                </div>
-            )}
-
+            <div className="home-top">
             <div
-                className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${isAnalyzing ? 'loading' : ''} ${!hasApiKey ? 'disabled' : ''}`}
+                className={`drop-zone ${isDragOver ? 'drag-over' : ''} ${isAnalyzing ? 'loading' : ''}`}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 role="button"
                 tabIndex={0}
-                aria-label="Drop audio or video file, or press to browse"
+                aria-label="Drop a file or project, or browse"
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBrowse(); }
                 }}
@@ -127,47 +112,29 @@ export function FileUpload({
                 {isAnalyzing ? (
                     <div className="loading-content">
                         <div className="spinner" />
-                        <p>Analyzing file...</p>
+                        <p>{analyzingMessage}</p>
                     </div>
                 ) : (
                     <div className="upload-prompt">
                         <span className="icon icon-xl upload-icon">folder_open</span>
-                        <h3>Drop your audio or video file here</h3>
-                        <p>or</p>
-                        <button className="btn-primary" onClick={handleBrowse} disabled={!hasApiKey}>
-                            Browse Files
+                        <h3>Drop a file here</h3>
+                        <p>Video, audio, subtitles, or a Sublibr project</p>
+                        <button className="btn-primary" onClick={handleBrowse}>
+                            Browse files
                         </button>
-
-                        <div className="upload-notes">
-                            <div className="upload-note">
-                                <span className="icon icon-sm">check_circle</span>
-                                <span>Supports MP4, MKV, MOV, MP3, WAV, and more (Max 3GB)</span>
-                            </div>
-                            <div className="upload-note">
-                                <span className="icon icon-sm">info</span>
-                                <span>For best results, use smaller files. Larger files take longer and cost more.</span>
-                            </div>
-                            <div className="upload-note">
-                                <span className="icon icon-sm">auto_awesome</span>
-                                <span>Offline: Whisper Large v3 Turbo (Hebrew weights when Hebrew is selected). Online: Gemini 3.5 Transcribe / OpenAI Whisper. All return word timestamps.</span>
-                            </div>
-                            <div className="upload-note">
-                                <span className="icon icon-sm">redeem</span>
-                                <span>Google AI Studio offers a free API key — no payment required. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a free API key</a></span>
-                            </div>
-                            <div className="upload-note disclaimer-note">
-                                <span className="icon icon-sm">gavel</span>
-                                <span>
-                                    By using this service, you acknowledge that AI-generated results may vary in accuracy.
-                                    Cloud models send audio to your selected provider (OpenAI or Google Gemini).
-                                    Offline Whisper models transcribe on this computer and do not upload audio.
-                                    We value your privacy: no tracking is used, and data collection is limited to optional usability surveys or marketing updates you explicitly approve.
-                                    This software is provided "as is"—the developer assumes no liability for outcomes, and use is at the user's sole responsibility.
-                                </span>
-                            </div>
-                        </div>
                     </div>
                 )}
+            </div>
+
+            <div className="home-actions">
+                <button className="btn-secondary home-action-btn" onClick={onStartFromScratch} disabled={isAnalyzing}>
+                    <span className="icon icon-sm">add</span>
+                    Start from scratch
+                </button>
+                <button className="btn-secondary home-action-btn" onClick={onLoadExisting} disabled={isAnalyzing}>
+                    <span className="icon icon-sm">folder_open</span>
+                    Load existing project
+                </button>
             </div>
 
             {propsError && (
@@ -176,11 +143,14 @@ export function FileUpload({
                     {propsError}
                 </div>
             )}
+            </div>
 
-            <RecentFiles
-                files={recentFiles}
-                onLoadRecent={onLoadRecent}
-                onClearRecents={onClearRecents}
+            <LatestProjects
+                projects={latestProjects}
+                onLoadProject={onLoadProject}
+                onRequestDelete={onRequestDelete}
+                onDuplicateProject={onDuplicateProject}
+                onRenameProject={onRenameProject}
                 highlightedIndex={highlightedRecentIndex}
             />
         </div>

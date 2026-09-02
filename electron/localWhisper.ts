@@ -6,6 +6,7 @@ import { app } from 'electron';
 import { fileURLToPath } from 'url';
 import { trackChild } from './childProcesses';
 import { getWorkDir } from './projects';
+import { audioDurationFromWords, makeTokenUsage, resolveTokenUsage } from '../src/services/tokenCount';
 
 const ELECTRON_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -181,13 +182,11 @@ export async function transcribeLocal(
 
     return {
       text: JSON.stringify({ text, words }),
-      tokenUsage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        provider: 'local' as const,
-        model: resolvedId,
-        timestamp: Date.now(),
-      },
+      tokenUsage: makeTokenUsage(
+        'local',
+        resolvedId,
+        resolveTokenUsage({ transcript: text, durationSec: audioDurationFromWords(words) }),
+      ),
     };
   } finally {
     fs.promises.unlink(jsonPath).catch(() => {});

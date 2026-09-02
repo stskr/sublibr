@@ -22,12 +22,17 @@ import { useVersionHistory } from './hooks/useVersionHistory';
 import { useTranscriptionPipeline } from './hooks/useTranscriptionPipeline';
 
 import { generateId } from './utils';
-import type { Subtitle, AppSettings, MediaFile, RecentFile, ScreenSize } from './types';
+import type { Subtitle, AppSettings, ProjectSummary, ScreenSize } from './types';
+import { layoutSubtitles, reflowSubtitles } from './services/subtitleLayout';
+import { parseSubtitleFile } from './services/subtitleParser';
 import { DEFAULT_SUBTITLE_STYLE } from './types';
 import { PROVIDER_LABELS, resolveSavedModel, resolveSavedTranslatorModel, TRANSLATOR_MODEL_OPTIONS, isTranscriptionReady, CLOUD_PROVIDERS, transcriptionModelLabel } from './services/providers';
 import { SubtitleStylePanel } from './components/SubtitleStylePanel';
+import { ResolutionPicker } from './components/ResolutionPicker';
 
 import './App.css';
+import { bindSessionLog, describeClickTarget, logSession } from './services/sessionLog';
+import { settingsSnapshot } from './services/sessionSanitize';
 import logoWhite from './assets/Logo/logo-white.svg';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -177,6 +182,7 @@ function App() {
 
   const handleSettingsChange = useCallback(async (newSettings: AppSettings) => {
     setSettings(newSettings);
+    logSession('settings.saved', settingsSnapshot(newSettings));
     if (window.electronAPI) {
       await window.electronAPI.setStoreValue('settings', newSettings);
     }
@@ -186,27 +192,44 @@ function App() {
   const mediaManager = useMediaManager();
   const {
     mediaFile,
+    currentProject,
     audioPath,
     duration,
-    recentFiles,
+    latestProjects,
     highlightedRecentIndex,
     processingError,
     isAnalyzing,
+    analyzingMessage,
+    pendingMissing,
+    deleteCandidate,
+    deleteStep,
     setDuration,
     setHighlightedRecentIndex,
-    addToRecents,
-    handleClearRecents,
     processFile: coreProcessFile,
-    handleFileSelect: coreFileSelect,
     handleLoadRecent: coreLoadRecent,
+    handleCreateEmpty,
+    handleLoadExisting,
+    handleAddOrReplaceMedia,
+    handleRelink,
+    dismissMissing,
+    requestDelete,
+    handleDuplicate,
+    renameTarget,
+    requestRename,
+    cancelRename,
+    submitRename,
+    cancelDelete,
+    confirmDelete,
     handleNavigateRecentUp,
     handleNavigateRecentDown,
-    clearMedia
+    clearMedia,
+    refreshProjects,
   } = mediaManager;
 
   // 2. Version History
   const versionHistory = useVersionHistory({
-    mediaFile,
+    projectDir: currentProject?.dir ?? null,
+    projectName: currentProject?.name ?? 'Untitled Project',
     subtitles,
     resetSubtitles,
     settings
@@ -224,8 +247,7 @@ function App() {
   } = versionHistory;
 
   // Wrapped Media Manager Handlers to Sync Version History & Subtitles
-  const wrappedLoadRecent = useCallback(async (recent: RecentFile) => {
-    const data = await coreLoadRecent(recent);
+  const applyOpened = useCallback(async (data: Awaited<ReturnType<typeof coreProcessFile>>) => {
     if (!data) return;
     setVersions(data.cachedVersions);
     if (data.cachedVersions.length > 0) {
@@ -233,42 +255,49 @@ function App() {
     } else {
       setActiveVersionId(null);
     }
-    resetSubtitles(data.subsToLoad);
-    setShowGenerator(!data.hasSubtitles);
+    let subs = data.subsToLoad;
+    if (data.subtitleImportPath && window.electronAPI) {
+      try {
+        const buffer = await window.electronAPI.readFile(data.subtitleImportPath);
+        const text = new TextDecoder('utf-8').decode(new Uint8Array(buffer));
+        const ext = data.subtitleImportPath.split('.').pop() || '';
+        const loaded = layoutSubtitles(parseSubtitleFile(text, ext), 'original', data.file?.width, data.file?.height);
+        if (loaded.length > 0) subs = loaded;
+      } catch (err) {
+        console.error('Failed to import dropped subtitles:', err);
+      }
+    }
+    resetSubtitles(subs);
+    setShowGenerator(!data.hasSubtitles && subs.length === 0);
     setCurrentTime(0);
-  }, [coreLoadRecent, setVersions, setActiveVersionId, resetSubtitles, setShowGenerator]);
+  }, [setVersions, setActiveVersionId, resetSubtitles, setShowGenerator]);
+
+  const wrappedLoadRecent = useCallback(async (project: ProjectSummary) => {
+    await applyOpened(await coreLoadRecent(project));
+  }, [coreLoadRecent, applyOpened]);
 
   const wrappedProcessFile = useCallback(async (filePath: string) => {
-    const data = await coreProcessFile(filePath);
-    if (!data) return;
-    setVersions(data.cachedVersions);
-    if (data.cachedVersions.length > 0) {
-      setActiveVersionId(data.cachedVersions[data.cachedVersions.length - 1].id);
-      resetSubtitles(data.subsToLoad);
-      setShowGenerator(false);
-    } else {
-      setActiveVersionId(null);
-      resetSubtitles([]);
-      setShowGenerator(true);
-    }
-    setCurrentTime(0);
-  }, [coreProcessFile, setVersions, setActiveVersionId, resetSubtitles, setShowGenerator]);
+    await applyOpened(await coreProcessFile(filePath));
+  }, [coreProcessFile, applyOpened]);
 
-  const wrappedFileSelect = useCallback(async (file: MediaFile) => {
-    const data = await coreFileSelect(file);
-    if (!data) return;
-    setVersions(data.cachedVersions);
-    if (data.cachedVersions.length > 0) {
-      setActiveVersionId(data.cachedVersions[data.cachedVersions.length - 1].id);
-      resetSubtitles(data.subsToLoad);
-      setShowGenerator(false);
-    } else {
-      setActiveVersionId(null);
-      resetSubtitles([]);
-      setShowGenerator(true);
-    }
-    setCurrentTime(0);
-  }, [coreFileSelect, setVersions, setActiveVersionId, resetSubtitles, setShowGenerator]);
+  const wrappedStartFromScratch = useCallback(async () => {
+    await applyOpened(await handleCreateEmpty());
+  }, [handleCreateEmpty, applyOpened]);
+
+  const wrappedLoadExisting = useCallback(async () => {
+    await applyOpened(await handleLoadExisting());
+  }, [handleLoadExisting, applyOpened]);
+
+  const wrappedAddMedia = useCallback(async () => {
+    if (!window.electronAPI) return;
+    const filePath = await window.electronAPI.openFileDialog();
+    if (!filePath) return;
+    await applyOpened(await handleAddOrReplaceMedia(filePath));
+  }, [handleAddOrReplaceMedia, applyOpened]);
+
+  const wrappedRelink = useCallback(async () => {
+    await applyOpened(await handleRelink());
+  }, [handleRelink, applyOpened]);
 
   // 3. Transcription Pipeline
   const pipeline = useTranscriptionPipeline({
@@ -280,7 +309,8 @@ function App() {
     setSubtitles,
     resetSubtitles,
     addVersion,
-    addToRecents,
+    projectDir: currentProject?.dir ?? null,
+    onProjectTouched: refreshProjects,
     setShowGenerator
   });
   const {
@@ -308,22 +338,86 @@ function App() {
     isPausing,
   } = pipeline;
 
-  // Auto-select Subtitle Format + Render Resolution based on video aspect ratio when a file is loaded.
-  // Uses functional setSettings to avoid reading stale 'settings' from the closure
-  // (loadSettings is async and may not have committed yet when mediaFile first changes).
+  // Render output stays on the source frame unless the user picks another size.
   useEffect(() => {
-    if (!mediaFile?.isVideo || !mediaFile.width || !mediaFile.height) return;
-    const ratio = mediaFile.width / mediaFile.height;
-    const inferred: 'wide' | 'square' | 'vertical' =
-      ratio >= 1.5 ? 'wide' : ratio >= 0.75 ? 'square' : 'vertical';
-    setSettings(prev => {
-      const updated = { ...prev, screenSize: inferred };
-      window.electronAPI?.setStoreValue('settings', updated).catch(() => {});
-      return updated;
-    });
-    setRenderResolution(inferred);
+    if (!mediaFile) return;
+    setRenderResolution('original');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFile]);
+  }, [mediaFile?.path]);
+
+  useEffect(() => {
+    if (!currentProject?.dir) return;
+    bindSessionLog({
+      projectDir: currentProject.dir,
+      sourcePath: mediaFile?.path,
+      name: currentProject.name,
+      media: mediaFile && {
+        path: mediaFile.path,
+        name: mediaFile.name,
+        ext: mediaFile.ext,
+        size: mediaFile.size,
+        duration: mediaFile.duration,
+        isVideo: mediaFile.isVideo,
+        width: mediaFile.width,
+        height: mediaFile.height,
+      },
+      settings: settingsSnapshot(settings),
+    });
+    logSession('project.opened', { dir: currentProject.dir, name: currentProject.name, media: mediaFile?.path });
+  // Snapshot settings at open; a later settings.saved event covers changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject?.dir, currentProject?.name, mediaFile?.path]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      logSession('ui.click', describeClickTarget(e.target));
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target?.isContentEditable;
+      if (typing && !e.metaKey && !e.ctrlKey && e.key !== 'Enter' && e.key !== 'Escape') return;
+      logSession('ui.keydown', {
+        key: e.key,
+        meta: e.metaKey,
+        ctrl: e.ctrlKey,
+        alt: e.altKey,
+        shift: e.shiftKey,
+        target: describeClickTarget(e.target),
+      });
+    };
+    const onError = (e: ErrorEvent) => {
+      logSession('ui.error', { message: e.message, filename: e.filename, line: e.lineno, col: e.colno }, 'error');
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason instanceof Error
+        ? { message: e.reason.message, stack: e.reason.stack }
+        : { message: String(e.reason) };
+      logSession('ui.unhandledRejection', reason, 'error');
+    };
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (processing.status === 'idle') return;
+    logSession('pipeline.status', {
+      status: processing.status,
+      progress: processing.progress,
+      currentChunk: processing.currentChunk,
+      totalChunks: processing.totalChunks,
+      error: processing.error,
+    }, processing.status === 'error' ? 'error' : 'info');
+  }, [processing.status]);
 
   // Global Editor/Player handlers
   const handleSeek = useCallback((time: number) => {
@@ -389,18 +483,18 @@ function App() {
   }, [subtitles, currentTime, setSubtitles]);
 
   const handleSelectRecent = useCallback(() => {
-    if (mediaFile || highlightedRecentIndex === null || !recentFiles[highlightedRecentIndex]) return;
-    wrappedLoadRecent(recentFiles[highlightedRecentIndex]);
-  }, [mediaFile, highlightedRecentIndex, recentFiles, wrappedLoadRecent]);
+    if (currentProject || highlightedRecentIndex === null || !latestProjects[highlightedRecentIndex]) return;
+    wrappedLoadRecent(latestProjects[highlightedRecentIndex]);
+  }, [currentProject, highlightedRecentIndex, latestProjects, wrappedLoadRecent]);
 
   const handleOpenFileShortcut = useCallback(async () => {
-    if (mediaFile) return;
+    if (currentProject) return;
     if (!window.electronAPI) return;
     const filePath = await window.electronAPI.openFileDialog();
     if (filePath) {
       wrappedProcessFile(filePath);
     }
-  }, [mediaFile, wrappedProcessFile]);
+  }, [currentProject, wrappedProcessFile]);
 
   const handleSubtitleLineChange = useCallback((id: string, text: string) => {
     setSubtitles(subtitles.map(s => s.id === id ? { ...s, text } : s));
@@ -470,7 +564,14 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-left">
-          {mediaFile && (
+          <div className="header-brand">
+            <img src={logoWhite} alt="" className="header-brand-logo" />
+            <span className="header-brand-name">SUBLIBR</span>
+          </div>
+        </div>
+
+        <div className="header-right">
+          {currentProject && (
             <button
               className="btn-icon"
               onClick={() => {
@@ -483,19 +584,16 @@ function App() {
                 setCurrentTime(0);
                 setProcessing({ status: 'idle', progress: 0 });
               }}
-              title="Back to Home"
-              aria-label="Back to Home"
+              title="Back to home"
+              aria-label="Back to home"
             >
               <span className="icon">home</span>
             </button>
           )}
-        </div>
-
-        <div className="header-right">
-          <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts" aria-label="Keyboard Shortcuts">
+          <button className="btn-icon" onClick={() => setShowShortcuts(true)} title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
             <span className="icon">keyboard</span>
           </button>
-          <button className="btn-icon" onClick={() => setShowAbout(true)} title="About SUBLIBR" aria-label="About SUBLIBR">
+          <button className="btn-icon" onClick={() => setShowAbout(true)} title="About Sublibr" aria-label="About Sublibr">
             <span className="icon">info</span>
           </button>
           <button className="btn-icon" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
@@ -507,28 +605,63 @@ function App() {
       <UpdateNotification />
 
       <main className="app-main">
-        {!mediaFile ? (
+        {!currentProject ? (
           <FileUpload
-            settings={settings}
-            onFileSelect={wrappedFileSelect}
-            recentFiles={recentFiles}
-            onLoadRecent={wrappedLoadRecent}
-            onClearRecents={handleClearRecents}
+            latestProjects={latestProjects}
+            onLoadProject={wrappedLoadRecent}
             highlightedRecentIndex={highlightedRecentIndex}
             onProcessFile={wrappedProcessFile}
+            onStartFromScratch={wrappedStartFromScratch}
+            onLoadExisting={wrappedLoadExisting}
+            onRequestDelete={requestDelete}
+            onDuplicateProject={handleDuplicate}
+            onRenameProject={requestRename}
             isAnalyzing={isAnalyzing}
+            analyzingMessage={analyzingMessage}
             error={processingError}
           />
         ) : (
           <div className="editor-container">
             <div className="editor-sidebar">
-              <div className="sidebar-brand-row">
-                <div className="sidebar-brand">
-                  <img src={logoWhite} alt="SUBLIBR Logo" style={{ height: '16px' }} />
-                  <span className="sidebar-brand-name">SUBLIBR</span>
+              {!showStylePanel && !showTranslator && (
+              <div className="project-media-card">
+                <div className="project-media-meta">
+                  <span className="icon icon-sm">folder</span>
+                  <button
+                    type="button"
+                    className="project-title-btn"
+                    title="Rename project"
+                    onClick={() => currentProject && requestRename(currentProject)}
+                  >
+                    <span className="project-media-name">{currentProject?.name}</span>
+                    <span className="icon icon-sm">edit</span>
+                  </button>
                 </div>
+                {mediaFile ? (
+                  <div className="project-media-file" title={mediaFile.path}>
+                    <span className="icon icon-sm">{mediaFile.isVideo ? 'movie' : 'audio_file'}</span>
+                    <span>{mediaFile.name}</span>
+                    <button
+                      type="button"
+                      className="project-file-action"
+                      title="Replace media"
+                      aria-label="Replace media"
+                      onClick={wrappedAddMedia}
+                    >
+                      <span className="icon icon-sm">swap_horiz</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="sidebar-hint">Add video or audio to generate or preview subtitles.</p>
+                    <button className="btn-primary sidebar-action-btn" onClick={wrappedAddMedia}>
+                      <span className="icon icon-sm">upload</span>
+                      Add video or audio
+                    </button>
+                  </>
+                )}
               </div>
-
+              )}
               {!isProcessing && (showGenerator || subtitles.length === 0) && !showTranslator && (
                 <div className="sidebar-section">
                   {versions.length > 0 && (
@@ -537,33 +670,13 @@ function App() {
                       onClick={() => setShowGenerator(false)}
                     >
                       <span className="icon icon-sm">chevron_left</span>
-                      Cancel
+                      Back
                     </button>
                   )}
 
-                  <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
-                    <label className="sidebar-label">Subtitle Format</label>
-                    <CustomSelect
-                      options={[
-                        { value: 'wide', label: 'Wide-screen (16:9)' },
-                        { value: 'square', label: 'Square (1:1)' },
-                        { value: 'vertical', label: 'Vertical (9:16)' },
-                      ]}
-                      value={settings.screenSize}
-                      onChange={(value) => {
-                        const updated = { ...settings, screenSize: value as ScreenSize };
-                        setSettings(updated);
-                        if (window.electronAPI) {
-                          window.electronAPI.setStoreValue('settings', updated);
-                        }
-                      }}
-                    />
-                    <p className="sidebar-hint" style={{ marginTop: '0.25rem' }}>
-                      {settings.screenSize === 'wide' && 'Max 40 chars per line, up to 2 lines'}
-                      {settings.screenSize === 'square' && 'Max 25 chars per line, up to 2 lines'}
-                      {settings.screenSize === 'vertical' && 'Max 15 chars per line, up to 2 lines'}
-                    </p>
-                  </div>
+                  <p className="sidebar-hint" style={{ marginBottom: '1rem', marginTop: '1rem' }}>
+                    Subtitles stay at most two lines. Pick a frame size later under Render resolution.
+                  </p>
 
                   <LanguageSelector
                     language={settings.language}
@@ -581,15 +694,25 @@ function App() {
                     className="btn-primary sidebar-action-btn"
                     onClick={handleGenerate}
                     disabled={!canGenerate}
+                    title={!mediaFile
+                      ? 'Add video or audio first'
+                      : !isTranscriptionReady(settings.activeProvider, activeConfig)
+                        ? 'Set up transcription in Settings'
+                        : undefined}
                   >
                     <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'auto_awesome'}</span>
-                    {settings.activeProvider === 'local' ? 'Generate locally' : 'Generate Subtitles'}
+                    Generate subtitles
                   </button>
-                  {settings.activeProvider === 'local' && (
+                  {!canGenerate && (
                     <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
-                      {settings.language === 'Hebrew'
-                        ? 'Hebrew Whisper weights run on this computer. Audio is not uploaded.'
-                        : 'Whisper Large v3 Turbo runs on this computer. Audio is not uploaded.'}
+                      {!mediaFile
+                        ? 'Add video or audio first.'
+                        : 'Set up transcription in Settings.'}
+                    </p>
+                  )}
+                  {canGenerate && settings.activeProvider === 'local' && (
+                    <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
+                      Audio stays on this computer.
                     </p>
                   )}
 
@@ -601,10 +724,10 @@ function App() {
                     className="btn-secondary sidebar-action-btn"
                     onClick={handleLoadSubtitles}
                   >
-                    <span className="icon icon-sm">upload_file</span> Import Subtitles
+                    <span className="icon icon-sm">upload_file</span> Import subtitles
                   </button>
                   <p className="sidebar-hint">
-                    Supported formats: .srt, .vtt, .ass
+                    SRT, VTT, or ASS
                   </p>
                 </div>
               )}
@@ -618,7 +741,9 @@ function App() {
                     if (window.electronAPI) window.electronAPI.setStoreValue('settings', updated);
                   }}
                   onBack={() => setShowStylePanel(false)}
-                  screenSize={settings.screenSize}
+                  screenSize={renderResolution}
+                  mediaWidth={mediaFile?.width}
+                  mediaHeight={mediaFile?.height}
                 />
               )}
 
@@ -629,7 +754,7 @@ function App() {
                     onClick={() => setShowTranslator(false)}
                   >
                     <span className="icon icon-sm">chevron_left</span>
-                    Cancel
+                    Back
                   </button>
 
                   <LanguageSelector
@@ -643,8 +768,11 @@ function App() {
                     className="btn-primary sidebar-action-btn"
                     onClick={handleTranslate}
                   >
-                    <span className="icon icon-sm">translate</span> Start Translation
+                    <span className="icon icon-sm">translate</span> Translate
                   </button>
+                  <p className="sidebar-hint" style={{ marginTop: '0.4rem' }}>
+                    Saves a new version. The original is kept.
+                  </p>
                 </div>
               )}
 
@@ -669,6 +797,7 @@ function App() {
                     className="btn-secondary sidebar-action-btn"
                     onClick={() => setShowTranslator(true)}
                     style={{ marginBottom: '0.5rem', width: '100%' }}
+                    title="Create a translated copy as a new version"
                   >
                     <span className="icon icon-sm">translate</span> Translate
                   </button>
@@ -676,22 +805,31 @@ function App() {
                     className="btn-secondary sidebar-action-btn"
                     onClick={handleRegenerate}
                     style={{ marginBottom: '0.5rem', width: '100%' }}
+                    title="Transcribe again and keep this version"
                   >
                     <span className="icon icon-sm">refresh</span> Regenerate
                   </button>
                   <button
                     className="btn-secondary sidebar-action-btn"
                     onClick={() => setShowStylePanel(true)}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', marginBottom: '0.5rem' }}
                   >
-                    <span className="icon icon-sm">palette</span> Global Style
+                    <span className="icon icon-sm">palette</span> Style
+                  </button>
+                  <button
+                    className="btn-secondary sidebar-action-btn"
+                    onClick={() => setSubtitles(reflowSubtitles(subtitles, renderResolution, mediaFile?.width, mediaFile?.height))}
+                    style={{ width: '100%' }}
+                    title="Rewrap lines for the current frame size"
+                  >
+                    <span className="icon icon-sm">wrap_text</span> Reformat lines
                   </button>
                   <p className="sidebar-hint" style={{ marginTop: '0.4rem', marginBottom: '1.25rem' }}>
-                    Switch to the Preview tab to see style changes live.
+                    Shorter lines on 9:16, longer on 16:9. Changing resolution does this automatically.
                   </p>
 
                   <div className="sidebar-divider"></div>
-                  <label className="sidebar-label">Export Format</label>
+                  <label className="sidebar-label">Export</label>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                     <CustomSelect
                       options={[
@@ -713,26 +851,28 @@ function App() {
                   </div>
                   {mediaFile && ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts', '.mts', '.m2ts'].includes(mediaFile.ext) && (
                     <div style={{ marginTop: '1rem' }}>
-                      <label className="sidebar-label">Render Resolution</label>
-                      <CustomSelect
-                        options={[
-                          { value: 'wide', label: 'Wide-screen (16:9) — 1920×1080' },
-                          { value: 'square', label: 'Square (1:1) — 1080×1080' },
-                          { value: 'vertical', label: 'Vertical (9:16) — 1080×1920' },
-                          ...(mediaFile.width && mediaFile.height
-                            ? [{ value: 'original', label: `Original — ${mediaFile.width}×${mediaFile.height}` }]
-                            : [{ value: 'original', label: 'Original — source size' }])
-                        ]}
+                      <label className="sidebar-label">Render resolution</label>
+                      <ResolutionPicker
                         value={renderResolution}
-                        onChange={(v) => setRenderResolution(v as ScreenSize)}
+                        mediaWidth={mediaFile.width}
+                        mediaHeight={mediaFile.height}
+                        onChange={(next) => {
+                          setRenderResolution(next);
+                          if (subtitles.length > 0) {
+                            setSubtitles(reflowSubtitles(subtitles, next, mediaFile.width, mediaFile.height));
+                          }
+                        }}
                       />
+                      <p className="sidebar-hint" style={{ marginTop: '0.25rem' }}>
+                        Preview, wrapping, and rendered video use this frame.
+                      </p>
                       <button
                         className="btn-secondary sidebar-action-btn"
                         onClick={handleRenderVideo}
                         style={{ marginTop: '0.5rem', width: '100%' }}
-                        title="Burn subtitles into the video using FFmpeg"
+                        title="Create a new video with subtitles burned in"
                       >
-                        <span className="icon icon-sm">movie</span> Render Video
+                        <span className="icon icon-sm">movie</span> Render video
                       </button>
                     </div>
                   )}
@@ -741,8 +881,12 @@ function App() {
 
               <ProgressIndicator
                 state={processing}
-                providerLabel={PROVIDER_LABELS[settings.activeProvider]}
-                isLocal={settings.activeProvider === 'local'}
+                providerLabel={processing.status === 'translating'
+                  ? PROVIDER_LABELS[settings.translator.provider]
+                  : PROVIDER_LABELS[settings.activeProvider]}
+                isLocal={processing.status === 'translating'
+                  ? settings.translator.provider === 'local'
+                  : settings.activeProvider === 'local'}
                 onRetry={handleGenerate}
                 onDismiss={() => setProcessing({ status: 'idle', progress: 0 })}
                 onPause={handlePause}
@@ -783,7 +927,7 @@ function App() {
                   canRedo={canRedo}
                 />
               ) : (
-                mediaFile && (
+                mediaFile ? (
                   <SubtitlePreview
                     subtitles={subtitles}
                     currentTime={currentTime}
@@ -796,6 +940,12 @@ function App() {
                     canUndo={canUndo}
                     canRedo={canRedo}
                   />
+                ) : (
+                  <div className="preview-empty-media">
+                    <span className="icon icon-lg">movie</span>
+                    <p>Add video or audio to preview subtitles.</p>
+                    <button className="btn-primary" onClick={wrappedAddMedia}>Add video or audio</button>
+                  </div>
                 )
               )}
             </div>
@@ -838,14 +988,14 @@ function App() {
                   <button
                     className={`active-model-badge${settings.activeProvider === 'local' ? ' is-local' : ' is-cloud'}`}
                     onClick={() => setShowSettings(true)}
-                    title="Click to change model"
+                    title="Change transcription model"
                   >
                     <span className="icon icon-sm">{settings.activeProvider === 'local' ? 'computer' : 'cloud'}</span>
                     <span className={`run-location-chip ${settings.activeProvider === 'local' ? 'is-offline' : 'is-cloud'}`}>
                       {settings.activeProvider === 'local' ? 'Offline' : 'Online'}
                     </span>
                     <span className="active-model-label">
-                      {settings.activeProvider === 'local' ? 'Transcription:' : 'Online transcription:'}
+                      Transcription
                     </span>
                     {settings.activeProvider !== 'local' && (
                       <span>{PROVIDER_LABELS[settings.activeProvider]}</span>
@@ -861,21 +1011,21 @@ function App() {
                   <button
                     className={`btn-tool ${activeTool === 'select' ? 'active' : ''}`}
                     onClick={() => setActiveTool('select')}
-                    title="Select Tool (V)"
+                    title="Select (V)"
                   >
                     <span className="icon">near_me</span>
                   </button>
                   <button
                     className={`btn-tool ${activeTool === 'scissors' ? 'active' : ''}`}
                     onClick={() => setActiveTool('scissors')}
-                    title="Scissors Tool (C)"
+                    title="Split (C)"
                   >
                     <span className="icon">content_cut</span>
                   </button>
                   <button
                     className={`btn-tool ${activeTool === 'trim' ? 'active' : ''}`}
                     onClick={() => setActiveTool('trim')}
-                    title="Trim Tool (T)"
+                    title="Trim (T)"
                   >
                     <span className="icon">straighten</span>
                   </button>
@@ -912,7 +1062,7 @@ function App() {
         showShortcuts && (
           <ShortcutsModal
             onClose={() => setShowShortcuts(false)}
-            view={mediaFile ? 'editor' : 'homepage'}
+            view={currentProject ? 'editor' : 'homepage'}
           />
         )
       }
@@ -925,7 +1075,91 @@ function App() {
           />
         )
       }
+
+      {pendingMissing && currentProject && (
+        <div className="project-dialog-backdrop" role="dialog" aria-labelledby="missing-media-title">
+          <div className="project-dialog">
+            <h3 id="missing-media-title">Media is missing</h3>
+            <p>
+              This project needs <strong>{pendingMissing.name}</strong>. Choose the file on this computer — Sublibr will copy it into the project.
+            </p>
+            <div className="project-dialog-actions">
+              <button className="btn-primary" onClick={wrappedRelink}>Locate file</button>
+              <button className="btn-secondary" onClick={dismissMissing}>Continue without media</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteCandidate && (
+        <div className="project-dialog-backdrop" role="dialog" aria-labelledby="delete-project-title">
+          <div className="project-dialog">
+            <h3 id="delete-project-title">
+              {deleteStep === 1 ? 'Delete this project?' : 'Delete permanently?'}
+            </h3>
+            <p>
+              {deleteStep === 1
+                ? `“${deleteCandidate.name}” will be removed from your projects folder.`
+                : 'This cannot be undone. The project folder and copied media will be deleted.'}
+            </p>
+            <div className="project-dialog-actions">
+              <button className="btn-danger" onClick={confirmDelete}>
+                {deleteStep === 1 ? 'Delete' : 'Delete permanently'}
+              </button>
+              <button className="btn-secondary" onClick={cancelDelete}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renameTarget && (
+        <RenameProjectDialog
+          initialName={renameTarget.name}
+          onCancel={cancelRename}
+          onSubmit={submitRename}
+        />
+      )}
     </div >
+  );
+}
+
+function RenameProjectDialog({
+  initialName,
+  onCancel,
+  onSubmit,
+}: {
+  initialName: string;
+  onCancel: () => void;
+  onSubmit: (name: string) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  return (
+    <div className="project-dialog-backdrop" role="dialog" aria-labelledby="rename-project-title">
+      <form
+        className="project-dialog"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) onSubmit(name);
+        }}
+      >
+        <h3 id="rename-project-title">Rename project</h3>
+        <label className="sidebar-hint" htmlFor="rename-project-input" style={{ display: 'block', marginBottom: 8 }}>
+          Name
+        </label>
+        <input
+          id="rename-project-input"
+          className="project-rename-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          maxLength={80}
+        />
+        <div className="project-dialog-actions">
+          <button type="submit" className="btn-primary" disabled={!name.trim()}>Rename</button>
+          <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

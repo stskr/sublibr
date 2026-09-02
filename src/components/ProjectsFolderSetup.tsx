@@ -67,12 +67,11 @@ export function ProjectsFolderSetup({ suggestedFolder, onConfirm }: ProjectsFold
                 tabIndex={-1}
             >
                 <div className="settings-header">
-                    <h2 id="setup-title">Projects folder</h2>
+                    <h2 id="setup-title">Choose a projects folder</h2>
                 </div>
                 <div className="settings-content">
                     <p className="settings-tab-intro">
-                        Sublibr stores each media file in its own folder. API keys are never saved here.
-                        You can change this later in Settings.
+                        Each project lives here as its own folder, with media copied in so you can open it on another computer. API keys are never saved here. You can change this later in Settings.
                     </p>
                     <div className="projects-folder-row">
                         <code className="projects-folder-path" title={displayPath}>

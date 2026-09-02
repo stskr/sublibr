@@ -5,11 +5,13 @@ interface RichTextEditorProps {
     value: string;
     onChange: (value: string) => void;
     onBlur?: (e: React.FocusEvent) => void;
+    onFocus?: (e: React.FocusEvent) => void;
     onStatusChange?: (status: { bold: boolean; italic: boolean; underline: boolean; color: string; size: string }) => void;
     placeholder?: string;
     className?: string;
     autoFocus?: boolean;
     onKeyDown?: (e: React.KeyboardEvent) => void;
+    onMouseDown?: (e: React.MouseEvent) => void;
 }
 
 export interface RichTextEditorRef {
@@ -96,11 +98,13 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     value,
     onChange,
     onBlur,
+    onFocus,
     onStatusChange,
     placeholder,
     className,
     autoFocus,
-    onKeyDown
+    onKeyDown,
+    onMouseDown,
 }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const lastValueRef = useRef<string | null>(null);
@@ -215,13 +219,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             contentEditable
             className={`rich-text-editor ${className || ''}`}
             onInput={handleInput}
+            onFocus={onFocus}
             onBlur={onBlur}
             onKeyDown={handleKeyDown}
             onMouseUp={handleMouseUp}
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                onMouseDown?.(e);
+            }}
+            onClick={(e) => e.stopPropagation()}
             dir={direction}
             style={{
                 direction: direction as "ltr" | "rtl" | undefined,
-                minHeight: '1em',
+                unicodeBidi: 'isolate',
                 outline: 'none',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',

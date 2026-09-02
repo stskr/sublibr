@@ -1,6 +1,6 @@
 import { Fragment, useState, useCallback, useRef, useEffect } from 'react';
+import type { FocusEvent } from 'react';
 import { formatSrtTime, parseSrtTime, generateId, detectDirection } from '../utils';
-import { StyledText } from './common/StyledText';
 import { RichTextEditor } from './common/RichTextEditor';
 import { EditorHeader } from './common/EditorHeader';
 import type { RichTextEditorRef } from './common/RichTextEditor';
@@ -21,12 +21,16 @@ function TimeInput({
     min = 0,
     max,
     ariaLabel,
+    onFocusField,
+    onBlurField,
 }: {
     seconds: number;
     onCommit: (seconds: number) => void;
     min?: number;
     max?: number;
     ariaLabel: string;
+    onFocusField?: () => void;
+    onBlurField?: (e: FocusEvent<HTMLInputElement>) => void;
 }) {
     const [text, setText] = useState(formatSrtTime(seconds));
     const focusedRef = useRef(false);
@@ -57,11 +61,16 @@ function TimeInput({
             aria-label={ariaLabel}
             title="↑↓ or ←→ to nudge 100ms · Shift for 1s"
             onClick={(e) => e.stopPropagation()}
-            onFocus={() => { focusedRef.current = true; }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onFocus={() => {
+                focusedRef.current = true;
+                onFocusField?.();
+            }}
             onChange={(e) => setText(e.target.value)}
-            onBlur={() => {
+            onBlur={(e) => {
                 focusedRef.current = false;
                 commit(parseSrtTime(text));
+                onBlurField?.(e);
             }}
             onKeyDown={(e) => {
                 const step = e.shiftKey ? TIME_NUDGE_SHIFT_SEC : TIME_NUDGE_SEC;
@@ -97,21 +106,48 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
     const [autoScroll, setAutoScroll] = useState(true);
     const activeRef = useRef<HTMLDivElement | null>(null);
     const editorRefs = useRef<{ [key: string]: RichTextEditorRef | null }>({});
+    const pendingFocusId = useRef<string | null>(null);
     const [activeStyles, setActiveStyles] = useState({ bold: false, italic: false, underline: false, size: '' });
 
-    // Search State
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [replaceQuery, setReplaceQuery] = useState('');
-    const [matches, setMatches] = useState<string[]>([]); // Array of subtitle IDs
+    const [matches, setMatches] = useState<string[]>([]);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    const beginEdit = useCallback((id: string) => {
+        setEditingId(id);
+    }, []);
+
+    const endEditIfLeft = useCallback((id: string, relatedTarget: EventTarget | null) => {
+        const next = relatedTarget as HTMLElement | null;
+        if (next?.closest('.subtitle-list, .editor-styling-toolbar')) return;
+        requestAnimationFrame(() => {
+            const active = document.activeElement as HTMLElement | null;
+            if (active?.closest('.subtitle-list, .editor-styling-toolbar')) return;
+            setEditingId(current => (current === id ? null : current));
+        });
+    }, []);
+
+    const editingIdRef = useRef(editingId);
+    editingIdRef.current = editingId;
+
+    // Follow the playhead only while the user isn't editing.
+    // Do not re-run when editingId changes: blur used to scroll the playhead
+    // line back under the cursor and steal the next field's click.
     useEffect(() => {
-        if (autoScroll && activeRef.current && !editingId) {
-            activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }, [autoScroll, currentTime, editingId]);
+        if (!autoScroll || editingIdRef.current) return;
+        const activeEl = document.activeElement as HTMLElement | null;
+        if (activeEl?.closest('.subtitle-list')) return;
+        activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, [autoScroll, currentTime]);
+
+    useEffect(() => {
+        if (!editingId || pendingFocusId.current !== editingId) return;
+        pendingFocusId.current = null;
+        editorRefs.current[editingId]?.focus();
+    }, [editingId]);
 
     // Focus search input when shown
     useEffect(() => {
@@ -301,6 +337,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
             text: '',
         };
         onSubtitlesChange([...subtitles, newSub]);
+        pendingFocusId.current = newSub.id;
         setEditingId(newSub.id);
     }, [subtitles, onSubtitlesChange]);
 
@@ -324,6 +361,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
             ...subtitles.slice(afterIndex + 1),
         ].map((s, i) => ({ ...s, index: i + 1 }));
         onSubtitlesChange(nextList);
+        pendingFocusId.current = newSub.id;
         setEditingId(newSub.id);
     }, [subtitles, onSubtitlesChange]);
 
@@ -428,7 +466,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                             <input
                                 ref={searchInputRef}
                                 type="text"
-                                placeholder="Find..."
+                                placeholder="Find"
                                 value={searchQuery}
                                 onChange={(e) => performSearch(e.target.value)}
                                 onKeyDown={(e) => {
@@ -444,11 +482,14 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                     {currentMatchIndex + 1} of {matches.length}
                                 </span>
                             )}
+                            {searchQuery && matches.length === 0 && (
+                                <span className="search-counter">No matches</span>
+                            )}
                             <div className="search-nav">
-                                <button className="btn-icon-tiny" onClick={handlePrevMatch} title="Previous Match" disabled={matches.length === 0}>
+                                <button className="btn-icon-tiny" onClick={handlePrevMatch} title="Previous match" disabled={matches.length === 0}>
                                     <span className="icon icon-sm">expand_less</span>
                                 </button>
-                                <button className="btn-icon-tiny" onClick={handleNextMatch} title="Next Match" disabled={matches.length === 0}>
+                                <button className="btn-icon-tiny" onClick={handleNextMatch} title="Next match" disabled={matches.length === 0}>
                                     <span className="icon icon-sm">expand_more</span>
                                 </button>
                             </div>
@@ -457,7 +498,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                             <span className="icon icon-sm search-icon">edit</span>
                             <input
                                 type="text"
-                                placeholder="Replace with..."
+                                placeholder="Replace with"
                                 value={replaceQuery}
                                 onChange={(e) => setReplaceQuery(e.target.value)}
                                 onKeyDown={(e) => {
@@ -468,8 +509,8 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                     </div>
                     <div className="search-actions">
                         <button className="btn-small" onClick={handleReplace} disabled={matches.length === 0}>Replace</button>
-                        <button className="btn-small" onClick={handleReplaceAll} disabled={matches.length === 0}>Replace All</button>
-                        <button className="btn-icon-tiny close-search" onClick={() => setShowSearch(false)}>
+                        <button className="btn-small" onClick={handleReplaceAll} disabled={matches.length === 0}>Replace all</button>
+                        <button className="btn-icon-tiny close-search" onClick={() => setShowSearch(false)} aria-label="Close search">
                             <span className="icon icon-sm">close</span>
                         </button>
                     </div>
@@ -479,7 +520,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
             {subtitles.length === 0 ? (
                 <div className="empty-state">
                     <p>No subtitles yet</p>
-                    <p className="hint">To get started, click "Generate Subtitles" or Import Subtitles</p>
+                    <p className="hint">Generate them in the sidebar, or import a file.</p>
                 </div>
             ) : (
                 <div className="subtitle-list" role="list">
@@ -498,8 +539,14 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                             <Fragment key={sub.id}>
                             <div
                                 ref={isActive(sub) ? activeRef : null}
-                                className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${editingId === sub.id ? 'editing' : ''} ${isBeyondMedia ? 'beyond-media' : ''} ${isCurrentMatch ? 'search-match' : ''}`}
-                                onClick={() => onSeek(sub.startTime)}
+                                className={`subtitle-entry ${isActive(sub) ? 'active' : ''} ${isBeyondMedia ? 'beyond-media' : ''} ${isCurrentMatch ? 'search-match' : ''}`}
+                                onClick={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (target.closest('.subtitle-text, .time-input, .delete-btn, .subtitle-times, .rich-text-editor, .subtitle-text-display')) {
+                                        return;
+                                    }
+                                    onSeek(sub.startTime);
+                                }}
                                 title={isBeyondMedia ? "This subtitle starts after the media ends" : ""}
                             >
                                 <div className="subtitle-index">{sub.index}</div>
@@ -511,6 +558,8 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         min={0}
                                         max={roundMs(sub.endTime - 0.05)}
                                         ariaLabel={`Subtitle ${sub.index} start time`}
+                                        onFocusField={() => beginEdit(sub.id)}
+                                        onBlurField={(e) => endEditIfLeft(sub.id, e.relatedTarget)}
                                     />
                                     <span className="time-separator">→</span>
                                     <TimeInput
@@ -519,6 +568,8 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         min={roundMs(sub.startTime + 0.05)}
                                         max={mediaDuration}
                                         ariaLabel={`Subtitle ${sub.index} end time`}
+                                        onFocusField={() => beginEdit(sub.id)}
+                                        onBlurField={(e) => endEditIfLeft(sub.id, e.relatedTarget)}
                                     />
                                 </div>
 
@@ -528,21 +579,11 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         dir={detectDirection(sub.text)}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setEditingId(sub.id);
+                                            pendingFocusId.current = sub.id;
+                                            beginEdit(sub.id);
                                         }}
                                     >
                                         {highlightText(sub.text, searchQuery)}
-                                    </div>
-                                ) : editingId !== sub.id ? (
-                                    <div
-                                        className="subtitle-text-display styled-preview"
-                                        dir={detectDirection(sub.text)}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditingId(sub.id);
-                                        }}
-                                    >
-                                        <StyledText text={sub.text} />
                                     </div>
                                 ) : (
                                     <RichTextEditor
@@ -550,15 +591,16 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                                         className="subtitle-text"
                                         value={sub.text}
                                         onChange={(text) => handleTextChange(sub.id, text)}
+                                        onMouseDown={() => beginEdit(sub.id)}
+                                        onFocus={() => beginEdit(sub.id)}
                                         onBlur={(e) => {
-                                            if (e.relatedTarget && (e.relatedTarget as HTMLElement).closest('.editor-styling-toolbar')) {
+                                            if ((e.relatedTarget as HTMLElement | null)?.closest('.editor-styling-toolbar')) {
                                                 return;
                                             }
-                                            setEditingId(null);
+                                            endEditIfLeft(sub.id, e.relatedTarget);
                                         }}
                                         onStatusChange={setActiveStyles}
-                                        placeholder="Enter subtitle text..."
-                                        autoFocus={editingId === sub.id}
+                                        placeholder="Subtitle text"
                                     />
                                 )}
 
@@ -612,7 +654,7 @@ export function SubtitleEditor({ subtitles, onSubtitlesChange, currentTime, medi
                     })}
 
                     <button className="add-subtitle-btn" onClick={handleAdd}>
-                        <span className="icon icon-sm">add</span> Add New Line
+                        <span className="icon icon-sm">add</span> Add subtitle
                     </button>
                 </div>
             )}
