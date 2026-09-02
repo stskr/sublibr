@@ -388,7 +388,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-const WORK_FILE_RE = /^(chunk_\d+\.(flac|mp3)|gap_heal_\d+.*\.flac|subtitles_gen_audio_\d+\.(flac|mp3)|sublibr_subs_burn\.(srt|ass)|sublibr-whisper-.*)$/;
+const WORK_FILE_RE = /^(chunk_\d+.*\.(flac|mp3)|gap_heal_\d+.*\.(flac|mp3)|subtitles_gen_audio_\d+\.(flac|mp3)|sublibr_subs_burn\.(srt|ass)|sublibr-whisper-.*)$/;
 
 // Clean up working audio/json created during transcription
 function cleanupTempAudioFiles() {
@@ -1091,7 +1091,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
       case 'gemini': {
         const res = await mainFetch(
           'https://generativelanguage.googleapis.com/v1beta/models',
-          { headers: { 'x-goog-api-key': apiKey } },
+          { headers: { 'x-goog-api-key': apiKey }, timeout: 20_000 },
         );
         if (!res.ok) {
           const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
@@ -1107,6 +1107,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
             'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
           },
+          timeout: 20_000,
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 1,
@@ -1122,6 +1123,7 @@ ipcMain.handle('ai:testApiKey', async (_event, provider: AIProvider, apiKey: str
       case 'openai': {
         const res = await mainFetch('https://api.openai.com/v1/models', {
           headers: { 'Authorization': `Bearer ${apiKey}` },
+          timeout: 20_000,
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({})) as { error?: { message?: string } };

@@ -4,10 +4,15 @@ import { randomBytes } from 'node:crypto';
 
 type HeaderMap = Record<string, string>;
 
+/** Socket inactivity timeout. Transcription APIs can sit silent for minutes after the audio upload. */
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
+
 export type MainFetchInit = {
   method?: string;
   headers?: HeaderMap;
   body?: string | Buffer | Uint8Array;
+  /** Socket inactivity timeout in ms. Defaults to 30 minutes for long transcription calls. */
+  timeout?: number;
 };
 
 export type MainFetchResponse = {
@@ -48,7 +53,7 @@ export function mainFetch(url: string, init: MainFetchInit = {}): Promise<MainFe
         path: `${target.pathname}${target.search}`,
         method,
         headers,
-        timeout: 20_000,
+        timeout: init.timeout ?? DEFAULT_TIMEOUT_MS,
       },
       (res) => {
         const chunks: Buffer[] = [];
