@@ -2,9 +2,12 @@
 
 <img src="src/assets/Logo/logo-black.svg" alt="Sublibr" height="40">
 
+[![Website](https://img.shields.io/badge/website-stskr.github.io%2Fsublibr-0B6E4F?style=flat)](https://stskr.github.io/sublibr/)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 A desktop app that turns video and audio into **timed subtitles**. Transcribe locally or in the cloud, edit on a timeline, style the text, and export files or a burned-in video.
+
+**Website:** [stskr.github.io/sublibr](https://stskr.github.io/sublibr/)
 
 
 ## Screenshots
