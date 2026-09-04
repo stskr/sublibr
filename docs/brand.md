@@ -1,4 +1,4 @@
-# Sublibr brand & marketing design system
+# SubLibr brand & marketing design system
 
 A brief for a GitHub Pages marketing site. Values below are copied from the app’s live tokens in `src/App.css`. Use them as-is; do not invent a second palette.
 
@@ -21,11 +21,11 @@ npm run dev
 
 | Context | Form |
 |---|---|
-| Prose, headings, alt text | **Sublibr** |
+| Prose, headings, alt text | **SubLibr** |
 | Logo / wordmark | Custom geometric caps **SUBLIBR** |
 | Repo / URL | `sublibr` |
 
-Do not write Sub-Libr, Sub Libr, or SUB LIBR. Do not use a different casing in marketing copy than **Sublibr**.
+Do not write Sublibr, Sub-Libr, Sub Libr, or SUB LIBR. Do not use a different casing in marketing copy than **SubLibr**.
 
 Hebrew one-liner (from the README; keep it on the page if space allows):
 

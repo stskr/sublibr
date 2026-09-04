@@ -673,10 +673,6 @@ code {
   margin-block-end: var(--space-md);
 }
 
-.site-footer__brand p + p {
-  margin-block-start: var(--space-sm);
-}
-
 .site-footer__cols {
   display: grid;
   gap: var(--space-xl);
